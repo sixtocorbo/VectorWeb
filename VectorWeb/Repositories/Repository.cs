@@ -15,6 +15,19 @@ namespace VectorWeb.Repositories
             _dbSet = context.Set<T>();
         }
 
+
+        public IQueryable<T> GetQueryable(string includeProperties = "")
+        {
+            IQueryable<T> query = _dbSet;
+
+            foreach (var includeProperty in includeProperties.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                query = query.Include(includeProperty);
+            }
+
+            return query.AsNoTracking();
+        }
+
         public async Task<IEnumerable<T>> GetAllAsync()
         {
             return await _dbSet.ToListAsync();

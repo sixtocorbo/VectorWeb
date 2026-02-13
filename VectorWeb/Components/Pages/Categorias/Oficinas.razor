@@ -1,0 +1,61 @@
+@page "/configuracion/oficinas"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<CatOficina> RepoOficina
+@rendermode InteractiveServer
+
+<h3>Gestión de Oficinas</h3>
+
+<div class="row mb-3">
+    <div class="col">
+        <input type="text" class="form-control" placeholder="Nombre de nueva oficina..." @bind="nuevaOficinaNombre" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-success" @onclick="AgregarOficina">Agregar</button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var oficina in listaOficinas)
+        {
+            <tr>
+                <td>@oficina.Nombre</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(oficina.IdOficina)">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IEnumerable<CatOficina> listaOficinas = new List<CatOficina>();
+    private string nuevaOficinaNombre = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar() => listaOficinas = await RepoOficina.GetAllAsync();
+
+    private async Task AgregarOficina()
+    {
+        if (!string.IsNullOrWhiteSpace(nuevaOficinaNombre))
+        {
+            await RepoOficina.AddAsync(new CatOficina { Nombre = nuevaOficinaNombre.Trim() });
+            nuevaOficinaNombre = string.Empty;
+            await Cargar();
+        }
+    }
+
+    private async Task Eliminar(int id)
+    {
+        await RepoOficina.DeleteAsync(id);
+        await Cargar();
+    }
+}

@@ -1,0 +1,72 @@
+@page "/configuracion/tipos-documento"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<CatTipoDocumento> RepoTipo
+@rendermode InteractiveServer
+
+<h3>Gestión de Tipos de Documento</h3>
+
+<div class="row mb-3">
+    <div class="col-md-5">
+        <input type="text" class="form-control" placeholder="Nombre del tipo..." @bind="nuevoNombre" />
+    </div>
+    <div class="col-md-3">
+        <input type="text" class="form-control" placeholder="Código" @bind="nuevoCodigo" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-success" @onclick="Agregar">Agregar</button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Código</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var tipo in listaTipos)
+        {
+            <tr>
+                <td>@tipo.Nombre</td>
+                <td>@tipo.Codigo</td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(tipo.IdTipo)">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IEnumerable<CatTipoDocumento> listaTipos = new List<CatTipoDocumento>();
+    private string nuevoNombre = string.Empty;
+    private string nuevoCodigo = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar() => listaTipos = await RepoTipo.GetAllAsync();
+
+    private async Task Agregar()
+    {
+        if (!string.IsNullOrWhiteSpace(nuevoNombre) && !string.IsNullOrWhiteSpace(nuevoCodigo))
+        {
+            await RepoTipo.AddAsync(new CatTipoDocumento
+            {
+                Nombre = nuevoNombre.Trim(),
+                Codigo = nuevoCodigo.Trim()
+            });
+            nuevoNombre = string.Empty;
+            nuevoCodigo = string.Empty;
+            await Cargar();
+        }
+    }
+
+    private async Task Eliminar(int id)
+    {
+        await RepoTipo.DeleteAsync(id);
+        await Cargar();
+    }
+}

@@ -1,0 +1,72 @@
+@page "/configuracion/estados"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<CatEstado> RepoEstado
+@rendermode InteractiveServer
+
+<h3>Gestión de Estados</h3>
+
+<div class="row mb-3">
+    <div class="col-md-5">
+        <input type="text" class="form-control" placeholder="Nombre del estado..." @bind="nuevoNombre" />
+    </div>
+    <div class="col-md-3">
+        <input type="color" class="form-control form-control-color" @bind="nuevoColorHex" />
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-success" @onclick="Agregar">Agregar</button>
+    </div>
+</div>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Color</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var estado in listaEstados)
+        {
+            <tr>
+                <td>@estado.Nombre</td>
+                <td><span class="badge" style="background-color:@(estado.ColorHex ?? "#6c757d")">@estado.ColorHex</span></td>
+                <td>
+                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(estado.IdEstado)">Eliminar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private IEnumerable<CatEstado> listaEstados = new List<CatEstado>();
+    private string nuevoNombre = string.Empty;
+    private string nuevoColorHex = "#6c757d";
+
+    protected override async Task OnInitializedAsync() => await Cargar();
+
+    private async Task Cargar() => listaEstados = await RepoEstado.GetAllAsync();
+
+    private async Task Agregar()
+    {
+        if (!string.IsNullOrWhiteSpace(nuevoNombre))
+        {
+            await RepoEstado.AddAsync(new CatEstado
+            {
+                Nombre = nuevoNombre.Trim(),
+                ColorHex = nuevoColorHex
+            });
+            nuevoNombre = string.Empty;
+            nuevoColorHex = "#6c757d";
+            await Cargar();
+        }
+    }
+
+    private async Task Eliminar(int id)
+    {
+        await RepoEstado.DeleteAsync(id);
+        await Cargar();
+    }
+}
