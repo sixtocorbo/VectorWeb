@@ -1,3 +1,5 @@
+@using Microsoft.AspNetCore.Components
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -10,13 +12,18 @@
     <link rel="stylesheet" href="VectorWeb.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="InteractiveServerWithoutPrerendering" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveServerWithoutPrerendering" />
     
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    private static readonly IComponentRenderMode InteractiveServerWithoutPrerendering =
+        new InteractiveServerRenderMode(prerender: false);
+}
