@@ -20,8 +20,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
     {
         if (!_initialized)
         {
-            _initialized = true;
-            await TryRestoreUserFromSessionAsync();
+            _initialized = await TryRestoreUserFromSessionAsync();
         }
 
         return new AuthenticationState(_currentUser);
@@ -55,7 +54,7 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
     }
 
-    private async Task TryRestoreUserFromSessionAsync()
+    private async Task<bool> TryRestoreUserFromSessionAsync()
     {
         try
         {
@@ -72,10 +71,13 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 
                 _currentUser = new ClaimsPrincipal(identity);
             }
+
+            return true;
         }
         catch (InvalidOperationException)
         {
             // Browser storage is unavailable during server pre-rendering.
+            return false;
         }
     }
 
