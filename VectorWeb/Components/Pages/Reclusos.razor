@@ -2,6 +2,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeRecluso> Repositorio
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <h3>Listado de Reclusos</h3>
@@ -50,6 +51,9 @@ else
                         <a href="reclusos/editar/@recluso.IdRecluso" class="btn btn-primary btn-sm">
                             Editar
                         </a>
+                        <button class="btn btn-danger btn-sm ms-2" @onclick="() => ConfirmarEliminacion(recluso)">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
                     </td>
                 </tr>
             }
@@ -66,5 +70,16 @@ else
     {
         // Usamos el repositorio para traer todos los datos
         listaReclusos = await Repositorio.GetAllAsync();
+    }
+
+    private async Task ConfirmarEliminacion(MaeRecluso recluso)
+    {
+        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Estás seguro de que deseas eliminar a {recluso.NombreCompleto}?");
+
+        if (confirmado)
+        {
+            await Repositorio.DeleteAsync(recluso.IdRecluso);
+            listaReclusos = await Repositorio.GetAllAsync();
+        }
     }
 }
