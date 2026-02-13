@@ -157,7 +157,8 @@
         historial = await RepoMovimientos
             .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation")
             .Where(m => idsDocumentosDelHilo.Contains(m.IdDocumento))
-            .OrderByDescending(m => m.FechaMovimiento)
+            .OrderBy(m => m.FechaMovimiento)
+            .ThenBy(m => m.IdMovimiento)
             .ToListAsync();
     }
 
