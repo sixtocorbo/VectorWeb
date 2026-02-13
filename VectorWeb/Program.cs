@@ -14,7 +14,8 @@ builder.Services.AddRazorComponents()
 
 // Database
 builder.Services.AddDbContext<SecretariaDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")),
+    contextLifetime: ServiceLifetime.Transient);
 
 // Generic repository
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
