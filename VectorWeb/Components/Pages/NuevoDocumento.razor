@@ -1,0 +1,93 @@
+@page "/documentos/nuevo"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<CatOficina> RepoOficinas
+@inject IRepository<CatTipoDocumento> RepoTipos
+@inject IRepository<CatEstado> RepoEstados
+@inject NavigationManager Navegador
+@rendermode InteractiveServer
+
+<h3>Ingreso de Documento - Mesa de Entrada</h3>
+
+<EditForm Model="nuevoDoc" OnValidSubmit="Guardar">
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>Tipo de Documento:</label>
+            <InputSelect @bind-Value="nuevoDoc.IdTipo" class="form-control">
+                <option value="0">-- Seleccione Tipo --</option>
+                @foreach (var tipo in tipos)
+                {
+                    <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label>Número Oficial:</label>
+            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" />
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label>Asunto:</label>
+        <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="2" />
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label>Oficina Destino:</label>
+            <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
+                @foreach (var ofi in oficinas)
+                {
+                    <option value="@ofi.IdOficina">@ofi.Nombre</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <label>Estado Inicial:</label>
+            <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
+                @foreach (var est in estados)
+                {
+                    <option value="@est.IdEstado">@est.Nombre</option>
+                }
+            </InputSelect>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Registrar Ingreso</button>
+    <a href="documentos" class="btn btn-secondary">Cancelar</a>
+</EditForm>
+
+@code {
+    private MaeDocumento nuevoDoc = new()
+    {
+        FechaCreacion = DateTime.Now,
+        Asunto = string.Empty,
+        NumeroInterno = string.Empty,
+        EstadoSemaforo = "GRIS"
+    };
+
+    private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
+    private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
+    private IEnumerable<CatEstado> estados = new List<CatEstado>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        oficinas = await RepoOficinas.GetAllAsync();
+        tipos = await RepoTipos.GetAllAsync();
+        estados = await RepoEstados.GetAllAsync();
+
+        nuevoDoc.IdHiloConversacion = Guid.NewGuid();
+        nuevoDoc.IdTipo = tipos.FirstOrDefault()?.IdTipo ?? 0;
+        nuevoDoc.IdOficinaActual = oficinas.FirstOrDefault()?.IdOficina ?? 0;
+        nuevoDoc.IdEstadoActual = estados.FirstOrDefault()?.IdEstado ?? 0;
+    }
+
+    private async Task Guardar()
+    {
+        await RepoDocs.AddAsync(nuevoDoc);
+        Navegador.NavigateTo("documentos");
+    }
+}
