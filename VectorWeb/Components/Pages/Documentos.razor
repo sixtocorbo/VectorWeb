@@ -1,12 +1,14 @@
 @page "/documentos"
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
 @using System.Security.Claims
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<CatOficina> RepoOficinas
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
@@ -103,31 +105,13 @@ else
                         </span>
                     </td>
                     <td>
-                        @if (doc.IdOficinaActual == idOficinaUsuario)
-                        {
-                            <button class="btn btn-warning btn-sm text-dark ms-1"
-                                    title="Realizar Pase a otra oficina"
-                                    @onclick="() => IrAPase(doc)">
-                                <i class="bi bi-arrow-right-circle"></i> Pase
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-primary btn-sm ms-1"
-                                    title="Agregar una actuación y traer el expediente a mi bandeja automáticamente"
-                                    @onclick="() => IrAActuacion(doc)">
-                                <i class="bi bi-file-earmark-plus"></i> Agregar Actuación
-                            </button>
-
-                            <button class="btn btn-secondary btn-sm ms-1"
-                                    title="Solo recuperar/traer el expediente sin agregar nada"
-                                    @onclick="() => IrAPase(doc)">
-                                <i class="bi bi-box-arrow-in-down"></i> Traer
-                            </button>
-                        }
-
-                        <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver movimientos">
-                            <i class="bi bi-clock-history"></i>
+                        <button class="btn btn-warning btn-sm text-dark ms-1"
+                                title="Realizar Pase"
+                                @onclick="() => ClickPase(doc)">
+                            <i class="bi bi-arrow-right-circle"></i> Pase
+                        </button>
+                        <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver Historial">
+                            <i class="bi bi-clock-history"></i> Historial
                         </a>
                     </td>
                 </tr>
@@ -153,6 +137,7 @@ else
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
     private bool verTodo;
+    private bool usuarioSinOficinaAsignada;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
 
     private IEnumerable<MaeDocumento> DocumentosFiltrados
@@ -232,6 +217,7 @@ else
                 }
                 else
                 {
+                    usuarioSinOficinaAsignada = true;
                     nombreOficinaUsuario = "Todas las oficinas";
                     verTodo = true;
                 }
@@ -294,13 +280,21 @@ else
         => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase)
         || string.Equals(estadoSemaforo, "Rojo", StringComparison.OrdinalIgnoreCase);
 
-    private void IrAPase(MaeDocumento doc)
+    private async Task ClickPase(MaeDocumento doc)
     {
-        Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
-    }
+        if (doc.IdOficinaActual == idOficinaUsuario || usuarioSinOficinaAsignada)
+        {
+            Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
+            return;
+        }
 
-    private void IrAActuacion(MaeDocumento doc)
-    {
-        Navegador.NavigateTo($"documentos/nuevo?idPadre={doc.IdDocumento}&autoPaseBandeja=true");
+        var confirmar = await JS.InvokeAsync<bool>(
+            "confirm",
+            "El documento está en una oficina remota. ¿El pase viene con actuación?");
+
+        if (confirmar)
+        {
+            Navegador.NavigateTo($"documentos/nuevo?idPadre={doc.IdDocumento}&autoPaseBandeja=true");
+        }
     }
 }
