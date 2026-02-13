@@ -12,15 +12,49 @@
     </a>
 </div>
 
+<div class="row g-2 mb-3 align-items-end">
+    <div class="col-md-6">
+        <label for="buscadorDocumentos" class="form-label">Buscador general</label>
+        <input id="buscadorDocumentos"
+               class="form-control"
+               placeholder="Buscar por número, asunto, tipo, oficina o estado"
+               @bind="FiltroBusqueda"
+               @bind:event="oninput" />
+        <small class="text-muted">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
+    </div>
+    <div class="col-md-3">
+        <label for="tamanoPagina" class="form-label">Resultados por página</label>
+        <select id="tamanoPagina" class="form-select" @bind="TamanoPagina">
+            @foreach (var opcion in opcionesTamanoPagina)
+            {
+                <option value="@opcion">@opcion</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="mb-3">
+    <span class="badge bg-danger me-2">Rojo</span>
+    <span class="me-3">Trámite vencido o de atención urgente.</span>
+    <span class="badge bg-info me-2">Azul</span>
+    <span>Trámite en plazo o en curso normal.</span>
+</div>
+
 @if (listaDocs is null)
 {
     <p><em>Cargando documentos...</em></p>
 }
 else
 {
+    @if (!DocumentosPaginados.Any())
+    {
+        <p><em>No se encontraron documentos con los filtros actuales.</em></p>
+    }
+
     <table class="table table-striped">
         <thead>
             <tr>
+                <th>Fecha creación</th>
                 <th>Nro. Oficial</th>
                 <th>Asunto</th>
                 <th>Tipo</th>
@@ -30,9 +64,10 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var doc in listaDocs)
+            @foreach (var doc in DocumentosPaginados)
             {
                 <tr>
+                    <td>@doc.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</td>
                     <td>@doc.NumeroOficial</td>
                     <td>@doc.Asunto</td>
                     <td>@doc.IdTipoNavigation?.Nombre</td>
@@ -49,10 +84,81 @@ else
             }
         </tbody>
     </table>
+
+    <div class="d-flex justify-content-between align-items-center">
+        <small class="text-muted">Mostrando @DesdeRegistro a @HastaRegistro de @TotalRegistros documento(s)</small>
+        <div class="btn-group" role="group" aria-label="Paginación">
+            <button class="btn btn-outline-secondary" @onclick="PaginaAnterior" disabled="@(PaginaActualEfectiva == 1)">Anterior</button>
+            <button class="btn btn-outline-secondary disabled">Página @PaginaActualEfectiva de @TotalPaginas</button>
+            <button class="btn btn-outline-secondary" @onclick="PaginaSiguiente" disabled="@(PaginaActualEfectiva >= TotalPaginas)">Siguiente</button>
+        </div>
+    </div>
 }
 
 @code {
-    private IEnumerable<MaeDocumento>? listaDocs;
+    private List<MaeDocumento>? listaDocs;
+    private string filtroBusqueda = string.Empty;
+    private int paginaActual = 1;
+    private int tamanoPagina = 10;
+    private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
+
+    private IEnumerable<MaeDocumento> DocumentosFiltrados
+    {
+        get
+        {
+            if (listaDocs is null)
+            {
+                return [];
+            }
+
+            var terminos = filtroBusqueda
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return listaDocs.Where(doc => terminos.All(termino =>
+                ConstruirIndiceBusqueda(doc).Contains(termino, StringComparison.OrdinalIgnoreCase)));
+        }
+    }
+
+    private IEnumerable<MaeDocumento> DocumentosPaginados
+        => DocumentosFiltrados
+            .Skip((PaginaActualEfectiva - 1) * tamanoPagina)
+            .Take(tamanoPagina);
+
+    private int TotalRegistros => DocumentosFiltrados.Count();
+    private int TotalPaginas => Math.Max(1, (int)Math.Ceiling(TotalRegistros / (double)tamanoPagina));
+    private int PaginaActualEfectiva => Math.Min(paginaActual, TotalPaginas);
+    private int DesdeRegistro => TotalRegistros == 0 ? 0 : ((PaginaActualEfectiva - 1) * tamanoPagina) + 1;
+    private int HastaRegistro => Math.Min(PaginaActualEfectiva * tamanoPagina, TotalRegistros);
+
+    private string FiltroBusqueda
+    {
+        get => filtroBusqueda;
+        set
+        {
+            if (filtroBusqueda == value)
+            {
+                return;
+            }
+
+            filtroBusqueda = value;
+            paginaActual = 1;
+        }
+    }
+
+    private int TamanoPagina
+    {
+        get => tamanoPagina;
+        set
+        {
+            if (tamanoPagina == value)
+            {
+                return;
+            }
+
+            tamanoPagina = value;
+            paginaActual = 1;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -60,6 +166,35 @@ else
             .GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
             .OrderByDescending(d => d.FechaCreacion)
             .ToList();
+    }
+
+
+    private static string ConstruirIndiceBusqueda(MaeDocumento doc)
+        => string.Join(' ',
+            doc.NumeroOficial,
+            doc.Asunto,
+            doc.Descripcion,
+            doc.IdTipoNavigation?.Nombre,
+            doc.IdOficinaActualNavigation?.Nombre,
+            doc.IdEstadoActualNavigation?.Nombre,
+            doc.EstadoSemaforo,
+            doc.NumeroInterno,
+            doc.FechaCreacion?.ToString("dd/MM/yyyy"));
+
+    private void PaginaAnterior()
+    {
+        if (PaginaActualEfectiva > 1)
+        {
+            paginaActual = PaginaActualEfectiva - 1;
+        }
+    }
+
+    private void PaginaSiguiente()
+    {
+        if (PaginaActualEfectiva < TotalPaginas)
+        {
+            paginaActual = PaginaActualEfectiva + 1;
+        }
     }
 
     private static bool EsRojo(string? estadoSemaforo)
