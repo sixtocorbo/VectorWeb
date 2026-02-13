@@ -58,7 +58,7 @@
         var auth = (CustomAuthStateProvider)AuthStateProvider;
         var oficinaId = usuarioEncontrado.IdOficina ?? 0;
 
-        auth.MarkUserAsAuthenticated(
+        await auth.MarkUserAsAuthenticatedAsync(
             usuarioEncontrado.IdUsuario,
             usuarioEncontrado.NombreCompleto,
             usuarioEncontrado.Rol,
