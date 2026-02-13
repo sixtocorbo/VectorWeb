@@ -106,7 +106,7 @@ else
                     </td>
                     <td>
                         <button class="btn btn-warning btn-sm text-dark ms-1"
-                                title="Realizar Pase o Actuación"
+                                title="Realizar Pase"
                                 @onclick="() => ClickPase(doc)">
                             <i class="bi bi-arrow-right-circle"></i> Pase
                         </button>
@@ -279,7 +279,7 @@ else
 
         var confirmar = await JS.InvokeAsync<bool>(
             "confirm",
-            "El documento se encuentra en otra oficina. ¿Desea agregar una actuación/respuesta vinculada a ese documento?");
+            "El documento está en otra oficina. ¿Desea agregar una actuación/respuesta vinculada a este documento?");
 
         if (confirmar)
         {
