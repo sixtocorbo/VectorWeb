@@ -1,7 +1,9 @@
-using VectorWeb.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using VectorWeb.Auth;
+using VectorWeb.Components;
 using VectorWeb.Models;
-using VectorWeb.Repositories; // <--- ¡IMPORTANTE! AGREGA ESTO
+using VectorWeb.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -9,12 +11,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// 1. Configuración de Base de Datos (Ya la tenías)
+// Database
 builder.Services.AddDbContext<SecretariaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. REGISTRO DEL REPOSITORIO (¡ESTO ES LO QUE FALTA!) <---
+// Generic repository
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+
+// Blazor auth services
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 
 var app = builder.Build();
 

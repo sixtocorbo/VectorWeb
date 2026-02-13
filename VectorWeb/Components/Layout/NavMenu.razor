@@ -1,4 +1,9 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@using Microsoft.AspNetCore.Components.Authorization
+@using VectorWeb.Auth
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navegador
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">VectorWeb</a>
     </div>
@@ -7,32 +12,62 @@
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="flex-column">        
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="reclusos">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reclusos
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="documentos">
-                <span class="bi bi-file-earmark-text" aria-hidden="true"></span> Documentos
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="configuracion/oficinas">
-                <span class="bi bi-building" aria-hidden="true"></span> Oficinas
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="configuracion/tipos-documento">
-                <span class="bi bi-files" aria-hidden="true"></span> Tipos de Documento
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="configuracion/estados">
-                <span class="bi bi-flag" aria-hidden="true"></span> Estados
-            </NavLink>
-        </div>
+    <nav class="flex-column">
+        <AuthorizeView>
+            <Authorized Context="authContext">
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="reclusos">
+                        <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Reclusos
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="documentos">
+                        <span class="bi bi-file-earmark-text" aria-hidden="true"></span> Documentos
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="configuracion/oficinas">
+                        <span class="bi bi-building" aria-hidden="true"></span> Oficinas
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="configuracion/tipos-documento">
+                        <span class="bi bi-files" aria-hidden="true"></span> Tipos de Documento
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="configuracion/estados">
+                        <span class="bi bi-flag" aria-hidden="true"></span> Estados
+                    </NavLink>
+                </div>
+                <div class="nav-item px-3 mt-4">
+                    <div class="text-white small px-3">
+                        Usuario: <strong>@authContext.User.Identity?.Name</strong>
+                    </div>
+                    <button class="btn btn-link nav-link text-warning" @onclick="CerrarSesion">
+                        <i class="bi bi-box-arrow-left"></i> Salir
+                    </button>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="login">
+                        <span class="bi bi-person-lock" aria-hidden="true"></span> Iniciar Sesión
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
     </nav>
 </div>
 
+@code {
+    private void CerrarSesion()
+    {
+        if (AuthStateProvider is CustomAuthStateProvider auth)
+        {
+            auth.MarkUserAsLoggedOut();
+        }
+
+        Navegador.NavigateTo("/login");
+    }
+}

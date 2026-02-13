@@ -1,0 +1,69 @@
+@page "/"
+@page "/login"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Authorization
+@using VectorWeb.Auth
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<CatUsuario> RepoUsuarios
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navegador
+
+<div class="d-flex justify-content-center align-items-center vh-100 bg-light">
+    <div class="card shadow p-4" style="width: 400px;">
+        <div class="text-center mb-4">
+            <h2 class="text-primary fw-bold">VECTOR Web</h2>
+            <p class="text-muted">Inicie sesión para continuar</p>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(mensajeError))
+        {
+            <div class="alert alert-danger">@mensajeError</div>
+        }
+
+        <div class="mb-3">
+            <label>Usuario:</label>
+            <input type="text" class="form-control" @bind="usuario" placeholder="Ej: admin" />
+        </div>
+
+        <div class="mb-3">
+            <label>Contraseña:</label>
+            <input type="password" class="form-control" @bind="clave" placeholder="******" />
+        </div>
+
+        <button class="btn btn-primary w-100" @onclick="IniciarSesion">Ingresar</button>
+    </div>
+</div>
+
+@code {
+    private string usuario = string.Empty;
+    private string clave = string.Empty;
+    private string mensajeError = string.Empty;
+
+    private async Task IniciarSesion()
+    {
+        var usuarios = await RepoUsuarios.FindAsync(u =>
+            u.UsuarioLogin == usuario &&
+            u.Clave == clave &&
+            u.Activo == true);
+
+        var usuarioEncontrado = usuarios.FirstOrDefault();
+
+        if (usuarioEncontrado is null)
+        {
+            mensajeError = "Usuario o contraseña incorrectos.";
+            return;
+        }
+
+        var auth = (CustomAuthStateProvider)AuthStateProvider;
+        var oficinaId = usuarioEncontrado.IdOficina ?? 0;
+
+        auth.MarkUserAsAuthenticated(
+            usuarioEncontrado.IdUsuario,
+            usuarioEncontrado.NombreCompleto,
+            usuarioEncontrado.Rol,
+            oficinaId);
+
+        Navegador.NavigateTo("/documentos");
+    }
+}
