@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+@using Microsoft.AspNetCore.Components.Web
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -9,11 +10,11 @@
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="VectorWeb.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <Routes />
+    <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 
