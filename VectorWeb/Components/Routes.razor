@@ -1,27 +1,29 @@
+@using VectorWeb.Components.Layout
+@using Microsoft.AspNetCore.Components.Authorization
+
 <CascadingAuthenticationState>
+
     <Router AppAssembly="typeof(Program).Assembly">
         <Found Context="routeData">
-            @if (routeData.PageType == typeof(Pages.Login))
-            {
-                <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-            }
-            else
-            {
-                <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
-                    <NotAuthorized>
-                        <div class="alert alert-danger">
-                            No tienes permiso para ver esta página. <a href="login">Ir al inicio de sesión</a>
-                        </div>
-                    </NotAuthorized>
-                </AuthorizeRouteView>
-            }
-            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (!context.User.Identity.IsAuthenticated)
+                    {
+                        <div class="alert alert-warning">Debes <a href="login">iniciar sesión</a></div>
+                    }
+                    else
+                    {
+                        <p role="alert">No tienes permiso para ver esta página.</p>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
         </Found>
         <NotFound>
             <PageTitle>No encontrado</PageTitle>
-            <LayoutView Layout="typeof(Layout.MainLayout)">
+            <LayoutView Layout="typeof(MainLayout)">
                 <p role="alert">Lo siento, no hay nada en esta dirección.</p>
             </LayoutView>
         </NotFound>
     </Router>
-</CascadingAuthenticationState>
+
+</CascadingAuthenticationState> 
