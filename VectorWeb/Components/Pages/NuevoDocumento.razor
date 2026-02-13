@@ -282,6 +282,15 @@
         await RepoDocs.AddAsync(nuevoDoc);
 
         // 2. Crear TRA_MOVIMIENTO (Historial)
+        var observacionMovimiento = "Ingreso inicial al sistema";
+        if (esActuacion)
+        {
+            var referenciaPadre = !string.IsNullOrWhiteSpace(docPadreSeleccionado?.NumeroOficial)
+                ? $" (Ref: {docPadreSeleccionado.NumeroOficial})"
+                : string.Empty;
+            observacionMovimiento = $"Confección de Actuación/Respuesta{referenciaPadre}";
+        }
+
         var mov = new TraMovimiento
         {
             IdDocumento = nuevoDoc.IdDocumento,
@@ -298,7 +307,7 @@
             // "Ingresado en [Oficina Elegida] por [Tu Nombre]"
             IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
             
-            ObservacionPase = "Ingreso inicial al sistema"
+            ObservacionPase = observacionMovimiento
         };
         
         await RepoMovimientos.AddAsync(mov);
@@ -317,9 +326,11 @@
                 IdDocumento = nuevoDoc.IdDocumento,
                 IdOficinaOrigen = oficinaOrigen,
                 IdOficinaDestino = oficinaDestino,
-                FechaMovimiento = DateTime.Now,
+                FechaMovimiento = DateTime.Now.AddSeconds(1),
                 IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
+                ObservacionPase = esActuacion
+                    ? "Se remite respuesta a BANDEJA DE ENTRADA"
+                    : $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
             };
 
             await RepoMovimientos.AddAsync(movPase);
