@@ -201,6 +201,11 @@
             return;
         }
 
+        if (idOficinaUsuario == 0)
+        {
+            idOficinaUsuario = docBase.IdOficinaActual;
+        }
+
         // Validar que esté en mi oficina
         if (docBase.IdOficinaActual != idOficinaUsuario && idOficinaUsuario != 0)
         {
@@ -217,6 +222,15 @@
                         d.IdOficinaActual == idOficinaUsuario &&
                         d.IdEstadoActual != 5)
             .ToListAsync();
+
+        if (!documentosAEnviar.Any())
+        {
+            documentosAEnviar = await RepoDocs.GetQueryable("IdTipoNavigation")
+                .Where(d => d.IdDocumento == Id &&
+                            d.IdOficinaActual == idOficinaUsuario &&
+                            d.IdEstadoActual != 5)
+                .ToListAsync();
+        }
 
         if (!documentosAEnviar.Any())
         {
