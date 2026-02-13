@@ -1,11 +1,12 @@
 @page "/reclusos/editar/{Id:int}"
+@page "/reclusos/nuevo"
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeRecluso> Repositorio
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
-<h3>Editar Recluso</h3>
+<h3>@(Id == 0 ? "Nuevo Recluso" : "Editar Recluso")</h3>
 
 @if (miRecluso == null)
 {
@@ -13,7 +14,7 @@
 }
 else
 {
-    <EditForm Model="miRecluso" OnValidSubmit="GuardarCambios">
+    <EditForm Model="miRecluso" OnValidSubmit="Guardar">
         <DataAnnotationsValidator />
 
         <div class="mb-3">
@@ -31,7 +32,7 @@ else
             <label class="form-check-label">¿Está Activo?</label>
         </div>
 
-        <button type="submit" class="btn btn-success">Guardar Cambios</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
         <a href="/reclusos" class="btn btn-secondary">Cancelar</a>
     </EditForm>
 }
@@ -56,17 +57,32 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        miRecluso = await Repositorio.GetByIdAsync(Id);
+        if (Id == 0)
+        {
+            miRecluso = new MaeRecluso { Activo = true };
+        }
+        else
+        {
+            miRecluso = await Repositorio.GetByIdAsync(Id);
+        }
     }
 
-    private async Task GuardarCambios()
+    private async Task Guardar()
     {
         if (miRecluso is null)
         {
             return;
         }
 
-        await Repositorio.UpdateAsync(miRecluso);
+        if (Id == 0)
+        {
+            await Repositorio.AddAsync(miRecluso);
+        }
+        else
+        {
+            await Repositorio.UpdateAsync(miRecluso);
+        }
+
         Navegador.NavigateTo("/reclusos");
     }
 }
