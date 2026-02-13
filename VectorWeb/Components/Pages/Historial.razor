@@ -1,0 +1,125 @@
+@page "/documentos/historial/{Id:int}"
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<TraMovimiento> RepoMovimientos
+@rendermode InteractiveServer
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-clock-history"></i> Historial del Documento</h3>
+        <a href="documentos" class="btn btn-outline-secondary">Volver a la lista</a>
+    </div>
+
+    @if (documento is null)
+    {
+        <div class="alert alert-info">Cargando información...</div>
+    }
+    else
+    {
+        <div class="card mb-4 shadow-sm border-primary">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <h4 class="card-title text-primary">@documento.NumeroOficial</h4>
+                        <h6 class="card-subtitle mb-2 text-muted">@documento.IdTipoNavigation?.Nombre</h6>
+                        <p class="card-text mt-3">@documento.Asunto</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="badge bg-secondary p-2">Estado actual: @documento.IdEstadoActualNavigation?.Nombre</span>
+                        <div class="mt-2 text-muted small">
+                            Creado el: @documento.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h5 class="mb-3">Recorrido del expediente</h5>
+
+        @if (!historial.Any())
+        {
+            <p class="text-muted">No se encontraron movimientos registrados.</p>
+        }
+        else
+        {
+            <div class="timeline">
+                @foreach (var mov in historial)
+                {
+                    <div class="timeline-item card shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h5 class="mb-1 text-success">
+                                    <i class="bi bi-building"></i> @mov.IdOficinaDestinoNavigation?.Nombre
+                                </h5>
+                                <small class="text-muted">@mov.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm")</small>
+                            </div>
+
+                            <p class="mb-1">
+                                <span class="text-muted">Enviado desde:</span>
+                                <strong>@mov.IdOficinaOrigenNavigation?.Nombre</strong>
+                            </p>
+
+                            @if (!string.IsNullOrWhiteSpace(mov.ObservacionPase))
+                            {
+                                <div class="alert alert-light mt-2 mb-0 border">
+                                    <i class="bi bi-chat-left-quote"></i> <em>@mov.ObservacionPase</em>
+                                </div>
+                            }
+
+                            <small class="text-muted mt-2 d-block">
+                                <i class="bi bi-person"></i> Responsable: @mov.IdUsuarioResponsableNavigation?.NombreCompleto
+                            </small>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .timeline {
+        position: relative;
+        margin-left: 1rem;
+        padding-left: 1.5rem;
+        border-left: 3px solid #0d6efd;
+    }
+
+    .timeline-item {
+        position: relative;
+    }
+
+    .timeline-item::before {
+        content: "";
+        position: absolute;
+        left: -2.15rem;
+        top: 1.25rem;
+        width: 0.9rem;
+        height: 0.9rem;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px #0d6efd;
+    }
+</style>
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private MaeDocumento? documento;
+    private List<TraMovimiento> historial = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        documento = await RepoDocs.GetQueryable("IdTipoNavigation,IdEstadoActualNavigation")
+                                  .FirstOrDefaultAsync(d => d.IdDocumento == Id);
+
+        historial = await RepoMovimientos
+            .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation")
+            .Where(m => m.IdDocumento == Id)
+            .OrderByDescending(m => m.FechaMovimiento)
+            .ToListAsync();
+    }
+}
