@@ -166,6 +166,7 @@
     private List<MaeDocumento> resultadosBusqueda;
     private MaeDocumento docPadreSeleccionado;
     private int? idOficinaBandejaEntrada;
+    private int idOficinaUsuarioActual;
 
     protected override async Task OnInitializedAsync()
     {
@@ -206,6 +207,7 @@
             var oficinaClaim = user.FindFirst(c => c.Type == "IdOficina");
             if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out int oid))
             {
+                idOficinaUsuarioActual = oid;
                 nuevoDoc.IdOficinaActual = oid;
             }
         }
@@ -301,7 +303,10 @@
         
         await RepoMovimientos.AddAsync(mov);
 
-        if (AutoPaseBandeja == true && IdPadre.HasValue && docPadreSeleccionado != null)
+        var autoPasePorOficinaRemota = idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual;
+        var autoPaseSolicitadoPorParametro = AutoPaseBandeja == true && IdPadre.HasValue && docPadreSeleccionado != null;
+
+        if (autoPasePorOficinaRemota || autoPaseSolicitadoPorParametro)
         {
             var oficinaOrigen = nuevoDoc.IdOficinaActual;
             var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;

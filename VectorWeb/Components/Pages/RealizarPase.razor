@@ -83,15 +83,31 @@
                     <div class="col-md-7">
                         <div class="mb-3">
                             <label class="form-label fw-bold">Oficina Destino:</label>
-                            <InputSelect @bind-Value="nuevoMovimiento.IdOficinaDestino" class="form-control form-select-lg">
-                                <option value="0">-- Seleccione Destino --</option>
-                                @foreach (var ofi in oficinas)
-                                {
-                                    <option value="@ofi.IdOficina">@ofi.Nombre</option>
-                                }
-                            </InputSelect>
-                            <ValidationMessage For="@(() => nuevoMovimiento.IdOficinaDestino)" />
+                            @if (esPaseDesdeOficinaRemota)
+                            {
+                                <input class="form-control form-select-lg" value="@nombreOficinaBandejaEntrada" disabled />
+                                <small class="text-muted">Al dar pase de una oficina remota, el destino se fija automáticamente en BANDEJA DE ENTRADA.</small>
+                            }
+                            else
+                            {
+                                <InputSelect @bind-Value="nuevoMovimiento.IdOficinaDestino" class="form-control form-select-lg">
+                                    <option value="0">-- Seleccione Destino --</option>
+                                    @foreach (var ofi in oficinas)
+                                    {
+                                        <option value="@ofi.IdOficina">@ofi.Nombre</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => nuevoMovimiento.IdOficinaDestino)" />
+                            }
                         </div>
+
+                        @if (esPaseDesdeOficinaRemota)
+                        {
+                            <div class="form-check form-switch mb-3">
+                                <InputCheckbox @bind-Value="crearActuacionRemota" class="form-check-input" />
+                                <label class="form-check-label fw-bold">El pase viene con actuación</label>
+                            </div>
+                        }
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -153,6 +169,11 @@
     private int usuarioLogueadoId = 1;
     private int idOficinaUsuario = 0;
     private bool usuarioSinOficinaAsignada;
+    private bool esPaseDesdeOficinaRemota;
+    private bool crearActuacionRemota;
+    private int? idOficinaBandejaEntrada;
+    private string nombreOficinaBandejaEntrada = "BANDEJA DE ENTRADA";
+    private int idOficinaOrigenPaquete;
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,6 +201,24 @@
             oficinas = await queryOficinas
                 .OrderBy(o => o.Nombre)
                 .ToListAsync();
+
+            idOficinaBandejaEntrada = (await RepoOficinas.GetQueryable()
+                .Where(o => o.Nombre.ToUpper() == "BANDEJA DE ENTRADA")
+                .Select(o => (int?)o.IdOficina)
+                .FirstOrDefaultAsync());
+
+            if (idOficinaBandejaEntrada.HasValue)
+            {
+                var nombreBandeja = await RepoOficinas.GetQueryable()
+                    .Where(o => o.IdOficina == idOficinaBandejaEntrada.Value)
+                    .Select(o => o.Nombre)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrWhiteSpace(nombreBandeja))
+                {
+                    nombreOficinaBandejaEntrada = nombreBandeja;
+                }
+            }
 
             estados = (await RepoEstados.GetAllAsync()).ToList();
 
@@ -215,11 +254,18 @@
             idOficinaUsuario = docBase.IdOficinaActual;
         }
 
-        // Validar que esté en mi oficina
-        if (!usuarioSinOficinaAsignada && docBase.IdOficinaActual != idOficinaUsuario)
+        esPaseDesdeOficinaRemota = !usuarioSinOficinaAsignada && docBase.IdOficinaActual != idOficinaUsuario;
+        idOficinaOrigenPaquete = docBase.IdOficinaActual;
+
+        if (esPaseDesdeOficinaRemota)
         {
-            mensajeError = $"Este documento no está en tu oficina. Está en: {docBase.IdOficinaActualNavigation?.Nombre ?? "Otra"}";
-            return;
+            if (!idOficinaBandejaEntrada.HasValue)
+            {
+                mensajeError = "No se encontró la oficina BANDEJA DE ENTRADA para completar el pase automático.";
+                return;
+            }
+
+            nuevoMovimiento.IdOficinaDestino = idOficinaBandejaEntrada.Value;
         }
 
         var guidFamilia = docBase.IdHiloConversacion;
@@ -231,7 +277,8 @@
 
         if (!usuarioSinOficinaAsignada)
         {
-            queryFamilia = queryFamilia.Where(d => d.IdOficinaActual == idOficinaUsuario);
+            var oficinaFiltro = esPaseDesdeOficinaRemota ? idOficinaOrigenPaquete : idOficinaUsuario;
+            queryFamilia = queryFamilia.Where(d => d.IdOficinaActual == oficinaFiltro);
         }
 
         documentosAEnviar = await queryFamilia.ToListAsync();
@@ -243,7 +290,8 @@
 
             if (!usuarioSinOficinaAsignada)
             {
-                queryDocumentoIndividual = queryDocumentoIndividual.Where(d => d.IdOficinaActual == idOficinaUsuario);
+                var oficinaFiltro = esPaseDesdeOficinaRemota ? idOficinaOrigenPaquete : idOficinaUsuario;
+                queryDocumentoIndividual = queryDocumentoIndividual.Where(d => d.IdOficinaActual == oficinaFiltro);
             }
 
             documentosAEnviar = await queryDocumentoIndividual.ToListAsync();
@@ -273,15 +321,62 @@
 
     private async Task GuardarPase()
     {
+        if (esPaseDesdeOficinaRemota)
+        {
+            if (!idOficinaBandejaEntrada.HasValue)
+            {
+                mensajeError = "No se encontró la oficina BANDEJA DE ENTRADA para completar el pase automático.";
+                return;
+            }
+
+            nuevoMovimiento.IdOficinaDestino = idOficinaBandejaEntrada.Value;
+        }
+
         if (nuevoMovimiento.IdOficinaDestino == 0) return;
 
-        var nombreDestino = oficinas.FirstOrDefault(o => o.IdOficina == nuevoMovimiento.IdOficinaDestino)?.Nombre ?? "Desconocido";
+        var nombreDestino = oficinas.FirstOrDefault(o => o.IdOficina == nuevoMovimiento.IdOficinaDestino)?.Nombre ?? nombreOficinaBandejaEntrada;
         var documentosProcesados = 0;
 
         await using var transaction = await DbContext.Database.BeginTransactionAsync();
 
         try
         {
+            if (esPaseDesdeOficinaRemota && crearActuacionRemota && docPadre != null)
+            {
+                var actuacionRemota = new MaeDocumento
+                {
+                    IdTipo = docPadre.IdTipo,
+                    NumeroOficial = $"ACT-{DateTime.Now:yyyyMMddHHmmss}",
+                    Asunto = $"Actuación previa al pase de {docPadre.NumeroOficial}",
+                    Descripcion = nuevoMovimiento.ObservacionPase,
+                    FechaCreacion = DateTime.Now,
+                    IdOficinaActual = docPadre.IdOficinaActual,
+                    IdEstadoActual = docPadre.IdEstadoActual,
+                    IdUsuarioCreador = usuarioLogueadoId,
+                    IdDocumentoPadre = docPadre.IdDocumento,
+                    IdHiloConversacion = docPadre.IdHiloConversacion,
+                    Fojas = 0
+                };
+
+                await RepoDocs.AddAsync(actuacionRemota);
+
+                var movimientoIngresoActuacion = new TraMovimiento
+                {
+                    IdDocumento = actuacionRemota.IdDocumento,
+                    IdOficinaOrigen = actuacionRemota.IdOficinaActual,
+                    IdOficinaDestino = actuacionRemota.IdOficinaActual,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = usuarioLogueadoId,
+                    IdEstadoEnEseMomento = actuacionRemota.IdEstadoActual,
+                    ObservacionPase = "Ingreso automático de actuación en oficina remota"
+                };
+
+                await RepoMovimientos.AddAsync(movimientoIngresoActuacion);
+
+                documentosAEnviar.Add(actuacionRemota);
+                documentosAdjuntos.Add(actuacionRemota);
+            }
+
             // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
             foreach (var doc in documentosAEnviar)
             {
@@ -307,7 +402,7 @@
                 var mov = new TraMovimiento
                 {
                     IdDocumento = doc.IdDocumento,
-                    IdOficinaOrigen = usuarioSinOficinaAsignada ? oficinaOrigenMovimiento : idOficinaUsuario,
+                    IdOficinaOrigen = (usuarioSinOficinaAsignada || esPaseDesdeOficinaRemota) ? oficinaOrigenMovimiento : idOficinaUsuario,
                     IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
                     FechaMovimiento = DateTime.Now,
                     IdUsuarioResponsable = usuarioLogueadoId,
