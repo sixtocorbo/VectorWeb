@@ -1,6 +1,7 @@
 using VectorWeb.Components;
-using Microsoft.EntityFrameworkCore; // <--- NUEVO: Para poder usar EF Core
-using VectorWeb.Models;              // <--- NUEVO: Para encontrar tu SecretariaDbContext
+using Microsoft.EntityFrameworkCore;
+using VectorWeb.Models;
+using VectorWeb.Repositories; // <--- ¡IMPORTANTE! AGREGA ESTO
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,11 +9,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// --- ZONA DE CONFIGURACIÓN DE BASE DE DATOS ---
-// Aquí le decimos a la app que use SQL Server con la cadena que pusiste en appsettings.json
+// 1. Configuración de Base de Datos (Ya la tenías)
 builder.Services.AddDbContext<SecretariaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-// ---------------------------------------------
+
+// 2. REGISTRO DEL REPOSITORIO (¡ESTO ES LO QUE FALTA!) <---
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 
 var app = builder.Build();
 
@@ -20,12 +22,10 @@ var app = builder.Build();
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 app.UseAntiforgery();
 

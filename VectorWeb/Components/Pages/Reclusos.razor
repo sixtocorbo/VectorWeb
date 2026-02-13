@@ -1,0 +1,64 @@
+﻿@page "/reclusos"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeRecluso> Repositorio
+@rendermode InteractiveServer
+
+<h3>Listado de Reclusos</h3>
+
+@if (listaReclusos == null)
+{
+    <p><em>Cargando datos...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre Completo</th>
+                <th>Documento</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var recluso in listaReclusos)
+            {
+                <tr>
+                    <td>@recluso.IdRecluso</td>
+                    <td>@recluso.NombreCompleto</td>
+                    <td>@recluso.Documento</td>
+                    <td>
+                        @if (recluso.Activo == true)
+                        {
+                            <span class="badge bg-success">Activo</span>
+                        }
+                        else
+                        {
+
+                            <span class="badge bg-danger">Inactivo</span>
+                        }
+                    </td>
+                    <td>
+                        <a href="reclusos/editar/@recluso.IdRecluso" class="btn btn-primary btn-sm">
+                            Editar
+                        </a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    // Esta es tu zona de variables (igual que en VB.NET)
+    private IEnumerable<MaeRecluso> listaReclusos;
+
+    // Este evento es como el "Form_Load"
+    protected override async Task OnInitializedAsync()
+    {
+        // Usamos el repositorio para traer todos los datos
+        listaReclusos = await Repositorio.GetAllAsync();
+    }
+}
