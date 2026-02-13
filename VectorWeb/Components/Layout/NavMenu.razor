@@ -61,11 +61,11 @@
 </div>
 
 @code {
-    private void CerrarSesion()
+    private async Task CerrarSesion()
     {
         if (AuthStateProvider is CustomAuthStateProvider auth)
         {
-            auth.MarkUserAsLoggedOut();
+            await auth.MarkUserAsLoggedOutAsync();
         }
 
         Navegador.NavigateTo("/login");
