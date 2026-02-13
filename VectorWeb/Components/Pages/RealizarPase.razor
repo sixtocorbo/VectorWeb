@@ -1,4 +1,4 @@
-@page "/documentos/pase/{Id:int}"
+@page "/documentos/pase/{Id:long}"
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
@@ -13,75 +13,116 @@
 @rendermode InteractiveServer
 
 <div class="card shadow">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-warning text-dark">
         <h3><i class="bi bi-arrow-right-circle"></i> Realizar Pase</h3>
     </div>
     <div class="card-body">
-        @if (documento is null)
+        @if (cargando)
         {
-            <p><em>Cargando datos del documento...</em></p>
+            <div class="d-flex align-items-center">
+                <div class="spinner-border text-primary ms-2 me-2" role="status"></div>
+                <span>Analizando paquete de documentos...</span>
+            </div>
+        }
+        else if (mensajeError != null)
+        {
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> @mensajeError
+                <br />
+                <a href="documentos" class="btn btn-secondary mt-2">Volver a la Bandeja</a>
+            </div>
         }
         else
         {
-            <div class="alert alert-secondary">
-                <h5>Documento: <strong>@documento.NumeroOficial</strong></h5>
-                <p class="mb-0">@documento.Asunto</p>
-                <hr />
-                <small>Ubicación Actual: <strong>@documento.IdOficinaActualNavigation?.Nombre</strong> | Estado: @documento.IdEstadoActualNavigation?.Nombre</small>
-            </div>
-
             <EditForm Model="nuevoMovimiento" OnValidSubmit="GuardarPase">
                 <DataAnnotationsValidator />
 
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Oficina Destino:</label>
-                        <InputSelect @bind-Value="nuevoMovimiento.IdOficinaDestino" class="form-control">
-                            <option value="0">-- Seleccione Destino --</option>
-                            @foreach (var ofi in oficinas)
-                            {
-                                @if (ofi.IdOficina != documento.IdOficinaActual)
+                    <div class="col-md-5">
+                        <div class="card bg-light mb-3">
+                            <div class="card-header fw-bold">📦 Resumen del Paquete</div>
+                            <div class="card-body small">
+                                @if (docPadre != null)
+                                {
+                                    <h6 class="text-primary fw-bold">EXPEDIENTE PRINCIPAL (PADRE)</h6>
+                                    <p class="mb-1">
+                                        <strong>@docPadre.NumeroOficial</strong><br />
+                                        @docPadre.Asunto
+                                    </p>
+                                    <span class="badge bg-secondary">Fojas Acumuladas: @docPadre.Fojas</span>
+                                    <hr />
+                                }
+
+                                @if (documentosAdjuntos.Any())
+                                {
+                                    <h6 class="text-secondary fw-bold">📎 ADJUNTOS (@documentosAdjuntos.Count)</h6>
+                                    <ul class="list-unstyled">
+                                        @foreach (var adj in documentosAdjuntos)
+                                        {
+                                            <li class="mb-1">
+                                                <i class="bi bi-paperclip"></i> @adj.NumeroOficial <br />
+                                                <span class="text-muted fst-italic">(@adj.Asunto)</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="text-muted">(Sin documentos adjuntos)</p>
+                                }
+
+                                <div class="alert alert-info mt-2 mb-0 py-2">
+                                    <strong>Total a enviar:</strong> @documentosAEnviar.Count documento(s).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Oficina Destino:</label>
+                            <InputSelect @bind-Value="nuevoMovimiento.IdOficinaDestino" class="form-control form-select-lg">
+                                <option value="0">-- Seleccione Destino --</option>
+                                @foreach (var ofi in oficinas)
                                 {
                                     <option value="@ofi.IdOficina">@ofi.Nombre</option>
                                 }
-                            }
-                        </InputSelect>
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-bold">Nuevo Estado:</label>
-                        <InputSelect @bind-Value="nuevoEstadoId" class="form-control">
-                            @foreach (var est in estados)
-                            {
-                                <option value="@est.IdEstado">@est.Nombre</option>
-                            }
-                        </InputSelect>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Instrucciones / Comentario:</label>
-                    <InputTextArea @bind-Value="nuevoMovimiento.ObservacionPase" class="form-control" rows="3" placeholder="Ej: Para su intervención..." />
-                </div>
-
-                @if (cantidadEnExpediente > 1)
-                {
-                    <div class="alert alert-warning">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" @bind="moverTodoElExpediente" id="chkMoverTodo">
-                            <label class="form-check-label fw-bold" for="chkMoverTodo">
-                                Mover todo el expediente (@cantidadEnExpediente documentos vinculados)
-                            </label>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => nuevoMovimiento.IdOficinaDestino)" />
                         </div>
-                        <small>Si desmarcas esto, solo moverás el documento actual y separarás el expediente.</small>
-                    </div>
-                }
 
-                <div class="d-flex justify-content-end gap-2">
-                    <a href="documentos" class="btn btn-secondary">Cancelar</a>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-send"></i> Confirmar Pase
-                    </button>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Nuevo Estado:</label>
+                                <InputSelect @bind-Value="nuevoEstadoId" class="form-control">
+                                    @foreach (var est in estados)
+                                    {
+                                        <option value="@est.IdEstado">@est.Nombre</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold text-success">
+                                    <i class="bi bi-files"></i> Fojas Agregadas:
+                                </label>
+                                <InputNumber @bind-Value="fojasAgregadas" class="form-control" min="0" />
+                                <small class="text-muted">Se sumarán al expediente principal.</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Observación / Instrucciones:</label>
+                            <InputTextArea @bind-Value="nuevoMovimiento.ObservacionPase" class="form-control" rows="4" 
+                                           placeholder="Se remite para su conocimiento, consideración y fines pertinentes..." />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a href="documentos" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success px-4 fw-bold">
+                                <i class="bi bi-send-check"></i> CONFIRMAR PASE
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </EditForm>
         }
@@ -89,87 +130,158 @@
 </div>
 
 @code {
-    [Parameter] public int Id { get; set; }
+    [Parameter] public long Id { get; set; }
 
-    private MaeDocumento? documento;
-    private readonly TraMovimiento nuevoMovimiento = new();
-    private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
-    private IEnumerable<CatEstado> estados = new List<CatEstado>();
-    private int nuevoEstadoId;
+    private bool cargando = true;
+    private string? mensajeError;
+
+    // Listas de datos
+    private List<CatOficina> oficinas = new();
+    private List<CatEstado> estados = new();
+
+    // Lógica del Paquete (frmPase.vb)
+    private List<MaeDocumento> documentosAEnviar = new();
+    private List<MaeDocumento> documentosAdjuntos = new();
+    private MaeDocumento? docPadre;
+
+    // Modelo del formulario
+    private TraMovimiento nuevoMovimiento = new();
+    private int nuevoEstadoId = 2; // Por defecto: 2 = En Trámite / Enviado (Según frmPase.vb)
+    private int fojasAgregadas = 0;
     private int usuarioLogueadoId = 1;
-    private int cantidadEnExpediente;
-    private bool moverTodoElExpediente = true;
+    private int idOficinaUsuario = 0;
 
     protected override async Task OnInitializedAsync()
     {
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var usuarioIdClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (int.TryParse(usuarioIdClaim, out var uid))
+        try
         {
-            usuarioLogueadoId = uid;
-        }
+            cargando = true;
 
-        documento = await RepoDocs.GetQueryable("IdOficinaActualNavigation,IdEstadoActualNavigation")
-                                  .FirstOrDefaultAsync(d => d.IdDocumento == Id);
+            // 1. Obtener usuario y su oficina
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var claimId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            var claimOficina = user.FindFirst("IdOficina")?.Value;
 
-        if (documento is not null)
-        {
-            nuevoEstadoId = documento.IdEstadoActual;
-            oficinas = await RepoOficinas.GetAllAsync();
+            if (int.TryParse(claimId, out var uid)) usuarioLogueadoId = uid;
+            if (int.TryParse(claimOficina, out var oid)) idOficinaUsuario = oid;
+
+            // 2. Cargar combos
+            oficinas = await RepoOficinas.GetQueryable()
+                .Where(o => o.IdOficina != idOficinaUsuario) // No mostrar mi propia oficina
+                .OrderBy(o => o.Nombre)
+                .ToListAsync();
+
             estados = await RepoEstados.GetAllAsync();
 
-            cantidadEnExpediente = await RepoDocs.GetQueryable()
-                .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
-                .CountAsync();
+            // 3. ANALIZAR PAQUETE (Lógica de frmPase.vb -> AnalizarPaquete)
+            await AnalizarPaqueteAsync();
+            
+            // 4. Texto por defecto (como en frmPase.vb)
+            nuevoMovimiento.ObservacionPase = "Se remite para su conocimiento, consideración y fines pertinentes.";
+        }
+        catch (Exception ex)
+        {
+            mensajeError = "Error inicializando: " + ex.Message;
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private async Task AnalizarPaqueteAsync()
+    {
+        // Traemos el documento base que clickeó el usuario
+        var docBase = await RepoDocs.GetQueryable().FirstOrDefaultAsync(d => d.IdDocumento == Id);
+
+        if (docBase == null)
+        {
+            mensajeError = "El documento solicitado no existe.";
+            return;
+        }
+
+        // Validar que esté en mi oficina
+        if (docBase.IdOficinaActual != idOficinaUsuario && idOficinaUsuario != 0)
+        {
+            mensajeError = $"Este documento no está en tu oficina. Está en: {docBase.IdOficinaActualNavigation?.Nombre ?? "Otra"}";
+            return;
+        }
+
+        var guidFamilia = docBase.IdHiloConversacion;
+
+        // TRAEMOS TODA LA FAMILIA QUE ESTÁ CONMIGO (Igual que frmPase.vb)
+        // Condición: Mismo Hilo + Misma Oficina + Activo (Estado != 5)
+        documentosAEnviar = await RepoDocs.GetQueryable("IdTipoNavigation")
+            .Where(d => d.IdHiloConversacion == guidFamilia &&
+                        d.IdOficinaActual == idOficinaUsuario &&
+                        d.IdEstadoActual != 5)
+            .ToListAsync();
+
+        if (!documentosAEnviar.Any())
+        {
+            mensajeError = "No hay documentos disponibles para enviar en este expediente.";
+            return;
+        }
+
+        // IDENTIFICAMOS AL PADRE (JEFE)
+        docPadre = documentosAEnviar.FirstOrDefault(d => d.IdDocumentoPadre == null);
+
+        // Si no encontramos padre (caso raro de huérfanos), tomamos el más antiguo
+        if (docPadre == null)
+        {
+            docPadre = documentosAEnviar.OrderBy(d => d.FechaCreacion).FirstOrDefault();
+        }
+
+        // Separamos los adjuntos para la vista
+        if (docPadre != null)
+        {
+            documentosAdjuntos = documentosAEnviar.Where(d => d.IdDocumento != docPadre.IdDocumento).ToList();
         }
     }
 
     private async Task GuardarPase()
     {
-        if (documento is null || nuevoMovimiento.IdOficinaDestino == 0)
+        if (nuevoMovimiento.IdOficinaDestino == 0) return;
+
+        // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
+        foreach (var doc in documentosAEnviar)
         {
-            return;
-        }
-
-        List<MaeDocumento> documentosAMover;
-
-        if (moverTodoElExpediente)
-        {
-            documentosAMover = await RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
-                .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
-                .ToListAsync();
-        }
-        else
-        {
-            documentosAMover = [documento];
-        }
-
-        foreach (var doc in documentosAMover)
-        {
-            var mov = new TraMovimiento
-            {
-                IdDocumento = doc.IdDocumento,
-                IdOficinaOrigen = doc.IdOficinaActual,
-                IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
-                FechaMovimiento = DateTime.Now,
-                IdUsuarioResponsable = usuarioLogueadoId,
-                IdEstadoEnEseMomento = nuevoEstadoId,
-                ObservacionPase = string.IsNullOrWhiteSpace(nuevoMovimiento.ObservacionPase)
-                    ? (moverTodoElExpediente ? "Movimiento en bloque de expediente." : null)
-                    : nuevoMovimiento.ObservacionPase + (moverTodoElExpediente ? " (Movimiento en bloque)" : string.Empty)
-            };
-
-            await RepoMovimientos.AddAsync(mov);
-
+            // 1. Actualizamos ubicación y estado
             doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
             doc.IdEstadoActual = nuevoEstadoId;
 
+            // Limpiamos navegaciones para evitar conflictos de EF
             doc.IdEstadoActualNavigation = null!;
             doc.IdOficinaActualNavigation = null!;
             doc.IdTipoNavigation = null!;
 
+            // 2. Sumamos fojas (SOLO AL PADRE, como en VB.NET)
+            if (docPadre != null && doc.IdDocumento == docPadre.IdDocumento && fojasAgregadas > 0)
+            {
+                // Asumiendo que existe la propiedad Fojas en tu modelo, 
+                // si se llama distinto (ej: CantidadFojas), ajustalo aquí.
+                // Basado en frmPase.vb línea 395: doc.Fojas += fojasNuevas
+                doc.Fojas = (doc.Fojas ?? 0) + fojasAgregadas; 
+            }
+
+            // 3. Generamos Historial
+            var mov = new TraMovimiento
+            {
+                IdDocumento = doc.IdDocumento,
+                IdOficinaOrigen = idOficinaUsuario,
+                IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
+                FechaMovimiento = DateTime.Now,
+                IdUsuarioResponsable = usuarioLogueadoId,
+                IdEstadoEnEseMomento = nuevoEstadoId,
+                ObservacionPase = nuevoMovimiento.ObservacionPase
+            };
+
+            await RepoMovimientos.AddAsync(mov);
             await RepoDocs.UpdateAsync(doc);
         }
+
+        // Auditoría opcional o notificación podría ir aquí
 
         Navegador.NavigateTo("documentos");
     }
