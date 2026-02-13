@@ -172,7 +172,7 @@
                 .OrderBy(o => o.Nombre)
                 .ToListAsync();
 
-            estados = await RepoEstados.GetAllAsync();
+            estados = (await RepoEstados.GetAllAsync()).ToList();
 
             // 3. ANALIZAR PAQUETE (Lógica de frmPase.vb -> AnalizarPaquete)
             await AnalizarPaqueteAsync();
