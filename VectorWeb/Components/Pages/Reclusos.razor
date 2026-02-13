@@ -75,10 +75,23 @@ else
     private string textoBusqueda = string.Empty;
 
     private IEnumerable<MaeRecluso> ReclusosFiltrados =>
-        listaReclusos.Where(recluso =>
-            string.IsNullOrWhiteSpace(textoBusqueda)
-            || (recluso.NombreCompleto ?? string.Empty).Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase)
-            || (recluso.Documento ?? string.Empty).Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase));
+        listaReclusos.Where(CoincideBusqueda);
+
+    private bool CoincideBusqueda(MaeRecluso recluso)
+    {
+        if (string.IsNullOrWhiteSpace(textoBusqueda))
+        {
+            return true;
+        }
+
+        var terminos = textoBusqueda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var textoRecluso = $"{recluso.NombreCompleto ?? string.Empty} {recluso.Documento ?? string.Empty}";
+
+        return terminos.All(termino =>
+            textoRecluso.Contains(termino, StringComparison.OrdinalIgnoreCase));
+    }
 
     // Este evento es como el "Form_Load"
     protected override async Task OnInitializedAsync()
