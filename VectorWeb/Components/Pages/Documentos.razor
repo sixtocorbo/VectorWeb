@@ -1,0 +1,68 @@
+@page "/documentos"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@rendermode InteractiveServer
+
+<h3>Gestión de Documentos</h3>
+
+<div class="mb-3">
+    <a href="documentos/nuevo" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Nuevo Ingreso (Mesa de Entrada)
+    </a>
+</div>
+
+@if (listaDocs is null)
+{
+    <p><em>Cargando documentos...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Nro. Oficial</th>
+                <th>Asunto</th>
+                <th>Tipo</th>
+                <th>Oficina Actual</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var doc in listaDocs)
+            {
+                <tr>
+                    <td>@doc.NumeroOficial</td>
+                    <td>@doc.Asunto</td>
+                    <td>@doc.IdTipoNavigation?.Nombre</td>
+                    <td>@doc.IdOficinaActualNavigation?.Nombre</td>
+                    <td>
+                        <span class="badge @(EsRojo(doc.EstadoSemaforo) ? "bg-danger" : "bg-info")">
+                            @doc.IdEstadoActualNavigation?.Nombre
+                        </span>
+                    </td>
+                    <td>
+                        <a href="documentos/editar/@doc.IdDocumento" class="btn btn-primary btn-sm">Ver Ficha</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IEnumerable<MaeDocumento>? listaDocs;
+
+    protected override void OnInitialized()
+    {
+        listaDocs = RepoDocs
+            .GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
+            .OrderByDescending(d => d.FechaCreacion)
+            .ToList();
+    }
+
+    private static bool EsRojo(string? estadoSemaforo)
+        => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(estadoSemaforo, "Rojo", StringComparison.OrdinalIgnoreCase);
+}
