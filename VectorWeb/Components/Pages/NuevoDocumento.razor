@@ -212,11 +212,6 @@
                 nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
                 nuevoDoc.Asunto = $"Ref: {padre.NumeroOficial} - ";
 
-                if (AutoPaseBandeja == true)
-                {
-                    var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
-                    nuevoDoc.IdOficinaActual = oficinaDestino;
-                }
             }
         }
     }
@@ -281,19 +276,24 @@
 
         if (AutoPaseBandeja == true && IdPadre.HasValue && docPadreSeleccionado != null)
         {
+            var oficinaOrigen = nuevoDoc.IdOficinaActual;
             var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
+            var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
 
             var movPase = new TraMovimiento
             {
                 IdDocumento = nuevoDoc.IdDocumento,
-                IdOficinaOrigen = docPadreSeleccionado.IdOficinaActual,
+                IdOficinaOrigen = oficinaOrigen,
                 IdOficinaDestino = oficinaDestino,
                 FechaMovimiento = DateTime.Now,
                 IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = "Pase automático a BANDEJA DE ENTRADA desde botón PASE"
+                ObservacionPase = $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
             };
 
             await RepoMovimientos.AddAsync(movPase);
+
+            nuevoDoc.IdOficinaActual = oficinaDestino;
+            await RepoDocs.UpdateAsync(nuevoDoc);
         }
 
         Navegador.NavigateTo("documentos");
