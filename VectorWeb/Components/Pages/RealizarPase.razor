@@ -112,6 +112,12 @@
         documento.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
         documento.IdEstadoActual = nuevoEstadoId;
 
+        // Evita conflictos de seguimiento en EF Core por entidades relacionadas
+        // duplicadas en memoria; para este update solo necesitamos las FKs.
+        documento.IdEstadoActualNavigation = null!;
+        documento.IdOficinaActualNavigation = null!;
+        documento.IdTipoNavigation = null!;
+
         await RepoDocs.UpdateAsync(documento);
 
         Navegador.NavigateTo("documentos");
