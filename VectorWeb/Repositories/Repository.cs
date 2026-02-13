@@ -51,7 +51,32 @@ namespace VectorWeb.Repositories
 
         public async Task UpdateAsync(T entity)
         {
-            _dbSet.Attach(entity);
+            var entry = _context.Entry(entity);
+
+            if (entry.State == EntityState.Detached)
+            {
+                var entityType = _context.Model.FindEntityType(typeof(T));
+                var primaryKey = entityType?.FindPrimaryKey();
+
+                if (primaryKey is not null)
+                {
+                    var localEntity = _dbSet.Local
+                        .FirstOrDefault(localItem =>
+                            primaryKey.Properties.All(property =>
+                                Equals(
+                                    property.PropertyInfo?.GetValue(localItem),
+                                    property.PropertyInfo?.GetValue(entity)
+                                )));
+
+                    if (localEntity is not null)
+                    {
+                        _context.Entry(localEntity).State = EntityState.Detached;
+                    }
+                }
+
+                _dbSet.Attach(entity);
+            }
+
             _context.Entry(entity).State = EntityState.Modified;
             await _context.SaveChangesAsync();
         }
