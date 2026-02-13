@@ -55,11 +55,26 @@
                 {
                     <div class="timeline-item card shadow-sm mb-3">
                         <div class="card-body">
+                            <div class="d-flex w-100 justify-content-between align-items-center mb-2">
+                                @if (mov.IdDocumentoNavigation is not null)
+                                {
+                                    var esDocumentoPrincipal = mov.IdDocumento == documento.IdDocumento;
+                                    var tipoDocumento = mov.IdDocumentoNavigation.IdTipoNavigation?.Nombre;
+                                    var numeroDocumento = mov.IdDocumentoNavigation.NumeroOficial;
+
+                                    <span class="badge @(esDocumentoPrincipal ? "bg-light text-dark border" : "bg-warning text-dark")">
+                                        <i class="bi @(esDocumentoPrincipal ? "bi-file-text" : "bi-paperclip")"></i>
+                                        @tipoDocumento @numeroDocumento
+                                    </span>
+                                }
+
+                                <small class="text-muted">@mov.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm")</small>
+                            </div>
+
                             <div class="d-flex w-100 justify-content-between">
                                 <h5 class="mb-1 text-success">
                                     <i class="bi bi-building"></i> @mov.IdOficinaDestinoNavigation?.Nombre
                                 </h5>
-                                <small class="text-muted">@mov.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm")</small>
                             </div>
 
                             <p class="mb-1">
@@ -155,7 +170,7 @@
             .ToListAsync();
 
         historial = await RepoMovimientos
-            .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation")
+            .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation,IdDocumentoNavigation,IdDocumentoNavigation.IdTipoNavigation")
             .Where(m => idsDocumentosDelHilo.Contains(m.IdDocumento))
             .OrderBy(m => m.FechaMovimiento)
             .ThenBy(m => m.IdMovimiento)
