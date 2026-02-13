@@ -6,8 +6,11 @@
 
 <h3>Gestión de Oficinas</h3>
 
-<div class="row mb-3">
-    <div class="col">
+<div class="row mb-3 g-2">
+    <div class="col-md-5">
+        <input type="text" class="form-control" placeholder="Buscar oficina..." @bind="busquedaOficina" @bind:event="oninput" />
+    </div>
+    <div class="col-md-5">
         <input type="text" class="form-control" placeholder="Nombre de nueva oficina..." @bind="nuevaOficinaNombre" />
     </div>
     <div class="col-auto">
@@ -23,7 +26,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var oficina in listaOficinas)
+        @foreach (var oficina in OficinasFiltradas)
         {
             <tr>
                 <td>@oficina.Nombre</td>
@@ -38,6 +41,27 @@
 @code {
     private IEnumerable<CatOficina> listaOficinas = new List<CatOficina>();
     private string nuevaOficinaNombre = string.Empty;
+    private string busquedaOficina = string.Empty;
+
+    private IEnumerable<CatOficina> OficinasFiltradas
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(busquedaOficina))
+            {
+                return listaOficinas;
+            }
+
+            var tokens = busquedaOficina
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            return listaOficinas.Where(oficina =>
+            {
+                var nombre = oficina.Nombre?.Trim() ?? string.Empty;
+                return tokens.All(token => nombre.Contains(token, StringComparison.OrdinalIgnoreCase));
+            });
+        }
+    }
 
     protected override async Task OnInitializedAsync() => await Cargar();
 

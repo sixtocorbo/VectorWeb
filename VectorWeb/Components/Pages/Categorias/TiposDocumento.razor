@@ -6,6 +6,11 @@
 
 <h3>Gestión de Tipos de Documento</h3>
 
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-warning" role="alert">@mensajeError</div>
+}
+
 <div class="row mb-3">
     <div class="col-md-5">
         <input type="text" class="form-control" placeholder="Nombre del tipo..." @bind="nuevoNombre" />
@@ -33,7 +38,7 @@
                 <td>@tipo.Nombre</td>
                 <td>@tipo.Codigo</td>
                 <td>
-                    <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(tipo.IdTipo)">Eliminar</button>
+                    <button class="btn btn-danger btn-sm" disabled="@EsTipoProtegido(tipo)" @onclick="() => Eliminar(tipo.IdTipo)">Eliminar</button>
                 </td>
             </tr>
         }
@@ -42,12 +47,20 @@
 
 @code {
     private IEnumerable<CatTipoDocumento> listaTipos = new List<CatTipoDocumento>();
+    private readonly HashSet<string> codigosProtegidos = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ARC", "ASU", "COM", "EXP", "FOR", "INF", "MEM", "OFI", "ORD", "RAD", "RES", "CAR"
+    };
     private string nuevoNombre = string.Empty;
     private string nuevoCodigo = string.Empty;
+    private string mensajeError = string.Empty;
 
     protected override async Task OnInitializedAsync() => await Cargar();
 
     private async Task Cargar() => listaTipos = await RepoTipo.GetAllAsync();
+
+    private bool EsTipoProtegido(CatTipoDocumento tipo)
+        => codigosProtegidos.Contains(tipo.Codigo?.Trim() ?? string.Empty);
 
     private async Task Agregar()
     {
@@ -66,6 +79,14 @@
 
     private async Task Eliminar(int id)
     {
+        var tipo = listaTipos.FirstOrDefault(t => t.IdTipo == id);
+        if (tipo is not null && EsTipoProtegido(tipo))
+        {
+            mensajeError = $"No se puede eliminar el tipo de documento '{tipo.Nombre}' ({tipo.Codigo}).";
+            return;
+        }
+
+        mensajeError = string.Empty;
         await RepoTipo.DeleteAsync(id);
         await Cargar();
     }
