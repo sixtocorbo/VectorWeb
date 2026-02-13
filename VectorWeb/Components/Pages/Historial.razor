@@ -143,9 +143,20 @@
         documento = await RepoDocs.GetQueryable("IdTipoNavigation,IdEstadoActualNavigation")
                                   .FirstOrDefaultAsync(d => d.IdDocumento == Id);
 
+        if (documento is null)
+        {
+            historial = [];
+            return;
+        }
+
+        var idsDocumentosDelHilo = await RepoDocs.GetQueryable()
+            .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
+            .Select(d => d.IdDocumento)
+            .ToListAsync();
+
         historial = await RepoMovimientos
             .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation")
-            .Where(m => m.IdDocumento == Id)
+            .Where(m => idsDocumentosDelHilo.Contains(m.IdDocumento))
             .OrderByDescending(m => m.FechaMovimiento)
             .ToListAsync();
     }
