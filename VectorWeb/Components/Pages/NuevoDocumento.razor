@@ -109,23 +109,26 @@
 
     <div class="card mb-3">
         <div class="card-body">
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label>Tipo de Documento:</label>
-                    <InputSelect @bind-Value="nuevoDoc.IdTipo" class="form-control">
-                        <option value="0">-- Seleccione Tipo --</option>
-                        @foreach (var tipo in tipos)
-                        {
-                            <option value="@tipo.IdTipo">@tipo.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
+            @if (!(esActuacion && soloTraerSinActuacion))
+            {
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label>Tipo de Documento:</label>
+                        <InputSelect @bind-Value="nuevoDoc.IdTipo" class="form-control">
+                            <option value="0">-- Seleccione Tipo --</option>
+                            @foreach (var tipo in tipos)
+                            {
+                                <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
 
-                <div class="col-md-6 mb-3">
-                    <label>Número Oficial (Opcional):</label>
-                    <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" placeholder="Ej. MEMO-2024-001" />
+                    <div class="col-md-6 mb-3">
+                        <label>Número Oficial (Opcional):</label>
+                        <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" placeholder="Ej. MEMO-2024-001" />
+                    </div>
                 </div>
-            </div>
+            }
 
             @if (!soloTraerSinActuacion)
             {
@@ -149,15 +152,18 @@
                     </div>
                 }
 
-                <div class="col-md-6 mb-3">
-                    <label>Estado Inicial:</label>
-                    <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
-                        @foreach (var est in estados)
-                        {
-                            <option value="@est.IdEstado">@est.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
+                @if (!(esActuacion && soloTraerSinActuacion))
+                {
+                    <div class="col-md-6 mb-3">
+                        <label>Estado Inicial:</label>
+                        <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
+                            @foreach (var est in estados)
+                            {
+                                <option value="@est.IdEstado">@est.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
             </div>
         </div>
     </div>
