@@ -227,7 +227,7 @@
         // TRAEMOS TODA LA FAMILIA QUE ESTÁ CONMIGO (Igual que frmPase.vb)
         // Condición: Mismo Hilo + Misma Oficina + Activo (Estado != 5)
         var queryFamilia = RepoDocs.GetQueryable("IdTipoNavigation")
-            .Where(d => d.IdHiloConversacion == guidFamilia && d.IdEstadoActual != 5);
+            .Where(d => d.IdHiloConversacion == guidFamilia && (d.IdEstadoActual != 5 || d.IdDocumento == Id));
 
         if (!usuarioSinOficinaAsignada)
         {
@@ -239,7 +239,7 @@
         if (!documentosAEnviar.Any())
         {
             var queryDocumentoIndividual = RepoDocs.GetQueryable("IdTipoNavigation")
-                .Where(d => d.IdDocumento == Id && d.IdEstadoActual != 5);
+                .Where(d => d.IdDocumento == Id);
 
             if (!usuarioSinOficinaAsignada)
             {
