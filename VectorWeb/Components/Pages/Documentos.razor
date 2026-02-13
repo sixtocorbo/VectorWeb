@@ -290,7 +290,7 @@ else
 
         var confirmar = await JS.InvokeAsync<bool>(
             "confirm",
-            "El documento está en una oficina remota. ¿El pase viene con actuación?");
+            "Este expediente no está en su oficina. Para tramitarlo, debe generar una actuación o respuesta. ¿Desea redactarla ahora?");
 
         if (confirmar)
         {
