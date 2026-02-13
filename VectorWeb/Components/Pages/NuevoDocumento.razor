@@ -15,6 +15,12 @@
 
 <EditForm Model="nuevoDoc" OnValidSubmit="Guardar">
     <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    @if (!string.IsNullOrWhiteSpace(errorGuardar))
+    {
+        <div class="alert alert-danger" role="alert">@errorGuardar</div>
+    }
 
     <div class="card mb-3 border-primary">
         <div class="card-header bg-light">
@@ -148,6 +154,7 @@
 
     private bool esActuacion = false;
     private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
+    private string? errorGuardar;
     
     // Listas
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
@@ -165,6 +172,12 @@
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+
+        var estadoInicial = estados.FirstOrDefault();
+        if (estadoInicial != null)
+        {
+            nuevoDoc.IdEstadoActual = estadoInicial.IdEstado;
+        }
 
         idOficinaBandejaEntrada = oficinas
             .FirstOrDefault(o => string.Equals(o.Nombre, "BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))
@@ -209,7 +222,11 @@
                 nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
-                nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
+                var estadoPadreExiste = estados.Any(e => e.IdEstado == padre.IdEstadoActual);
+                if (estadoPadreExiste)
+                {
+                    nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
+                }
                 nuevoDoc.Asunto = padre.Asunto;
                 nuevoDoc.Descripcion = padre.Descripcion;
 
@@ -249,6 +266,15 @@
 
     private async Task Guardar()
     {
+        errorGuardar = null;
+
+        var estadoValido = estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual);
+        if (!estadoValido)
+        {
+            errorGuardar = "El estado seleccionado no es válido. Selecciona un estado existente e inténtalo nuevamente.";
+            return;
+        }
+
         // 1. Guardar en MAE_DOCUMENTO
         // Se guarda: Creador = TÚ, Oficina = LA QUE ELEGISTE
         await RepoDocs.AddAsync(nuevoDoc);
