@@ -19,6 +19,14 @@
 }
 else
 {
+    <div class="mb-3">
+        <input type="text"
+               class="form-control"
+               placeholder="Buscar por nombre o documento..."
+               @bind="textoBusqueda"
+               @bind:event="oninput" />
+    </div>
+
     <table class="table table-striped">
         <thead>
             <tr>
@@ -30,7 +38,7 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var recluso in listaReclusos)
+            @foreach (var recluso in ReclusosFiltrados)
             {
                 <tr>
                     <td>@recluso.IdRecluso</td>
@@ -64,6 +72,13 @@ else
 @code {
     // Esta es tu zona de variables (igual que en VB.NET)
     private IEnumerable<MaeRecluso> listaReclusos;
+    private string textoBusqueda = string.Empty;
+
+    private IEnumerable<MaeRecluso> ReclusosFiltrados =>
+        listaReclusos.Where(recluso =>
+            string.IsNullOrWhiteSpace(textoBusqueda)
+            || (recluso.NombreCompleto ?? string.Empty).Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase)
+            || (recluso.Documento ?? string.Empty).Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase));
 
     // Este evento es como el "Form_Load"
     protected override async Task OnInitializedAsync()
