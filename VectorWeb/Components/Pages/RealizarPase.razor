@@ -8,8 +8,10 @@
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatEstado> RepoEstados
+@inject IRepository<EventosSistema> RepoEventos
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
+@inject SecretariaDbContext DbContext
 @rendermode InteractiveServer
 
 <div class="card shadow">
@@ -273,47 +275,70 @@
     {
         if (nuevoMovimiento.IdOficinaDestino == 0) return;
 
-        // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
-        foreach (var doc in documentosAEnviar)
+        var nombreDestino = oficinas.FirstOrDefault(o => o.IdOficina == nuevoMovimiento.IdOficinaDestino)?.Nombre ?? "Desconocido";
+        var documentosProcesados = 0;
+
+        await using var transaction = await DbContext.Database.BeginTransactionAsync();
+
+        try
         {
-            var oficinaOrigenMovimiento = doc.IdOficinaActual;
-
-            // 1. Actualizamos ubicación y estado
-            doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
-            doc.IdEstadoActual = nuevoEstadoId;
-
-            // Limpiamos navegaciones para evitar conflictos de EF
-            doc.IdEstadoActualNavigation = null!;
-            doc.IdOficinaActualNavigation = null!;
-            doc.IdTipoNavigation = null!;
-
-            // 2. Sumamos fojas (SOLO AL PADRE, como en VB.NET)
-            if (docPadre != null && doc.IdDocumento == docPadre.IdDocumento && fojasAgregadas > 0)
+            // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
+            foreach (var doc in documentosAEnviar)
             {
-                // Asumiendo que existe la propiedad Fojas en tu modelo, 
-                // si se llama distinto (ej: CantidadFojas), ajustalo aquí.
-                // Basado en frmPase.vb línea 395: doc.Fojas += fojasNuevas
-                doc.Fojas = (doc.Fojas ?? 0) + fojasAgregadas; 
+                var oficinaOrigenMovimiento = doc.IdOficinaActual;
+
+                // 1. Actualizamos ubicación y estado
+                doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
+                doc.IdEstadoActual = nuevoEstadoId;
+
+                // Limpiamos navegaciones para evitar conflictos de EF
+                doc.IdEstadoActualNavigation = null!;
+                doc.IdOficinaActualNavigation = null!;
+                doc.IdTipoNavigation = null!;
+
+                // 2. Sumamos fojas (SOLO AL PADRE, como en VB.NET)
+                if (docPadre != null && doc.IdDocumento == docPadre.IdDocumento && fojasAgregadas > 0)
+                {
+                    // Basado en frmPase.vb línea 395: doc.Fojas += fojasNuevas
+                    doc.Fojas = (doc.Fojas ?? 0) + fojasAgregadas;
+                }
+
+                // 3. Generamos Historial
+                var mov = new TraMovimiento
+                {
+                    IdDocumento = doc.IdDocumento,
+                    IdOficinaOrigen = usuarioSinOficinaAsignada ? oficinaOrigenMovimiento : idOficinaUsuario,
+                    IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = usuarioLogueadoId,
+                    IdEstadoEnEseMomento = nuevoEstadoId,
+                    ObservacionPase = nuevoMovimiento.ObservacionPase
+                };
+
+                await RepoMovimientos.AddAsync(mov);
+                await RepoDocs.UpdateAsync(doc);
+                documentosProcesados++;
             }
 
-            // 3. Generamos Historial
-            var mov = new TraMovimiento
+            var evento = new EventosSistema
             {
-                IdDocumento = doc.IdDocumento,
-                IdOficinaOrigen = usuarioSinOficinaAsignada ? oficinaOrigenMovimiento : idOficinaUsuario,
-                IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
-                FechaMovimiento = DateTime.Now,
-                IdUsuarioResponsable = usuarioLogueadoId,
-                IdEstadoEnEseMomento = nuevoEstadoId,
-                ObservacionPase = nuevoMovimiento.ObservacionPase
+                UsuarioId = usuarioLogueadoId,
+                FechaEvento = DateTime.Now,
+                Modulo = "PASE",
+                Descripcion = $"Pase de {documentosProcesados} documento(s) a {nombreDestino}. " +
+                              $"Observación: {nuevoMovimiento.ObservacionPase}. " +
+                              $"Fojas agregadas: {fojasAgregadas}."
             };
 
-            await RepoMovimientos.AddAsync(mov);
-            await RepoDocs.UpdateAsync(doc);
+            await RepoEventos.AddAsync(evento);
+            await transaction.CommitAsync();
+
+            Navegador.NavigateTo("documentos");
         }
-
-        // Auditoría opcional o notificación podría ir aquí
-
-        Navegador.NavigateTo("documentos");
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            mensajeError = "Error crítico al realizar el pase: " + ex.Message;
+        }
     }
 }
