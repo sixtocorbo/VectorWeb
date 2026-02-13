@@ -1,0 +1,81 @@
+@page "/documentos/editar/{Id:long}"
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@rendermode InteractiveServer
+
+<div class="container py-2">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3><i class="bi bi-file-earmark-text"></i> Ficha del Documento</h3>
+        <a href="documentos" class="btn btn-outline-secondary">Volver a la lista</a>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="alert alert-info">Cargando documento...</div>
+    }
+    else if (documento is null)
+    {
+        <div class="alert alert-warning">No se encontró el documento solicitado.</div>
+    }
+    else
+    {
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Número Oficial</label>
+                        <div class="form-control">@documento.NumeroOficial</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Número Interno</label>
+                        <div class="form-control">@documento.NumeroInterno</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Tipo de Documento</label>
+                        <div class="form-control">@documento.IdTipoNavigation?.Nombre</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Oficina Actual</label>
+                        <div class="form-control">@documento.IdOficinaActualNavigation?.Nombre</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Estado Actual</label>
+                        <div class="form-control">@documento.IdEstadoActualNavigation?.Nombre</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Fecha de Creación</label>
+                        <div class="form-control">@documento.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-muted">Asunto</label>
+                        <div class="form-control" style="min-height: 80px;">@documento.Asunto</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label text-muted">Descripción</label>
+                        <div class="form-control" style="min-height: 100px;">@documento.Descripcion</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private MaeDocumento? documento;
+    private bool cargando = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+
+        documento = await RepoDocs
+            .GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
+            .FirstOrDefaultAsync(d => d.IdDocumento == Id);
+
+        cargando = false;
+    }
+}
