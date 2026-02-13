@@ -210,7 +210,8 @@
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
                 nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
-                nuevoDoc.Asunto = $"Ref: {padre.NumeroOficial} - ";
+                nuevoDoc.Asunto = padre.Asunto;
+                nuevoDoc.Descripcion = padre.Descripcion;
 
             }
         }
