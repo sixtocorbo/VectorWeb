@@ -2,124 +2,200 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
-@inject IRepository<TraMovimiento> RepoMovimientos
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
 <h3>Ingreso de Documento - Mesa de Entrada</h3>
 
 <EditForm Model="nuevoDoc" OnValidSubmit="Guardar">
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label>Tipo de Documento:</label>
-            <InputSelect @bind-Value="nuevoDoc.IdTipo" class="form-control">
-                <option value="0">-- Seleccione Tipo --</option>
-                @foreach (var tipo in tipos)
-                {
-                    <option value="@tipo.IdTipo">@tipo.Nombre</option>
-                }
-            </InputSelect>
+    <DataAnnotationsValidator />
+
+    <div class="card mb-3 border-primary">
+        <div class="card-header bg-light">
+            <i class="bi bi-link-45deg"></i> Vinculación (Opcional)
         </div>
-
-        <div class="col-md-6 mb-3">
-            <label>Número Oficial:</label>
-            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" />
-        </div>
-    </div>
-
-    <div class="mb-3">
-        <label>Asunto:</label>
-        <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="2" />
-    </div>
-
-    <div class="mb-3">
-        <label>Documento Padre (Vinculación):</label>
-        <InputSelect @bind-Value="nuevoDoc.IdDocumentoPadre" class="form-control">
-            <option value="">-- Sin vinculación (trámite nuevo) --</option>
-            @foreach (var doc in documentosDisponiblesParaVincular)
+        <div class="card-body">
+            @if (docPadreSeleccionado == null)
             {
-                <option value="@doc.IdDocumento">#@doc.IdDocumento - @doc.NumeroOficial - @doc.Asunto</option>
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Buscar documento padre por Asunto o Nro..." 
+                           @bind="busquedaPadre" />
+                    <button type="button" class="btn btn-outline-primary" @onclick="BuscarPadre">
+                        <i class="bi bi-search"></i> Buscar
+                    </button>
+                </div>
+
+                @if (resultadosBusqueda != null && resultadosBusqueda.Any())
+                {
+                    <table class="table table-sm mt-2 table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nro</th>
+                                <th>Asunto</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in resultadosBusqueda)
+                            {
+                                <tr>
+                                    <td>@d.NumeroOficial</td>
+                                    <td>@d.Asunto</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadre(d)">
+                                            Vincular
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
             }
-        </InputSelect>
-    </div>
-
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label>Oficina Destino:</label>
-            <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
-                @foreach (var ofi in oficinas)
-                {
-                    <option value="@ofi.IdOficina">@ofi.Nombre</option>
-                }
-            </InputSelect>
-        </div>
-
-        <div class="col-md-6 mb-3">
-            <label>Estado Inicial:</label>
-            <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
-                @foreach (var est in estados)
-                {
-                    <option value="@est.IdEstado">@est.Nombre</option>
-                }
-            </InputSelect>
+            else
+            {
+                <div class="alert alert-info d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
+                    </span>
+                    <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
+                        <i class="bi bi-x-circle"></i> Quitar
+                    </button>
+                </div>
+            }
         </div>
     </div>
 
-    <button type="submit" class="btn btn-primary">Registrar Ingreso</button>
-    <a href="documentos" class="btn btn-secondary">Cancelar</a>
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label>Tipo de Documento:</label>
+                    <InputSelect @bind-Value="nuevoDoc.IdTipo" class="form-control">
+                        <option value="0">-- Seleccione Tipo --</option>
+                        @foreach (var tipo in tipos)
+                        {
+                            <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label>Número Oficial:</label>
+                    <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" />
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label>Asunto:</label>
+                <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="2" />
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label>Oficina Actual (Mesa Entrada):</label>
+                    <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
+                        @foreach (var ofi in oficinas)
+                        {
+                            <option value="@ofi.IdOficina">@ofi.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <label>Estado Inicial:</label>
+                    <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
+                        @foreach (var est in estados)
+                        {
+                            <option value="@est.IdEstado">@est.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-success btn-lg">
+        <i class="bi bi-save"></i> Registrar Ingreso
+    </button>
+    <a href="documentos" class="btn btn-secondary btn-lg">Cancelar</a>
 </EditForm>
 
 @code {
-    private MaeDocumento nuevoDoc = new()
-    {
-        FechaCreacion = DateTime.Now,
-        Asunto = string.Empty,
-        NumeroInterno = string.Empty,
-        EstadoSemaforo = "GRIS"
-    };
-
+    // Modelos principales
+    private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now, IdUsuarioCreador = 1 }; // TODO: Poner ID real del usuario logueado
+    
+    // Listas para los combos
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
-    private IEnumerable<MaeDocumento> documentosDisponiblesParaVincular = new List<MaeDocumento>();
+
+    // Variables para la lógica de vinculación
+    private string busquedaPadre = "";
+    private List<MaeDocumento> resultadosBusqueda;
+    private MaeDocumento docPadreSeleccionado;
 
     protected override async Task OnInitializedAsync()
     {
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
-        documentosDisponiblesParaVincular = (await RepoDocs.GetAllAsync())
-            .OrderByDescending(d => d.FechaCreacion)
-            .Take(100);
-
+        
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
-        nuevoDoc.IdTipo = tipos.FirstOrDefault()?.IdTipo ?? 0;
-        nuevoDoc.IdOficinaActual = oficinas.FirstOrDefault()?.IdOficina ?? 0;
-        nuevoDoc.IdEstadoActual = estados.FirstOrDefault()?.IdEstado ?? 0;
-        nuevoDoc.FechaRecepcion = DateTime.Now;
+    }
+
+    // Lógica de búsqueda (equivalente a frmVincular)
+    private async Task BuscarPadre()
+    {
+        if (!string.IsNullOrWhiteSpace(busquedaPadre))
+        {
+            var todos = await RepoDocs.GetAllAsync();
+            resultadosBusqueda = todos
+                .Where(d => d.Asunto.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase) || 
+                            d.NumeroOficial.Contains(busquedaPadre))
+                .Take(5)
+                .ToList();
+        }
+    }
+
+    private void SeleccionarPadre(MaeDocumento padre)
+    {
+        docPadreSeleccionado = padre;
+        nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
+        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion; // Heredamos el hilo del padre
+        resultadosBusqueda = null;
+        busquedaPadre = "";
+    }
+
+    private void QuitarVinculo()
+    {
+        docPadreSeleccionado = null;
+        nuevoDoc.IdDocumentoPadre = null;
+        nuevoDoc.IdHiloConversacion = Guid.NewGuid(); // Generamos hilo nuevo
     }
 
     private async Task Guardar()
     {
-        nuevoDoc.FechaCreacion ??= DateTime.Now;
-        nuevoDoc.FechaRecepcion ??= DateTime.Now;
+        // 1. Guardar el Documento
         await RepoDocs.AddAsync(nuevoDoc);
 
-        var movimientoInicial = new TraMovimiento
+        // 2. Crear Movimiento Automático (Esto es CRÍTICO para que sea igual a VECTOR)
+        var mov = new TraMovimiento
         {
             IdDocumento = nuevoDoc.IdDocumento,
             IdOficinaOrigen = nuevoDoc.IdOficinaActual,
-            IdOficinaDestino = nuevoDoc.IdOficinaActual,
+            IdOficinaDestino = nuevoDoc.IdOficinaActual, // En ingreso, origen y destino son iguales
             FechaMovimiento = DateTime.Now,
             IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-            IdEstadoEnEseMomento = nuevoDoc.IdEstadoActual,
-            ObservacionPase = "Ingreso inicial por Mesa de Entrada"
+            Comentario = "Ingreso inicial por Mesa de Entrada"
         };
+        
+        await RepoMovimientos.AddAsync(mov);
 
-        await RepoMovimientos.AddAsync(movimientoInicial);
         Navegador.NavigateTo("documentos");
     }
 }
