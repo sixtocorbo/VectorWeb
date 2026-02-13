@@ -96,8 +96,14 @@
             <p class="mb-0">@docPadreSeleccionado?.Asunto</p>
             <hr>
             <small class="mb-0 text-muted">
-                <i class="bi bi-geo-alt-fill"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong> (El memorando se creará aquí y se traerá a su bandeja automáticamente).
+                <i class="bi bi-geo-alt-fill"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
             </small>
+            <div class="form-check mt-3">
+                <InputCheckbox id="soloTraerSinActuacion" class="form-check-input" @bind-Value="soloTraerSinActuacion" />
+                <label for="soloTraerSinActuacion" class="form-check-label">
+                    Traer sin actuación (mover todos los documentos de la familia a BANDEJA DE ENTRADA)
+                </label>
+            </div>
         </div>
     }
 
@@ -121,10 +127,13 @@
                 </div>
             </div>
 
-            <div class="mb-3">
-                <label>Contenido / Asunto del Memorando:</label>
-                <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="4" />
-            </div>
+            @if (!soloTraerSinActuacion)
+            {
+                <div class="mb-3">
+                    <label>Contenido / Asunto del Memorando:</label>
+                    <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="4" />
+                </div>
+            }
 
             <div class="row">
                 @if (!esActuacion)
@@ -157,7 +166,14 @@
         <button type="submit" class="btn btn-success btn-lg">
             @if (esActuacion)
             {
-                <span><i class="bi bi-send-check"></i> Guardar y Traer a mi Bandeja</span>
+                @if (soloTraerSinActuacion)
+                {
+                    <span><i class="bi bi-box-arrow-in-down"></i> Traer sin Actuación</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-send-check"></i> Guardar Actuación y Traer todo</span>
+                }
             }
             else
             {
@@ -197,6 +213,7 @@
     private int? idOficinaBandejaEntrada;
     private int idOficinaUsuarioActual;
     private string nombreOficinaActualDoc = string.Empty;
+    private bool soloTraerSinActuacion;
 
     protected override async Task OnInitializedAsync()
     {
@@ -296,6 +313,23 @@
     {
         errorGuardar = null;
 
+        if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
+        {
+            if (!idOficinaBandejaEntrada.HasValue)
+            {
+                errorGuardar = "No se encontró la oficina BANDEJA DE ENTRADA para realizar el traslado.";
+                return;
+            }
+
+            await MoverFamiliaADestino(
+                docPadreSeleccionado.IdHiloConversacion,
+                idOficinaBandejaEntrada.Value,
+                "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
+
+            Navegador.NavigateTo("documentos");
+            return;
+        }
+
         nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
 
         if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
@@ -341,39 +375,10 @@
 
         if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
         {
-            var oficinaDestino = idOficinaUsuarioActual;
-            var oficinaOrigen = nuevoDoc.IdOficinaActual;
-
-            var movPaseHijo = new TraMovimiento
-            {
-                IdDocumento = nuevoDoc.IdDocumento,
-                IdOficinaOrigen = oficinaOrigen,
-                IdOficinaDestino = oficinaDestino,
-                FechaMovimiento = DateTime.Now.AddSeconds(1),
-                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = "Remisión de Actuación a solicitante"
-            };
-            await RepoMovimientos.AddAsync(movPaseHijo);
-
-            nuevoDoc.IdOficinaActual = oficinaDestino;
-            await RepoDocs.UpdateAsync(nuevoDoc);
-
-            if (docPadreSeleccionado.IdOficinaActual == oficinaOrigen)
-            {
-                var movPasePadre = new TraMovimiento
-                {
-                    IdDocumento = docPadreSeleccionado.IdDocumento,
-                    IdOficinaOrigen = oficinaOrigen,
-                    IdOficinaDestino = oficinaDestino,
-                    FechaMovimiento = DateTime.Now.AddSeconds(1),
-                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                    ObservacionPase = $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})"
-                };
-                await RepoMovimientos.AddAsync(movPasePadre);
-
-                docPadreSeleccionado.IdOficinaActual = oficinaDestino;
-                await RepoDocs.UpdateAsync(docPadreSeleccionado);
-            }
+            await MoverFamiliaADestino(
+                docPadreSeleccionado.IdHiloConversacion,
+                idOficinaUsuarioActual,
+                $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
         }
         else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
         {
@@ -398,5 +403,35 @@
         }
 
         Navegador.NavigateTo("documentos");
+    }
+
+    private async Task MoverFamiliaADestino(Guid hiloConversacion, int oficinaDestino, string observacion)
+    {
+        var documentosFamilia = (await RepoDocs.GetAllAsync())
+            .Where(d => d.IdHiloConversacion == hiloConversacion)
+            .ToList();
+
+        foreach (var documento in documentosFamilia)
+        {
+            if (documento.IdOficinaActual == oficinaDestino)
+            {
+                continue;
+            }
+
+            var movimiento = new TraMovimiento
+            {
+                IdDocumento = documento.IdDocumento,
+                IdOficinaOrigen = documento.IdOficinaActual,
+                IdOficinaDestino = oficinaDestino,
+                FechaMovimiento = DateTime.Now.AddSeconds(1),
+                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                ObservacionPase = observacion
+            };
+
+            await RepoMovimientos.AddAsync(movimiento);
+
+            documento.IdOficinaActual = oficinaDestino;
+            await RepoDocs.UpdateAsync(documento);
+        }
     }
 }
