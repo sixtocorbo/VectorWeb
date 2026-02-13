@@ -191,7 +191,7 @@
             IdOficinaDestino = nuevoDoc.IdOficinaActual, // En ingreso, origen y destino son iguales
             FechaMovimiento = DateTime.Now,
             IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-            Comentario = "Ingreso inicial por Mesa de Entrada"
+            ObservacionPase = "Ingreso inicial por Mesa de Entrada"
         };
         
         await RepoMovimientos.AddAsync(mov);
