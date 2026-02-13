@@ -137,6 +137,7 @@ else
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
     private bool verTodo;
+    private bool usuarioSinOficinaAsignada;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
 
     private IEnumerable<MaeDocumento> DocumentosFiltrados
@@ -208,8 +209,18 @@ else
             if (int.TryParse(claimOficina, out var oficinaId))
             {
                 idOficinaUsuario = oficinaId;
-                var oficina = await RepoOficinas.GetQueryable().FirstOrDefaultAsync(o => o.IdOficina == oficinaId);
-                nombreOficinaUsuario = oficina?.Nombre ?? $"Mi Oficina ({oficinaId})";
+
+                if (idOficinaUsuario > 0)
+                {
+                    var oficina = await RepoOficinas.GetQueryable().FirstOrDefaultAsync(o => o.IdOficina == oficinaId);
+                    nombreOficinaUsuario = oficina?.Nombre ?? $"Mi Oficina ({oficinaId})";
+                }
+                else
+                {
+                    usuarioSinOficinaAsignada = true;
+                    nombreOficinaUsuario = "Todas las oficinas";
+                    verTodo = true;
+                }
             }
             else
             {
@@ -271,7 +282,7 @@ else
 
     private async Task ClickPase(MaeDocumento doc)
     {
-        if (doc.IdOficinaActual == idOficinaUsuario)
+        if (doc.IdOficinaActual == idOficinaUsuario || usuarioSinOficinaAsignada)
         {
             Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
             return;

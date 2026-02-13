@@ -150,6 +150,7 @@
     private int fojasAgregadas = 0;
     private int usuarioLogueadoId = 1;
     private int idOficinaUsuario = 0;
+    private bool usuarioSinOficinaAsignada;
 
     protected override async Task OnInitializedAsync()
     {
@@ -165,10 +166,16 @@
 
             if (int.TryParse(claimId, out var uid)) usuarioLogueadoId = uid;
             if (int.TryParse(claimOficina, out var oid)) idOficinaUsuario = oid;
+            usuarioSinOficinaAsignada = idOficinaUsuario <= 0;
 
             // 2. Cargar combos
-            oficinas = await RepoOficinas.GetQueryable()
-                .Where(o => o.IdOficina != idOficinaUsuario) // No mostrar mi propia oficina
+            var queryOficinas = RepoOficinas.GetQueryable();
+            if (!usuarioSinOficinaAsignada)
+            {
+                queryOficinas = queryOficinas.Where(o => o.IdOficina != idOficinaUsuario); // No mostrar mi propia oficina
+            }
+
+            oficinas = await queryOficinas
                 .OrderBy(o => o.Nombre)
                 .ToListAsync();
 
@@ -207,7 +214,7 @@
         }
 
         // Validar que esté en mi oficina
-        if (docBase.IdOficinaActual != idOficinaUsuario && idOficinaUsuario != 0)
+        if (!usuarioSinOficinaAsignada && docBase.IdOficinaActual != idOficinaUsuario)
         {
             mensajeError = $"Este documento no está en tu oficina. Está en: {docBase.IdOficinaActualNavigation?.Nombre ?? "Otra"}";
             return;
@@ -217,19 +224,27 @@
 
         // TRAEMOS TODA LA FAMILIA QUE ESTÁ CONMIGO (Igual que frmPase.vb)
         // Condición: Mismo Hilo + Misma Oficina + Activo (Estado != 5)
-        documentosAEnviar = await RepoDocs.GetQueryable("IdTipoNavigation")
-            .Where(d => d.IdHiloConversacion == guidFamilia &&
-                        d.IdOficinaActual == idOficinaUsuario &&
-                        d.IdEstadoActual != 5)
-            .ToListAsync();
+        var queryFamilia = RepoDocs.GetQueryable("IdTipoNavigation")
+            .Where(d => d.IdHiloConversacion == guidFamilia && d.IdEstadoActual != 5);
+
+        if (!usuarioSinOficinaAsignada)
+        {
+            queryFamilia = queryFamilia.Where(d => d.IdOficinaActual == idOficinaUsuario);
+        }
+
+        documentosAEnviar = await queryFamilia.ToListAsync();
 
         if (!documentosAEnviar.Any())
         {
-            documentosAEnviar = await RepoDocs.GetQueryable("IdTipoNavigation")
-                .Where(d => d.IdDocumento == Id &&
-                            d.IdOficinaActual == idOficinaUsuario &&
-                            d.IdEstadoActual != 5)
-                .ToListAsync();
+            var queryDocumentoIndividual = RepoDocs.GetQueryable("IdTipoNavigation")
+                .Where(d => d.IdDocumento == Id && d.IdEstadoActual != 5);
+
+            if (!usuarioSinOficinaAsignada)
+            {
+                queryDocumentoIndividual = queryDocumentoIndividual.Where(d => d.IdOficinaActual == idOficinaUsuario);
+            }
+
+            documentosAEnviar = await queryDocumentoIndividual.ToListAsync();
         }
 
         if (!documentosAEnviar.Any())
@@ -261,6 +276,8 @@
         // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
         foreach (var doc in documentosAEnviar)
         {
+            var oficinaOrigenMovimiento = doc.IdOficinaActual;
+
             // 1. Actualizamos ubicación y estado
             doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
             doc.IdEstadoActual = nuevoEstadoId;
@@ -283,7 +300,7 @@
             var mov = new TraMovimiento
             {
                 IdDocumento = doc.IdDocumento,
-                IdOficinaOrigen = idOficinaUsuario,
+                IdOficinaOrigen = usuarioSinOficinaAsignada ? oficinaOrigenMovimiento : idOficinaUsuario,
                 IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
                 FechaMovimiento = DateTime.Now,
                 IdUsuarioResponsable = usuarioLogueadoId,
