@@ -5,6 +5,7 @@
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
+@inject IRepository<TraMovimiento> RepoMovimientos
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
@@ -32,6 +33,17 @@
     <div class="mb-3">
         <label>Asunto:</label>
         <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="2" />
+    </div>
+
+    <div class="mb-3">
+        <label>Documento Padre (Vinculación):</label>
+        <InputSelect @bind-Value="nuevoDoc.IdDocumentoPadre" class="form-control">
+            <option value="">-- Sin vinculación (trámite nuevo) --</option>
+            @foreach (var doc in documentosDisponiblesParaVincular)
+            {
+                <option value="@doc.IdDocumento">#@doc.IdDocumento - @doc.NumeroOficial - @doc.Asunto</option>
+            }
+        </InputSelect>
     </div>
 
     <div class="row">
@@ -72,22 +84,42 @@
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
+    private IEnumerable<MaeDocumento> documentosDisponiblesParaVincular = new List<MaeDocumento>();
 
     protected override async Task OnInitializedAsync()
     {
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+        documentosDisponiblesParaVincular = (await RepoDocs.GetAllAsync())
+            .OrderByDescending(d => d.FechaCreacion)
+            .Take(100);
 
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
         nuevoDoc.IdTipo = tipos.FirstOrDefault()?.IdTipo ?? 0;
         nuevoDoc.IdOficinaActual = oficinas.FirstOrDefault()?.IdOficina ?? 0;
         nuevoDoc.IdEstadoActual = estados.FirstOrDefault()?.IdEstado ?? 0;
+        nuevoDoc.FechaRecepcion = DateTime.Now;
     }
 
     private async Task Guardar()
     {
+        nuevoDoc.FechaCreacion ??= DateTime.Now;
+        nuevoDoc.FechaRecepcion ??= DateTime.Now;
         await RepoDocs.AddAsync(nuevoDoc);
+
+        var movimientoInicial = new TraMovimiento
+        {
+            IdDocumento = nuevoDoc.IdDocumento,
+            IdOficinaOrigen = nuevoDoc.IdOficinaActual,
+            IdOficinaDestino = nuevoDoc.IdOficinaActual,
+            FechaMovimiento = DateTime.Now,
+            IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+            IdEstadoEnEseMomento = nuevoDoc.IdEstadoActual,
+            ObservacionPase = "Ingreso inicial por Mesa de Entrada"
+        };
+
+        await RepoMovimientos.AddAsync(movimientoInicial);
         Navegador.NavigateTo("documentos");
     }
 }
