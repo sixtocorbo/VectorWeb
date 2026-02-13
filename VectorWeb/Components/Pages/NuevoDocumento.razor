@@ -100,12 +100,20 @@
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <label>Ubicación Inicial (Bandeja):</label>
-                    <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
+
+                    <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control" disabled="@esActuacion">
                         @foreach (var ofi in oficinas)
                         {
                             <option value="@ofi.IdOficina">@ofi.Nombre</option>
                         }
                     </InputSelect>
+
+                    @if (esActuacion)
+                    {
+                        <small class="text-danger">
+                            <i class="bi bi-lock-fill"></i> Fijado a la ubicación del expediente original.
+                        </small>
+                    }
                 </div>
 
                 <div class="col-md-6 mb-3">
@@ -132,6 +140,10 @@
     [CascadingParameter]
     private Task<AuthenticationState> AuthStateTask { get; set; }
 
+    [SupplyParameterFromQuery]
+    public int? IdPadre { get; set; }
+
+    private bool esActuacion = false;
     private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
     
     // Listas
@@ -156,7 +168,7 @@
         var authState = await AuthStateTask;
         var user = authState.User;
 
-        if (user.Identity.IsAuthenticated)
+        if (user.Identity?.IsAuthenticated == true)
         {
             // 1. AUDITORÍA (OBLIGATORIA):
             // Recuperamos TU ID. Esto asegura que aunque mandes el doc a China,
@@ -174,6 +186,23 @@
             if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out int oid))
             {
                 nuevoDoc.IdOficinaActual = oid;
+            }
+        }
+
+        if (IdPadre.HasValue)
+        {
+            var docPadre = await RepoDocs.GetAllAsync();
+            var padre = docPadre.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
+
+            if (padre != null)
+            {
+                esActuacion = true;
+                docPadreSeleccionado = padre;
+                nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
+                nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
+                nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
+                nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
+                nuevoDoc.Asunto = $"Ref: {padre.NumeroOficial} - ";
             }
         }
     }

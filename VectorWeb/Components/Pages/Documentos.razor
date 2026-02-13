@@ -105,8 +105,8 @@ else
                         <a href="documentos/editar/@doc.IdDocumento" class="btn btn-primary btn-sm">Ver Ficha</a>
                         @if (doc.IdOficinaActual == idOficinaUsuario || verTodo)
                         {
-                            <a href="documentos/pase/@doc.IdDocumento" class="btn btn-warning btn-sm text-dark ms-1" title="Realizar Pase">
-                                <i class="bi bi-arrow-right"></i> Pase
+                            <a href="documentos/nuevo?idPadre=@doc.IdDocumento" class="btn btn-secondary btn-sm ms-1" title="Adjuntar Actuación / Respuesta">
+                                <i class="bi bi-paperclip"></i> Adjuntar
                             </a>
                         }
                         <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver Historial">
