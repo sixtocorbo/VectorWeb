@@ -143,6 +143,9 @@
     [SupplyParameterFromQuery]
     public int? IdPadre { get; set; }
 
+    [SupplyParameterFromQuery]
+    public bool? AutoPaseBandeja { get; set; }
+
     private bool esActuacion = false;
     private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
     
@@ -155,12 +158,17 @@
     private string busquedaPadre = "";
     private List<MaeDocumento> resultadosBusqueda;
     private MaeDocumento docPadreSeleccionado;
+    private int? idOficinaBandejaEntrada;
 
     protected override async Task OnInitializedAsync()
     {
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+
+        idOficinaBandejaEntrada = oficinas
+            .FirstOrDefault(o => string.Equals(o.Nombre, "BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))
+            ?.IdOficina;
         
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
 
@@ -203,6 +211,12 @@
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
                 nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
                 nuevoDoc.Asunto = $"Ref: {padre.NumeroOficial} - ";
+
+                if (AutoPaseBandeja == true)
+                {
+                    var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
+                    nuevoDoc.IdOficinaActual = oficinaDestino;
+                }
             }
         }
     }
@@ -264,6 +278,23 @@
         };
         
         await RepoMovimientos.AddAsync(mov);
+
+        if (AutoPaseBandeja == true && IdPadre.HasValue && docPadreSeleccionado != null)
+        {
+            var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
+
+            var movPase = new TraMovimiento
+            {
+                IdDocumento = nuevoDoc.IdDocumento,
+                IdOficinaOrigen = docPadreSeleccionado.IdOficinaActual,
+                IdOficinaDestino = oficinaDestino,
+                FechaMovimiento = DateTime.Now,
+                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                ObservacionPase = "Pase automático a BANDEJA DE ENTRADA desde botón PASE"
+            };
+
+            await RepoMovimientos.AddAsync(movPase);
+        }
 
         Navegador.NavigateTo("documentos");
     }
