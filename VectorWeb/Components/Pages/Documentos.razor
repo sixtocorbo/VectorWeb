@@ -1,12 +1,15 @@
 @page "/documentos"
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.JSInterop
 @using System.Security.Claims
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<CatOficina> RepoOficinas
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@inject NavigationManager Navegador
 @rendermode InteractiveServer
 
 <h3>
@@ -102,15 +105,11 @@ else
                         </span>
                     </td>
                     <td>
-                        @if (doc.IdOficinaActual == idOficinaUsuario || verTodo)
-                        {
-                            <a href="documentos/nuevo?idPadre=@doc.IdDocumento" class="btn btn-secondary btn-sm" title="Adjuntar Actuación / Respuesta">
-                                <i class="bi bi-paperclip"></i> Adjuntar
-                            </a>
-                        }
-                        <a href="@ObtenerUrlPase(doc)" class="btn btn-warning btn-sm text-dark ms-1" title="@ObtenerTituloPase(doc)">
+                        <button class="btn btn-warning btn-sm text-dark ms-1"
+                                title="Realizar Pase o Actuación"
+                                @onclick="() => ClickPase(doc)">
                             <i class="bi bi-arrow-right-circle"></i> Pase
-                        </a>
+                        </button>
                         <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver Historial">
                             <i class="bi bi-clock-history"></i> Historial
                         </a>
@@ -270,13 +269,21 @@ else
         => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase)
         || string.Equals(estadoSemaforo, "Rojo", StringComparison.OrdinalIgnoreCase);
 
-    private string ObtenerUrlPase(MaeDocumento doc)
-        => doc.IdOficinaActual == idOficinaUsuario
-            ? $"documentos/pase/{doc.IdDocumento}"
-            : $"documentos/nuevo?idPadre={doc.IdDocumento}&autoPaseBandeja=true";
+    private async Task ClickPase(MaeDocumento doc)
+    {
+        if (doc.IdOficinaActual == idOficinaUsuario)
+        {
+            Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
+            return;
+        }
 
-    private string ObtenerTituloPase(MaeDocumento doc)
-        => doc.IdOficinaActual == idOficinaUsuario
-            ? "Dar Pase"
-            : "Adjuntar y pase automático a BANDEJA DE ENTRADA";
+        var confirmar = await JS.InvokeAsync<bool>(
+            "confirm",
+            "El documento se encuentra en otra oficina. ¿Desea agregar una actuación/respuesta vinculada a ese documento?");
+
+        if (confirmar)
+        {
+            Navegador.NavigateTo($"documentos/nuevo?idPadre={doc.IdDocumento}");
+        }
+    }
 }
