@@ -180,7 +180,11 @@
     public bool? AutoPaseBandeja { get; set; }
 
     private bool esActuacion = false;
-    private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
+    private MaeDocumento nuevoDoc = new MaeDocumento
+    {
+        FechaCreacion = DateTime.Now,
+        Asunto = string.Empty
+    };
     private string? errorGuardar;
 
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
@@ -291,6 +295,26 @@
     private async Task Guardar()
     {
         errorGuardar = null;
+
+        nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
+        {
+            errorGuardar = "Debe ingresar el contenido/asunto del documento.";
+            return;
+        }
+
+        if (nuevoDoc.Asunto.Length > 200)
+        {
+            errorGuardar = "El contenido/asunto no puede superar los 200 caracteres.";
+            return;
+        }
+
+        if (!tipos.Any(t => t.IdTipo == nuevoDoc.IdTipo))
+        {
+            errorGuardar = "Tipo de documento inválido.";
+            return;
+        }
 
         if (!estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual))
         {
