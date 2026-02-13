@@ -1,6 +1,8 @@
 @page "/documentos/nuevo"
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
@@ -97,7 +99,7 @@
 
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label>Oficina Actual (Mesa Entrada):</label>
+                    <label>Ubicación Inicial (Bandeja):</label>
                     <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
                         @foreach (var ofi in oficinas)
                         {
@@ -126,15 +128,18 @@
 </EditForm>
 
 @code {
-    // Modelos principales
-    private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now, IdUsuarioCreador = 1 }; // TODO: Poner ID real del usuario logueado
+    // Recibimos al usuario autenticado (TÚ)
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; }
+
+    private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
     
-    // Listas para los combos
+    // Listas
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
 
-    // Variables para la lógica de vinculación
+    // Vinculación
     private string busquedaPadre = "";
     private List<MaeDocumento> resultadosBusqueda;
     private MaeDocumento docPadreSeleccionado;
@@ -146,13 +151,38 @@
         estados = await RepoEstados.GetAllAsync();
         
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
+
+        // /// LEER AQUÍ: LÓGICA DE SEGURIDAD ///
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            // 1. AUDITORÍA (OBLIGATORIA):
+            // Recuperamos TU ID. Esto asegura que aunque mandes el doc a China,
+            // la base de datos sepa que fuiste TÚ quien lo creó.
+            var userIdClaim = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int uid))
+            {
+                nuevoDoc.IdUsuarioCreador = uid;
+            }
+
+            // 2. UBICACIÓN (SUGERIDA):
+            // Pre-seleccionamos tu oficina para ahorrar tiempo, pero como el Combo
+            // de arriba está habilitado, puedes cambiarlo si el doc no es para ti.
+            var oficinaClaim = user.FindFirst(c => c.Type == "IdOficina");
+            if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out int oid))
+            {
+                nuevoDoc.IdOficinaActual = oid;
+            }
+        }
     }
 
-    // Lógica de búsqueda (equivalente a frmVincular)
     private async Task BuscarPadre()
     {
         if (!string.IsNullOrWhiteSpace(busquedaPadre))
         {
+            // Nota: En producción optimizaremos esto con un FindAsync específico
             var todos = await RepoDocs.GetAllAsync();
             resultadosBusqueda = todos
                 .Where(d => d.Asunto.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase) || 
@@ -166,7 +196,7 @@
     {
         docPadreSeleccionado = padre;
         nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
-        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion; // Heredamos el hilo del padre
+        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion; 
         resultadosBusqueda = null;
         busquedaPadre = "";
     }
@@ -175,23 +205,33 @@
     {
         docPadreSeleccionado = null;
         nuevoDoc.IdDocumentoPadre = null;
-        nuevoDoc.IdHiloConversacion = Guid.NewGuid(); // Generamos hilo nuevo
+        nuevoDoc.IdHiloConversacion = Guid.NewGuid();
     }
 
     private async Task Guardar()
     {
-        // 1. Guardar el Documento
+        // 1. Guardar en MAE_DOCUMENTO
+        // Se guarda: Creador = TÚ, Oficina = LA QUE ELEGISTE
         await RepoDocs.AddAsync(nuevoDoc);
 
-        // 2. Crear Movimiento Automático (Esto es CRÍTICO para que sea igual a VECTOR)
+        // 2. Crear TRA_MOVIMIENTO (Historial)
         var mov = new TraMovimiento
         {
             IdDocumento = nuevoDoc.IdDocumento,
-            IdOficinaOrigen = nuevoDoc.IdOficinaActual,
-            IdOficinaDestino = nuevoDoc.IdOficinaActual, // En ingreso, origen y destino son iguales
+            
+            // Decimos que el movimiento ocurre EN la oficina destino directamente
+            // (Ya que es un ingreso inicial)
+            IdOficinaOrigen = nuevoDoc.IdOficinaActual, 
+            IdOficinaDestino = nuevoDoc.IdOficinaActual, 
+            
             FechaMovimiento = DateTime.Now,
+            
+            // /// LEER AQUÍ: RESPONSABILIDAD ///
+            // Aquí queda tu firma. En el historial dirá:
+            // "Ingresado en [Oficina Elegida] por [Tu Nombre]"
             IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-            ObservacionPase = "Ingreso inicial por Mesa de Entrada"
+            
+            Comentario = "Ingreso inicial al sistema"
         };
         
         await RepoMovimientos.AddAsync(mov);
