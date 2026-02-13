@@ -1,11 +1,14 @@
 @page "/documentos/pase/{Id:int}"
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatEstado> RepoEstados
+@inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
@@ -61,6 +64,19 @@
                     <InputTextArea @bind-Value="nuevoMovimiento.ObservacionPase" class="form-control" rows="3" placeholder="Ej: Para su intervención..." />
                 </div>
 
+                @if (cantidadEnExpediente > 1)
+                {
+                    <div class="alert alert-warning">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="moverTodoElExpediente" id="chkMoverTodo">
+                            <label class="form-check-label fw-bold" for="chkMoverTodo">
+                                Mover todo el expediente (@cantidadEnExpediente documentos vinculados)
+                            </label>
+                        </div>
+                        <small>Si desmarcas esto, solo moverás el documento actual y separarás el expediente.</small>
+                    </div>
+                }
+
                 <div class="d-flex justify-content-end gap-2">
                     <a href="documentos" class="btn btn-secondary">Cancelar</a>
                     <button type="submit" class="btn btn-success">
@@ -76,13 +92,23 @@
     [Parameter] public int Id { get; set; }
 
     private MaeDocumento? documento;
-    private TraMovimiento nuevoMovimiento = new();
+    private readonly TraMovimiento nuevoMovimiento = new();
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
     private int nuevoEstadoId;
+    private int usuarioLogueadoId = 1;
+    private int cantidadEnExpediente;
+    private bool moverTodoElExpediente = true;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var usuarioIdClaim = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (int.TryParse(usuarioIdClaim, out var uid))
+        {
+            usuarioLogueadoId = uid;
+        }
+
         documento = await RepoDocs.GetQueryable("IdOficinaActualNavigation,IdEstadoActualNavigation")
                                   .FirstOrDefaultAsync(d => d.IdDocumento == Id);
 
@@ -91,6 +117,10 @@
             nuevoEstadoId = documento.IdEstadoActual;
             oficinas = await RepoOficinas.GetAllAsync();
             estados = await RepoEstados.GetAllAsync();
+
+            cantidadEnExpediente = await RepoDocs.GetQueryable()
+                .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
+                .CountAsync();
         }
     }
 
@@ -101,24 +131,45 @@
             return;
         }
 
-        nuevoMovimiento.IdDocumento = documento.IdDocumento;
-        nuevoMovimiento.IdOficinaOrigen = documento.IdOficinaActual;
-        nuevoMovimiento.FechaMovimiento = DateTime.Now;
-        nuevoMovimiento.IdUsuarioResponsable = 1; // TODO: Usar ID real del usuario logueado
-        nuevoMovimiento.IdEstadoEnEseMomento = nuevoEstadoId;
+        List<MaeDocumento> documentosAMover;
 
-        await RepoMovimientos.AddAsync(nuevoMovimiento);
+        if (moverTodoElExpediente)
+        {
+            documentosAMover = await RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
+                .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
+                .ToListAsync();
+        }
+        else
+        {
+            documentosAMover = [documento];
+        }
 
-        documento.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
-        documento.IdEstadoActual = nuevoEstadoId;
+        foreach (var doc in documentosAMover)
+        {
+            var mov = new TraMovimiento
+            {
+                IdDocumento = doc.IdDocumento,
+                IdOficinaOrigen = doc.IdOficinaActual,
+                IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
+                FechaMovimiento = DateTime.Now,
+                IdUsuarioResponsable = usuarioLogueadoId,
+                IdEstadoEnEseMomento = nuevoEstadoId,
+                ObservacionPase = string.IsNullOrWhiteSpace(nuevoMovimiento.ObservacionPase)
+                    ? (moverTodoElExpediente ? "Movimiento en bloque de expediente." : null)
+                    : nuevoMovimiento.ObservacionPase + (moverTodoElExpediente ? " (Movimiento en bloque)" : string.Empty)
+            };
 
-        // Evita conflictos de seguimiento en EF Core por entidades relacionadas
-        // duplicadas en memoria; para este update solo necesitamos las FKs.
-        documento.IdEstadoActualNavigation = null!;
-        documento.IdOficinaActualNavigation = null!;
-        documento.IdTipoNavigation = null!;
+            await RepoMovimientos.AddAsync(mov);
 
-        await RepoDocs.UpdateAsync(documento);
+            doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
+            doc.IdEstadoActual = nuevoEstadoId;
+
+            doc.IdEstadoActualNavigation = null!;
+            doc.IdOficinaActualNavigation = null!;
+            doc.IdTipoNavigation = null!;
+
+            await RepoDocs.UpdateAsync(doc);
+        }
 
         Navegador.NavigateTo("documentos");
     }
