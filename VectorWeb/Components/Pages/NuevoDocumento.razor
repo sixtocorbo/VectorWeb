@@ -11,7 +11,16 @@
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
-<h3>Ingreso de Documento - Mesa de Entrada</h3>
+<h3>
+    @if (esActuacion)
+    {
+        <span><i class="bi bi-reply-all-fill"></i> Confeccionar Respuesta / Actuación</span>
+    }
+    else
+    {
+        <span><i class="bi bi-file-earmark-plus"></i> Ingreso de Documento - Mesa de Entrada</span>
+    }
+</h3>
 
 <EditForm Model="nuevoDoc" OnValidSubmit="Guardar">
     <DataAnnotationsValidator />
@@ -22,61 +31,75 @@
         <div class="alert alert-danger" role="alert">@errorGuardar</div>
     }
 
-    <div class="card mb-3 border-primary">
-        <div class="card-header bg-light">
-            <i class="bi bi-link-45deg"></i> Vinculación (Opcional)
-        </div>
-        <div class="card-body">
-            @if (docPadreSeleccionado == null)
-            {
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Buscar documento padre por Asunto o Nro..." 
-                           @bind="busquedaPadre" />
-                    <button type="button" class="btn btn-outline-primary" @onclick="BuscarPadre">
-                        <i class="bi bi-search"></i> Buscar
-                    </button>
-                </div>
-
-                @if (resultadosBusqueda != null && resultadosBusqueda.Any())
+    @if (!esActuacion)
+    {
+        <div class="card mb-3 border-primary">
+            <div class="card-header bg-light">
+                <i class="bi bi-link-45deg"></i> Vinculación (Opcional)
+            </div>
+            <div class="card-body">
+                @if (docPadreSeleccionado == null)
                 {
-                    <table class="table table-sm mt-2 table-hover">
-                        <thead>
-                            <tr>
-                                <th>Nro</th>
-                                <th>Asunto</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var d in resultadosBusqueda)
-                            {
+                    <div class="input-group">
+                        <input type="text" class="form-control" placeholder="Buscar documento padre por Asunto o Nro..."
+                               @bind="busquedaPadre" />
+                        <button type="button" class="btn btn-outline-primary" @onclick="BuscarPadre">
+                            <i class="bi bi-search"></i> Buscar
+                        </button>
+                    </div>
+
+                    @if (resultadosBusqueda != null && resultadosBusqueda.Any())
+                    {
+                        <table class="table table-sm mt-2 table-hover">
+                            <thead>
                                 <tr>
-                                    <td>@d.NumeroOficial</td>
-                                    <td>@d.Asunto</td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadre(d)">
-                                            Vincular
-                                        </button>
-                                    </td>
+                                    <th>Nro</th>
+                                    <th>Asunto</th>
+                                    <th></th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in resultadosBusqueda)
+                                {
+                                    <tr>
+                                        <td>@d.NumeroOficial</td>
+                                        <td>@d.Asunto</td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadre(d)">
+                                                Vincular
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
                 }
-            }
-            else
-            {
-                <div class="alert alert-info d-flex justify-content-between align-items-center">
-                    <span>
-                        <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
-                    </span>
-                    <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
-                        <i class="bi bi-x-circle"></i> Quitar
-                    </button>
-                </div>
-            }
+                else
+                {
+                    <div class="alert alert-info d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
+                        </span>
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
+                            <i class="bi bi-x-circle"></i> Quitar
+                        </button>
+                    </div>
+                }
+            </div>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="alert alert-warning shadow-sm">
+            <h5 class="alert-heading"><i class="bi bi-folder-fill"></i> Trabajando sobre el Expediente: @docPadreSeleccionado?.NumeroOficial</h5>
+            <p class="mb-0">@docPadreSeleccionado?.Asunto</p>
+            <hr>
+            <small class="mb-0 text-muted">
+                <i class="bi bi-geo-alt-fill"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong> (El memorando se creará aquí y se traerá a su bandeja automáticamente).
+            </small>
+        </div>
+    }
 
     <div class="card mb-3">
         <div class="card-body">
@@ -93,34 +116,29 @@
                 </div>
 
                 <div class="col-md-6 mb-3">
-                    <label>Número Oficial:</label>
-                    <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" />
+                    <label>Número Oficial (Opcional):</label>
+                    <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" placeholder="Ej. MEMO-2024-001" />
                 </div>
             </div>
 
             <div class="mb-3">
-                <label>Asunto:</label>
-                <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="2" />
+                <label>Contenido / Asunto del Memorando:</label>
+                <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="4" />
             </div>
 
             <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label>Ubicación Inicial (Bandeja):</label>
-
-                    <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control" disabled="@esActuacion">
-                        @foreach (var ofi in oficinas)
-                        {
-                            <option value="@ofi.IdOficina">@ofi.Nombre</option>
-                        }
-                    </InputSelect>
-
-                    @if (esActuacion)
-                    {
-                        <small class="text-danger">
-                            <i class="bi bi-lock-fill"></i> Fijado a la ubicación del expediente original.
-                        </small>
-                    }
-                </div>
+                @if (!esActuacion)
+                {
+                    <div class="col-md-6 mb-3">
+                        <label>Ubicación Inicial:</label>
+                        <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
+                            @foreach (var ofi in oficinas)
+                            {
+                                <option value="@ofi.IdOficina">@ofi.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
+                }
 
                 <div class="col-md-6 mb-3">
                     <label>Estado Inicial:</label>
@@ -135,14 +153,23 @@
         </div>
     </div>
 
-    <button type="submit" class="btn btn-success btn-lg">
-        <i class="bi bi-save"></i> Registrar Ingreso
-    </button>
-    <a href="documentos" class="btn btn-secondary btn-lg">Cancelar</a>
+    <div class="d-grid gap-2 d-md-block">
+        <button type="submit" class="btn btn-success btn-lg">
+            @if (esActuacion)
+            {
+                <span><i class="bi bi-send-check"></i> Guardar y Traer a mi Bandeja</span>
+            }
+            else
+            {
+                <span><i class="bi bi-save"></i> Registrar Ingreso</span>
+            }
+        </button>
+        <a href="documentos" class="btn btn-secondary btn-lg">Cancelar</a>
+    </div>
+
 </EditForm>
 
 @code {
-    // Recibimos al usuario autenticado (TÚ)
     [CascadingParameter]
     private Task<AuthenticationState> AuthStateTask { get; set; }
 
@@ -155,18 +182,17 @@
     private bool esActuacion = false;
     private MaeDocumento nuevoDoc = new MaeDocumento { FechaCreacion = DateTime.Now };
     private string? errorGuardar;
-    
-    // Listas
+
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
 
-    // Vinculación
-    private string busquedaPadre = "";
-    private List<MaeDocumento> resultadosBusqueda;
-    private MaeDocumento docPadreSeleccionado;
+    private string busquedaPadre = string.Empty;
+    private List<MaeDocumento>? resultadosBusqueda;
+    private MaeDocumento? docPadreSeleccionado;
     private int? idOficinaBandejaEntrada;
     private int idOficinaUsuarioActual;
+    private string nombreOficinaActualDoc = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -180,32 +206,24 @@
             nuevoDoc.IdEstadoActual = estadoInicial.IdEstado;
         }
 
+        nuevoDoc.IdHiloConversacion = Guid.NewGuid();
         idOficinaBandejaEntrada = oficinas
             .FirstOrDefault(o => string.Equals(o.Nombre, "BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))
             ?.IdOficina;
-        
-        nuevoDoc.IdHiloConversacion = Guid.NewGuid();
 
-        // /// LEER AQUÍ: LÓGICA DE SEGURIDAD ///
         var authState = await AuthStateTask;
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            // 1. AUDITORÍA (OBLIGATORIA):
-            // Recuperamos TU ID. Esto asegura que aunque mandes el doc a China,
-            // la base de datos sepa que fuiste TÚ quien lo creó.
             var userIdClaim = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int uid))
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var uid))
             {
                 nuevoDoc.IdUsuarioCreador = uid;
             }
 
-            // 2. UBICACIÓN (SUGERIDA):
-            // Pre-seleccionamos tu oficina para ahorrar tiempo, pero como el Combo
-            // de arriba está habilitado, puedes cambiarlo si el doc no es para ti.
             var oficinaClaim = user.FindFirst(c => c.Type == "IdOficina");
-            if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out int oid))
+            if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out var oid))
             {
                 idOficinaUsuarioActual = oid;
                 nuevoDoc.IdOficinaActual = oid;
@@ -214,24 +232,28 @@
 
         if (IdPadre.HasValue)
         {
-            var docPadre = await RepoDocs.GetAllAsync();
-            var padre = docPadre.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
+            var docPadres = await RepoDocs.GetAllAsync();
+            var padre = docPadres.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
 
             if (padre != null)
             {
                 esActuacion = true;
                 docPadreSeleccionado = padre;
+
                 nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
-                var estadoPadreExiste = estados.Any(e => e.IdEstado == padre.IdEstadoActual);
-                if (estadoPadreExiste)
-                {
-                    nuevoDoc.IdEstadoActual = padre.IdEstadoActual;
-                }
-                nuevoDoc.Asunto = padre.Asunto;
-                nuevoDoc.Descripcion = padre.Descripcion;
 
+                nombreOficinaActualDoc = oficinas.FirstOrDefault(o => o.IdOficina == padre.IdOficinaActual)?.Nombre ?? "Oficina Remota";
+
+                var tipoMemo = tipos.FirstOrDefault(t =>
+                    t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase) ||
+                    t.Nombre.Contains("Actuación", StringComparison.OrdinalIgnoreCase));
+
+                if (tipoMemo != null)
+                {
+                    nuevoDoc.IdTipo = tipoMemo.IdTipo;
+                }
             }
         }
     }
@@ -240,11 +262,11 @@
     {
         if (!string.IsNullOrWhiteSpace(busquedaPadre))
         {
-            // Nota: En producción optimizaremos esto con un FindAsync específico
             var todos = await RepoDocs.GetAllAsync();
             resultadosBusqueda = todos
-                .Where(d => d.Asunto.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase) || 
-                            d.NumeroOficial.Contains(busquedaPadre))
+                .Where(d =>
+                    (d.Asunto?.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (!string.IsNullOrWhiteSpace(d.NumeroOficial) && d.NumeroOficial.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase)))
                 .Take(5)
                 .ToList();
         }
@@ -254,9 +276,9 @@
     {
         docPadreSeleccionado = padre;
         nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
-        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion; 
+        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
         resultadosBusqueda = null;
-        busquedaPadre = "";
+        busquedaPadre = string.Empty;
     }
 
     private void QuitarVinculo()
@@ -270,52 +292,66 @@
     {
         errorGuardar = null;
 
-        var estadoValido = estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual);
-        if (!estadoValido)
+        if (!estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual))
         {
-            errorGuardar = "El estado seleccionado no es válido. Selecciona un estado existente e inténtalo nuevamente.";
+            errorGuardar = "Estado inválido.";
             return;
         }
 
-        // 1. Guardar en MAE_DOCUMENTO
-        // Se guarda: Creador = TÚ, Oficina = LA QUE ELEGISTE
         await RepoDocs.AddAsync(nuevoDoc);
 
-        // 2. Crear TRA_MOVIMIENTO (Historial)
-        var observacionMovimiento = "Ingreso inicial al sistema";
-        if (esActuacion)
-        {
-            var referenciaPadre = !string.IsNullOrWhiteSpace(docPadreSeleccionado?.NumeroOficial)
-                ? $" (Ref: {docPadreSeleccionado.NumeroOficial})"
-                : string.Empty;
-            observacionMovimiento = $"Confección de Actuación/Respuesta{referenciaPadre}";
-        }
+        var obsCreacion = esActuacion
+            ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
+            : "Ingreso inicial al sistema";
 
-        var mov = new TraMovimiento
+        var movCreacion = new TraMovimiento
         {
             IdDocumento = nuevoDoc.IdDocumento,
-            
-            // Decimos que el movimiento ocurre EN la oficina destino directamente
-            // (Ya que es un ingreso inicial)
-            IdOficinaOrigen = nuevoDoc.IdOficinaActual, 
-            IdOficinaDestino = nuevoDoc.IdOficinaActual, 
-            
+            IdOficinaOrigen = nuevoDoc.IdOficinaActual,
+            IdOficinaDestino = nuevoDoc.IdOficinaActual,
             FechaMovimiento = DateTime.Now,
-            
-            // /// LEER AQUÍ: RESPONSABILIDAD ///
-            // Aquí queda tu firma. En el historial dirá:
-            // "Ingresado en [Oficina Elegida] por [Tu Nombre]"
             IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-            
-            ObservacionPase = observacionMovimiento
+            ObservacionPase = obsCreacion
         };
-        
-        await RepoMovimientos.AddAsync(mov);
+        await RepoMovimientos.AddAsync(movCreacion);
 
-        var autoPasePorOficinaRemota = idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual;
-        var autoPaseSolicitadoPorParametro = AutoPaseBandeja == true && IdPadre.HasValue && docPadreSeleccionado != null;
+        if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
+        {
+            var oficinaDestino = idOficinaUsuarioActual;
+            var oficinaOrigen = nuevoDoc.IdOficinaActual;
 
-        if (autoPasePorOficinaRemota || autoPaseSolicitadoPorParametro)
+            var movPaseHijo = new TraMovimiento
+            {
+                IdDocumento = nuevoDoc.IdDocumento,
+                IdOficinaOrigen = oficinaOrigen,
+                IdOficinaDestino = oficinaDestino,
+                FechaMovimiento = DateTime.Now.AddSeconds(1),
+                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                ObservacionPase = "Remisión de Actuación a solicitante"
+            };
+            await RepoMovimientos.AddAsync(movPaseHijo);
+
+            nuevoDoc.IdOficinaActual = oficinaDestino;
+            await RepoDocs.UpdateAsync(nuevoDoc);
+
+            if (docPadreSeleccionado.IdOficinaActual == oficinaOrigen)
+            {
+                var movPasePadre = new TraMovimiento
+                {
+                    IdDocumento = docPadreSeleccionado.IdDocumento,
+                    IdOficinaOrigen = oficinaOrigen,
+                    IdOficinaDestino = oficinaDestino,
+                    FechaMovimiento = DateTime.Now.AddSeconds(1),
+                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                    ObservacionPase = $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})"
+                };
+                await RepoMovimientos.AddAsync(movPasePadre);
+
+                docPadreSeleccionado.IdOficinaActual = oficinaDestino;
+                await RepoDocs.UpdateAsync(docPadreSeleccionado);
+            }
+        }
+        else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
         {
             var oficinaOrigen = nuevoDoc.IdOficinaActual;
             var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
@@ -328,9 +364,7 @@
                 IdOficinaDestino = oficinaDestino,
                 FechaMovimiento = DateTime.Now.AddSeconds(1),
                 IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = esActuacion
-                    ? "Se remite respuesta a BANDEJA DE ENTRADA"
-                    : $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
+                ObservacionPase = $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
             };
 
             await RepoMovimientos.AddAsync(movPase);
