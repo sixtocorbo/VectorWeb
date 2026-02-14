@@ -62,7 +62,13 @@
                                         @foreach (var adj in documentosAdjuntos)
                                         {
                                             <li class="mb-1">
-                                                <i class="bi bi-paperclip"></i> @adj.NumeroOficial <br />
+                                                <i class="bi bi-paperclip"></i>
+                                                <span class="fw-semibold">@adj.IdTipoNavigation?.Nombre</span>
+                                                @if (!string.IsNullOrWhiteSpace(adj.NumeroOficial))
+                                                {
+                                                    <span>- @adj.NumeroOficial</span>
+                                                }
+                                                <br />
                                                 <span class="text-muted fst-italic">(@adj.Asunto)</span>
                                             </li>
                                         }
