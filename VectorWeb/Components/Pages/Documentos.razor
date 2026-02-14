@@ -147,7 +147,6 @@ else
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
     private bool verTodo;
-    private bool usuarioSinOficinaAsignada;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
 
     private IEnumerable<MaeDocumento> DocumentosFiltrados
@@ -227,7 +226,6 @@ else
                 }
                 else
                 {
-                    usuarioSinOficinaAsignada = true;
                     nombreOficinaUsuario = "Todas las oficinas";
                     verTodo = true;
                 }
