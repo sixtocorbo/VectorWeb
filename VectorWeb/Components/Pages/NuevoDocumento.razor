@@ -2,6 +2,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @using System.Security.Claims
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
@@ -143,28 +144,39 @@
                 {
                     <div class="col-md-6 mb-3">
                         <label>Ubicación Inicial:</label>
-                        <input type="text"
-                               class="form-control"
-                               placeholder="Escriba para buscar oficina..."
-                               value="@oficinaBusqueda"
-                               @oninput="FiltrarOficinas" />
+                        <div class="position-relative">
+                            <input type="text"
+                                   class="form-control"
+                                   placeholder="Escriba para buscar oficina..."
+                                   value="@oficinaBusqueda"
+                                   autocomplete="off"
+                                   @oninput="FiltrarOficinas"
+                                   @onfocus="MostrarSugerenciasOficina"
+                                   @onkeydown="ManejarTecladoOficinas" />
 
-                        @if (oficinasFiltradas.Any())
-                        {
-                            <div class="list-group mt-2">
-                                @foreach (var ofi in oficinasFiltradas)
-                                {
-                                    <button type="button"
-                                            class="list-group-item list-group-item-action"
-                                            @onclick="() => SeleccionarOficina(ofi)">
-                                        @ofi.Nombre
-                                    </button>
-                                }
-                            </div>
-                        }
+                            @if (oficinasFiltradas.Any())
+                            {
+                                <div class="list-group position-absolute start-0 end-0 shadow-sm"
+                                     style="@EstiloPanelSugerencias">
+                                    @for (var i = 0; i < oficinasFiltradas.Count; i++)
+                                    {
+                                        var ofi = oficinasFiltradas[i];
+                                        var cssItem = i == indiceOficinaSeleccionada
+                                            ? "list-group-item list-group-item-action active"
+                                            : "list-group-item list-group-item-action";
+
+                                        <button type="button"
+                                                class="@cssItem"
+                                                @onclick="() => SeleccionarOficina(ofi)">
+                                            @ofi.Nombre
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
 
                         <small class="text-muted">
-                            Puede buscar escribiendo palabras en cualquier orden.
+                            Puede buscar escribiendo palabras en cualquier orden. Use ↑ ↓ y Enter para seleccionar.
                         </small>
                     </div>
                 }
@@ -239,6 +251,11 @@
     private bool soloTraerSinActuacion;
     private string oficinaBusqueda = string.Empty;
     private List<CatOficina> oficinasFiltradas = new();
+    private int indiceOficinaSeleccionada = -1;
+    private bool mostrarSugerenciasArriba = true;
+    private string EstiloPanelSugerencias => mostrarSugerenciasArriba
+        ? "z-index: 20; bottom: calc(100% + .25rem);"
+        : "z-index: 20; top: calc(100% + .25rem);";
 
     protected override async Task OnInitializedAsync()
     {
@@ -472,6 +489,7 @@
     {
         oficinaBusqueda = e.Value?.ToString() ?? string.Empty;
         nuevoDoc.IdOficinaActual = 0;
+        indiceOficinaSeleccionada = -1;
 
         if (string.IsNullOrWhiteSpace(oficinaBusqueda))
         {
@@ -497,6 +515,49 @@
         nuevoDoc.IdOficinaActual = oficina.IdOficina;
         oficinaBusqueda = oficina.Nombre ?? string.Empty;
         oficinasFiltradas.Clear();
+        indiceOficinaSeleccionada = -1;
+    }
+
+    private void MostrarSugerenciasOficina()
+    {
+        if (!string.IsNullOrWhiteSpace(oficinaBusqueda))
+        {
+            oficinasFiltradas = BuscarOficinas(oficinaBusqueda)
+                .Take(8)
+                .ToList();
+        }
+    }
+
+    private void ManejarTecladoOficinas(KeyboardEventArgs e)
+    {
+        if (!oficinasFiltradas.Any())
+        {
+            return;
+        }
+
+        if (e.Key == "ArrowDown")
+        {
+            indiceOficinaSeleccionada = Math.Min(indiceOficinaSeleccionada + 1, oficinasFiltradas.Count - 1);
+            return;
+        }
+
+        if (e.Key == "ArrowUp")
+        {
+            indiceOficinaSeleccionada = Math.Max(indiceOficinaSeleccionada - 1, 0);
+            return;
+        }
+
+        if (e.Key == "Enter" && indiceOficinaSeleccionada >= 0)
+        {
+            SeleccionarOficina(oficinasFiltradas[indiceOficinaSeleccionada]);
+            return;
+        }
+
+        if (e.Key == "Escape")
+        {
+            oficinasFiltradas.Clear();
+            indiceOficinaSeleccionada = -1;
+        }
     }
 
     private IEnumerable<CatOficina> BuscarOficinas(string terminoBusqueda)
