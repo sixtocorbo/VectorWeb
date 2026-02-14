@@ -143,6 +143,7 @@ public class NumeracionRangoService
         }
 
         await DesactivarRangosAgotadosAsync(rango);
+        await DesactivarRangosActivosEnConflictoAsync(rango);
         await ValidarUnicoActivoPorTipoOficinaAnioAsync(rango);
 
         if (rango.IdRango == 0)
@@ -216,6 +217,33 @@ public class NumeracionRangoService
         foreach (var rangoAgotado in rangosAgotadosActivos)
         {
             rangoAgotado.Activo = false;
+        }
+    }
+
+    private async Task DesactivarRangosActivosEnConflictoAsync(MaeNumeracionRango rango)
+    {
+        if (!rango.Activo)
+        {
+            return;
+        }
+
+        var rangosActivosEnConflicto = await _context.MaeNumeracionRangos
+            .Where(r =>
+                r.IdRango != rango.IdRango &&
+                r.IdTipo == rango.IdTipo &&
+                r.Anio == rango.Anio &&
+                r.Activo &&
+                r.IdOficina == rango.IdOficina)
+            .ToListAsync();
+
+        if (rangosActivosEnConflicto.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var rangoActivo in rangosActivosEnConflicto)
+        {
+            rangoActivo.Activo = false;
         }
     }
 
