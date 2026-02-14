@@ -156,7 +156,7 @@
                             }
                             else if (esNumeracionExterna)
                             {
-                                <small class="text-muted">Numeración externa: ingrese el número oficial provisto por la entidad de origen.</small>
+                                <small class="text-muted">Numeración manual: ingrese el número oficial y se validará su unicidad por oficina, tipo y año.</small>
                             }
                         }
                     </div>
@@ -491,7 +491,7 @@
 
             if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
             {
-                errorGuardar = "Debe ingresar el número oficial para numeración externa.";
+                errorGuardar = "Debe ingresar el número oficial para numeración manual.";
                 return;
             }
 
@@ -657,7 +657,7 @@
         }
 
         esNumeracionExterna = true;
-        mensajeNumeracion = "Modo numeración externa: ingrese manualmente el número oficial con validación de unicidad por oficina, tipo y año.";
+        mensajeNumeracion = "Modo numeración manual: no existe rango configurado para esta oficina/tipo en el año actual. Ingrese el número oficial con validación de unicidad por oficina, tipo y año.";
     }
 
     private async Task FiltrarOficinas(ChangeEventArgs e)
