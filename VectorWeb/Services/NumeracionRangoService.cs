@@ -39,6 +39,50 @@ public class NumeracionRangoService
             .ToListAsync();
     }
 
+    public async Task<List<CupoLibroMayorItem>> ObtenerLibroMayorCuposAsync()
+    {
+        var cupos = await _context.MaeCuposSecretaria
+            .AsNoTracking()
+            .Include(c => c.IdTipoNavigation)
+            .OrderByDescending(c => c.Anio)
+            .ThenBy(c => c.IdTipoNavigation.Nombre)
+            .ToListAsync();
+
+        if (cupos.Count == 0)
+        {
+            return new List<CupoLibroMayorItem>();
+        }
+
+        var consumoPorTipoAnio = await _context.MaeNumeracionRangos
+            .AsNoTracking()
+            .GroupBy(r => new { r.IdTipo, r.Anio })
+            .Select(g => new
+            {
+                g.Key.IdTipo,
+                g.Key.Anio,
+                Consumo = g.Sum(x => x.NumeroFin - x.NumeroInicio + 1)
+            })
+            .ToListAsync();
+
+        var consumoLookup = consumoPorTipoAnio.ToDictionary(x => (x.IdTipo, x.Anio), x => x.Consumo);
+
+        return cupos
+            .Select(c =>
+            {
+                consumoLookup.TryGetValue((c.IdTipo, c.Anio), out var consumido);
+                return new CupoLibroMayorItem
+                {
+                    Tipo = c.IdTipoNavigation?.Nombre ?? $"Tipo {c.IdTipo}",
+                    Anio = c.Anio,
+                    Cantidad = c.Cantidad,
+                    Consumido = consumido,
+                    Disponible = Math.Max(0, c.Cantidad - consumido),
+                    Fecha = c.Fecha
+                };
+            })
+            .ToList();
+    }
+
     public async Task GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
     {
         if (rango.IdTipo <= 0)
@@ -72,7 +116,7 @@ public class NumeracionRangoService
         await AsegurarCupoSecretariaAsync(rango.IdTipo, anioObjetivo);
 
         var consumoSolicitado = rango.NumeroFin - rango.NumeroInicio + 1;
-        var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango);
+        var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango, rango.IdOficina);
         var cupo = await _context.MaeCuposSecretaria
             .FirstAsync(c => c.IdTipo == rango.IdTipo && c.Anio == anioObjetivo);
 
@@ -149,7 +193,32 @@ public class NumeracionRangoService
             return 0;
         }
 
-        return await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango);
+        return await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango, null);
+    }
+
+    public async Task EliminarRangoAsync(int idRango, int? idUsuario = null)
+    {
+        var rango = await _context.MaeNumeracionRangos
+            .FirstOrDefaultAsync(r => r.IdRango == idRango);
+
+        if (rango is null)
+        {
+            throw new InvalidOperationException("El rango que intenta eliminar no existe.");
+        }
+
+        _context.MaeNumeracionRangos.Remove(rango);
+
+        await RegistrarBitacoraAsync(
+            entidad: "RANGO",
+            accion: "ELIMINACION",
+            detalle: $"Eliminación de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
+            idTipo: rango.IdTipo,
+            anio: rango.Anio,
+            idOficina: rango.IdOficina,
+            idUsuario: idUsuario,
+            idReferencia: rango.IdRango);
+
+        await _context.SaveChangesAsync();
     }
 
     public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
@@ -325,10 +394,17 @@ public class NumeracionRangoService
         }
     }
 
-    private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango)
+    private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango, int? idOficina)
     {
-        return await _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipo && r.Anio == anio && (!excluirIdRango.HasValue || r.IdRango != excluirIdRango.Value))
+        var query = _context.MaeNumeracionRangos
+            .Where(r => r.IdTipo == idTipo && r.Anio == anio && (!excluirIdRango.HasValue || r.IdRango != excluirIdRango.Value));
+
+        if (idOficina.HasValue)
+        {
+            query = query.Where(r => r.IdOficina == idOficina.Value);
+        }
+
+        return await query
             .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
     }
 
@@ -487,4 +563,14 @@ public class NumeracionRangoService
 
         return $"Actualización de rango {actualizado.NombreRango}: {string.Join(", ", cambios)}.";
     }
+}
+
+public sealed class CupoLibroMayorItem
+{
+    public string Tipo { get; set; } = string.Empty;
+    public int Anio { get; set; }
+    public int Cantidad { get; set; }
+    public int Consumido { get; set; }
+    public int Disponible { get; set; }
+    public DateTime Fecha { get; set; }
 }
