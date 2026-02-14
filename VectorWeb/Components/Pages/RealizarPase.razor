@@ -106,6 +106,12 @@
                             <div class="form-check form-switch mb-3">
                                 <InputCheckbox @bind-Value="crearActuacionRemota" class="form-check-input" />
                                 <label class="form-check-label fw-bold">El pase viene con actuación</label>
+                                @if (crearActuacionRemota)
+                                {
+                                    <small class="text-muted d-block mt-1">
+                                        El sistema no generará automáticamente el registro de actuación previa. Podrás cargar la actuación manualmente con los datos que correspondan.
+                                    </small>
+                                }
                             </div>
                         }
 
@@ -341,41 +347,9 @@
 
         try
         {
-            if (esPaseDesdeOficinaRemota && crearActuacionRemota && docPadre != null)
-            {
-                var actuacionRemota = new MaeDocumento
-                {
-                    IdTipo = docPadre.IdTipo,
-                    NumeroOficial = $"ACT-{DateTime.Now:yyyyMMddHHmmss}",
-                    Asunto = $"Actuación previa al pase de {docPadre.NumeroOficial}",
-                    Descripcion = nuevoMovimiento.ObservacionPase,
-                    FechaCreacion = DateTime.Now,
-                    IdOficinaActual = docPadre.IdOficinaActual,
-                    IdEstadoActual = docPadre.IdEstadoActual,
-                    IdUsuarioCreador = usuarioLogueadoId,
-                    IdDocumentoPadre = docPadre.IdDocumento,
-                    IdHiloConversacion = docPadre.IdHiloConversacion,
-                    Fojas = 0
-                };
-
-                await RepoDocs.AddAsync(actuacionRemota);
-
-                var movimientoIngresoActuacion = new TraMovimiento
-                {
-                    IdDocumento = actuacionRemota.IdDocumento,
-                    IdOficinaOrigen = actuacionRemota.IdOficinaActual,
-                    IdOficinaDestino = actuacionRemota.IdOficinaActual,
-                    FechaMovimiento = DateTime.Now,
-                    IdUsuarioResponsable = usuarioLogueadoId,
-                    IdEstadoEnEseMomento = actuacionRemota.IdEstadoActual,
-                    ObservacionPase = "Ingreso automático de actuación en oficina remota"
-                };
-
-                await RepoMovimientos.AddAsync(movimientoIngresoActuacion);
-
-                documentosAEnviar.Add(actuacionRemota);
-                documentosAdjuntos.Add(actuacionRemota);
-            }
+            // La actuación en pases remotos se registra manualmente desde el flujo de NuevoDocumento.
+            // Aunque el usuario marque "viene con actuación", no se crea automáticamente un documento
+            // "actuación previa" para evitar registros incompletos o duplicados.
 
             // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
             foreach (var doc in documentosAEnviar)
