@@ -158,6 +158,11 @@
                     <button type="button" class="btn-close" @onclick="CerrarModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(mensajeErrorModalRango))
+                    {
+                        <div class="alert alert-danger" role="alert">@mensajeErrorModalRango</div>
+                    }
+
                     <EditForm Model="rangoActual" OnValidSubmit="Guardar">
                         <DataAnnotationsValidator />
 
@@ -229,6 +234,11 @@
                     <button type="button" class="btn-close" @onclick="CerrarModalCupo"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(mensajeErrorModalCupo))
+                    {
+                        <div class="alert alert-danger" role="alert">@mensajeErrorModalCupo</div>
+                    }
+
                     <div class="mb-3">
                         <label>Tipo de Documento</label>
                         <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-control" @onchange="OnCupoFiltroCambio">
@@ -269,6 +279,8 @@
     private bool mostrarModal;
     private string mensajeError = string.Empty;
     private string mensajeOk = string.Empty;
+    private string mensajeErrorModalRango = string.Empty;
+    private string mensajeErrorModalCupo = string.Empty;
     private int cupoTipoSeleccionado;
     private int cupoAnio = DateTime.Now.Year;
     private int cupoCantidad;
@@ -345,35 +357,36 @@
     {
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
+        mensajeErrorModalCupo = string.Empty;
 
         if (cupoTipoSeleccionado <= 0)
         {
-            mensajeError = "Debe seleccionar un tipo de documento para configurar el cupo.";
+            mensajeErrorModalCupo = "Debe seleccionar un tipo de documento para configurar el cupo.";
             return;
         }
 
         if (cupoAnio < 2000 || cupoAnio > 2100)
         {
-            mensajeError = "Debe indicar un año válido para el cupo.";
+            mensajeErrorModalCupo = "Debe indicar un año válido para el cupo.";
             return;
         }
 
         if (cupoCantidad < 0)
         {
-            mensajeError = "La cantidad de cupo no puede ser negativa.";
+            mensajeErrorModalCupo = "La cantidad de cupo no puede ser negativa.";
             return;
         }
 
         if (cupoCantidad < cupoConsumido)
         {
-            mensajeError = $"El cupo no puede ser menor al consumo actual ({cupoConsumido}).";
+            mensajeErrorModalCupo = $"El cupo no puede ser menor al consumo actual ({cupoConsumido}).";
             return;
         }
 
         var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
         if (!resultado.Exitoso)
         {
-            mensajeError = resultado.Mensaje;
+            mensajeErrorModalCupo = resultado.Mensaje;
             return;
         }
 
@@ -388,6 +401,7 @@
     {
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
+        mensajeErrorModalCupo = string.Empty;
         mostrarModalCupo = true;
     }
 
@@ -395,6 +409,7 @@
     {
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
+        mensajeErrorModalRango = string.Empty;
         rangoActual = new MaeNumeracionRango
         {
             NombreRango = "AUTO",
@@ -411,6 +426,7 @@
     {
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
+        mensajeErrorModalRango = string.Empty;
         rangoActual = new MaeNumeracionRango
         {
             IdRango = rango.IdRango,
@@ -434,53 +450,56 @@
     private void CerrarModal()
     {
         mostrarModal = false;
+        mensajeErrorModalRango = string.Empty;
     }
 
     private void CerrarModalCupo()
     {
         mostrarModalCupo = false;
+        mensajeErrorModalCupo = string.Empty;
     }
 
     private async Task Guardar()
     {
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
+        mensajeErrorModalRango = string.Empty;
 
         if (rangoActual.IdTipo <= 0)
         {
-            mensajeError = "Debe seleccionar un tipo de documento.";
+            mensajeErrorModalRango = "Debe seleccionar un tipo de documento.";
             return;
         }
 
 
         if (rangoActual.NumeroInicio <= 0 || rangoActual.NumeroFin <= 0)
         {
-            mensajeError = "Los valores de rango deben ser mayores a cero.";
+            mensajeErrorModalRango = "Los valores de rango deben ser mayores a cero.";
             return;
         }
 
         if (rangoActual.NumeroInicio > rangoActual.NumeroFin)
         {
-            mensajeError = "El número inicial no puede ser mayor al número final.";
+            mensajeErrorModalRango = "El número inicial no puede ser mayor al número final.";
             return;
         }
 
         if (rangoActual.UltimoUtilizado < rangoActual.NumeroInicio - 1 || rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
         {
-            mensajeError = "El último utilizado debe estar entre (desde - 1) y hasta.";
+            mensajeErrorModalRango = "El último utilizado debe estar entre (desde - 1) y hasta.";
             return;
         }
 
         if (rangoActual.Anio < 2000 || rangoActual.Anio > 2100)
         {
-            mensajeError = "Debe indicar un año válido para el rango.";
+            mensajeErrorModalRango = "Debe indicar un año válido para el rango.";
             return;
         }
 
         var resultado = await RangoService.GuardarRangoAsync(rangoActual);
         if (!resultado.Exitoso)
         {
-            mensajeError = resultado.Mensaje;
+            mensajeErrorModalRango = resultado.Mensaje;
             return;
         }
         mostrarModal = false;
