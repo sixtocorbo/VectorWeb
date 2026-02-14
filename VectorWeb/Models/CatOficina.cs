@@ -17,6 +17,8 @@ public partial class CatOficina
 
     public virtual ICollection<MaeDocumento> MaeDocumentos { get; set; } = new List<MaeDocumento>();
 
+    public virtual ICollection<MaeNumeracionBitacora> MaeNumeracionBitacoras { get; set; } = new List<MaeNumeracionBitacora>();
+
     public virtual ICollection<MaeNumeracionRango> MaeNumeracionRangos { get; set; } = new List<MaeNumeracionRango>();
 
     public virtual ICollection<TraMovimiento> TraMovimientoIdOficinaDestinoNavigations { get; set; } = new List<TraMovimiento>();

@@ -39,9 +39,9 @@ public partial class SecretariaDbContext : DbContext
 
     public virtual DbSet<MaeDocumento> MaeDocumentos { get; set; }
 
-    public virtual DbSet<MaeNumeracionRango> MaeNumeracionRangos { get; set; }
-
     public virtual DbSet<MaeNumeracionBitacora> MaeNumeracionBitacoras { get; set; }
+
+    public virtual DbSet<MaeNumeracionRango> MaeNumeracionRangos { get; set; }
 
     public virtual DbSet<MaeRecluso> MaeReclusos { get; set; }
 
@@ -354,6 +354,41 @@ public partial class SecretariaDbContext : DbContext
                 .HasConstraintName("FK__Mae_Docum__IdUsu__36B12243");
         });
 
+        modelBuilder.Entity<MaeNumeracionBitacora>(entity =>
+        {
+            entity.HasKey(e => e.IdBitacora).HasName("PK__Mae_Nume__ED3A1B13B40DFE49");
+
+            entity.ToTable("Mae_NumeracionBitacora");
+
+            entity.HasIndex(e => new { e.Fecha, e.IdBitacora }, "IX_Mae_NumeracionBitacora_Fecha").IsDescending();
+
+            entity.Property(e => e.Accion)
+                .HasMaxLength(30)
+                .IsUnicode(false);
+            entity.Property(e => e.Detalle)
+                .HasMaxLength(500)
+                .IsUnicode(false);
+            entity.Property(e => e.Entidad)
+                .HasMaxLength(30)
+                .IsUnicode(false);
+            entity.Property(e => e.Fecha)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime");
+
+            entity.HasOne(d => d.IdOficinaNavigation).WithMany(p => p.MaeNumeracionBitacoras)
+                .HasForeignKey(d => d.IdOficina)
+                .HasConstraintName("FK_MaeNumeracionBitacora_Oficina");
+
+            entity.HasOne(d => d.IdTipoNavigation).WithMany(p => p.MaeNumeracionBitacoras)
+                .HasForeignKey(d => d.IdTipo)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_MaeNumeracionBitacora_Tipo");
+
+            entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.MaeNumeracionBitacoras)
+                .HasForeignKey(d => d.IdUsuario)
+                .HasConstraintName("FK_MaeNumeracionBitacora_Usuario");
+        });
+
         modelBuilder.Entity<MaeNumeracionRango>(entity =>
         {
             entity.HasKey(e => e.IdRango).HasName("PK__Mae_Nume__B9E65D7F1BA7E5ED");
@@ -384,42 +419,6 @@ public partial class SecretariaDbContext : DbContext
                 .HasForeignKey(d => d.IdTipo)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Numeracion_Tipo");
-        });
-
-
-        modelBuilder.Entity<MaeNumeracionBitacora>(entity =>
-        {
-            entity.HasKey(e => e.IdBitacora).HasName("PK_Mae_NumeracionBitacora");
-
-            entity.ToTable("Mae_NumeracionBitacora");
-
-            entity.HasIndex(e => new { e.Fecha, e.IdBitacora }, "IX_Mae_NumeracionBitacora_Fecha").IsDescending();
-
-            entity.Property(e => e.Accion)
-                .HasMaxLength(30)
-                .IsUnicode(false);
-            entity.Property(e => e.Detalle)
-                .HasMaxLength(500)
-                .IsUnicode(false);
-            entity.Property(e => e.Entidad)
-                .HasMaxLength(30)
-                .IsUnicode(false);
-            entity.Property(e => e.Fecha)
-                .HasDefaultValueSql("(getdate())")
-                .HasColumnType("datetime");
-
-            entity.HasOne(d => d.IdOficinaNavigation).WithMany()
-                .HasForeignKey(d => d.IdOficina)
-                .HasConstraintName("FK_MaeNumeracionBitacora_Oficina");
-
-            entity.HasOne(d => d.IdTipoNavigation).WithMany()
-                .HasForeignKey(d => d.IdTipo)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_MaeNumeracionBitacora_Tipo");
-
-            entity.HasOne(d => d.IdUsuarioNavigation).WithMany()
-                .HasForeignKey(d => d.IdUsuario)
-                .HasConstraintName("FK_MaeNumeracionBitacora_Usuario");
         });
 
         modelBuilder.Entity<MaeRecluso>(entity =>

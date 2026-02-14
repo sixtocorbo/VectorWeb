@@ -1,4 +1,5 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 
 namespace VectorWeb.Models;
 
@@ -24,9 +25,9 @@ public partial class MaeNumeracionBitacora
 
     public int? IdReferencia { get; set; }
 
-    public virtual CatTipoDocumento IdTipoNavigation { get; set; } = null!;
-
     public virtual CatOficina? IdOficinaNavigation { get; set; }
+
+    public virtual CatTipoDocumento IdTipoNavigation { get; set; } = null!;
 
     public virtual CatUsuario? IdUsuarioNavigation { get; set; }
 }

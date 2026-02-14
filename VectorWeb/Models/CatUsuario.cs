@@ -27,5 +27,7 @@ public partial class CatUsuario
 
     public virtual ICollection<MaeDocumento> MaeDocumentos { get; set; } = new List<MaeDocumento>();
 
+    public virtual ICollection<MaeNumeracionBitacora> MaeNumeracionBitacoras { get; set; } = new List<MaeNumeracionBitacora>();
+
     public virtual ICollection<TraMovimiento> TraMovimientos { get; set; } = new List<TraMovimiento>();
 }
