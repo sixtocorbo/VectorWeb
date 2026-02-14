@@ -1,10 +1,17 @@
 @page "/configuracion/estados"
+@using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<CatEstado> RepoEstado
+@inject SecretariaDbContext DbContext
 @rendermode InteractiveServer
 
 <h3>Gestión de Estados</h3>
+
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-warning" role="alert">@mensajeError</div>
+}
 
 <div class="row mb-3">
     <div class="col-md-5">
@@ -44,6 +51,7 @@
     private IEnumerable<CatEstado> listaEstados = new List<CatEstado>();
     private string nuevoNombre = string.Empty;
     private string nuevoColorHex = "#6c757d";
+    private string mensajeError = string.Empty;
 
     protected override async Task OnInitializedAsync() => await Cargar();
 
@@ -53,6 +61,7 @@
     {
         if (!string.IsNullOrWhiteSpace(nuevoNombre))
         {
+            mensajeError = string.Empty;
             await RepoEstado.AddAsync(new CatEstado
             {
                 Nombre = nuevoNombre.Trim(),
@@ -66,6 +75,28 @@
 
     private async Task Eliminar(int id)
     {
+        var estado = listaEstados.FirstOrDefault(e => e.IdEstado == id);
+        if (estado is null)
+        {
+            mensajeError = "No se encontró el estado que intentas eliminar.";
+            return;
+        }
+
+        var tieneDocumentos = await DbContext.MaeDocumentos
+            .AsNoTracking()
+            .AnyAsync(d => d.IdEstadoActual == id);
+
+        var tieneHistorial = await DbContext.TraMovimientos
+            .AsNoTracking()
+            .AnyAsync(m => m.IdEstadoEnEseMomento == id);
+
+        if (tieneDocumentos || tieneHistorial)
+        {
+            mensajeError = $"No se puede eliminar el estado '{estado.Nombre}' porque está siendo utilizado en documentos o en el historial de movimientos.";
+            return;
+        }
+
+        mensajeError = string.Empty;
         await RepoEstado.DeleteAsync(id);
         await Cargar();
     }
