@@ -366,7 +366,7 @@
 
         var obsCreacion = esActuacion
             ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
-            : "Ingreso inicial al sistema";
+            : "Se crea el documento";
 
         var movCreacion = new TraMovimiento
         {
@@ -399,7 +399,7 @@
                 IdOficinaDestino = oficinaDestino,
                 FechaMovimiento = DateTime.Now.AddSeconds(1),
                 IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = $"Pase automático desde {nombreOficinaOrigen} hacia BANDEJA DE ENTRADA"
+                ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
             };
 
             await RepoMovimientos.AddAsync(movPase);
