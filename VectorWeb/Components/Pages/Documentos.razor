@@ -103,22 +103,11 @@ else
                         </span>
                     </td>
                     <td>
-                        @if (doc.IdOficinaActual == idOficinaUsuario)
-                        {
-                            <button class="btn btn-warning btn-sm text-dark ms-1"
-                                    title="Realizar Pase a otra oficina"
-                                    @onclick="() => IrAPase(doc)">
-                                <i class="bi bi-arrow-right-circle"></i> Pase
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-primary btn-sm ms-1"
-                                    title="Agregar una actuación o traer sin actuación, según la opción elegida en el formulario"
-                                    @onclick="() => IrAActuacion(doc)">
-                                <i class="bi bi-file-earmark-plus"></i> Agregar Actuación
-                            </button>
-                        }
+                        <button class="btn btn-warning btn-sm text-dark ms-1"
+                                title="Dar pase del documento. El sistema detecta automáticamente si el documento está en tu oficina o en una remota."
+                                @onclick="() => IrAPase(doc)">
+                            <i class="bi bi-arrow-right-circle"></i> Dar Pase
+                        </button>
 
                         <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver movimientos">
                             <i class="bi bi-clock-history"></i>
@@ -293,8 +282,4 @@ else
         Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
     }
 
-    private void IrAActuacion(MaeDocumento doc)
-    {
-        Navegador.NavigateTo($"documentos/nuevo?idPadre={doc.IdDocumento}&autoPaseBandeja=true");
-    }
 }
