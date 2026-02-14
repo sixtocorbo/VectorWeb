@@ -257,7 +257,16 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.Fecha, e.IdCupo }, "IX_Mae_CuposSecretaria_Fecha_IdCupo").IsDescending();
 
+            entity.HasIndex(e => new { e.IdTipo, e.Anio }, "UX_Mae_CuposSecretaria_Tipo_Anio").IsUnique();
+
+            entity.Property(e => e.Anio)
+                .HasDefaultValueSql("(datepart(year,getdate()))");
+
             entity.Property(e => e.Fecha).HasColumnType("datetime");
+
+            entity.Property(e => e.NombreCupo)
+                .HasMaxLength(100)
+                .IsUnicode(false);
 
             entity.HasOne(d => d.IdTipoNavigation).WithMany(p => p.MaeCuposSecretaria)
                 .HasForeignKey(d => d.IdTipo)
@@ -353,8 +362,13 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina, e.Activo }, "IX_Mae_NumeracionRangos_Completo");
 
+            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina }, "UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio")
+                .IsUnique()
+                .HasFilter("([Activo]=(1))");
+
             entity.Property(e => e.Activo).HasDefaultValue(true);
-            entity.Property(e => e.Anio).HasDefaultValue(2026);
+            entity.Property(e => e.Anio)
+                .HasDefaultValueSql("(datepart(year,getdate()))");
             entity.Property(e => e.FechaCreacion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
