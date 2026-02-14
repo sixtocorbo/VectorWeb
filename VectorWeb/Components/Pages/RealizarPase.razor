@@ -107,19 +107,25 @@
                             }
                         </div>
 
-                        @if (esPaseDesdeOficinaRemota)
-                        {
-                            <div class="form-check form-switch mb-3">
-                                <InputCheckbox @bind-Value="crearActuacionRemota" class="form-check-input" />
-                                <label class="form-check-label fw-bold">El pase viene con actuación</label>
-                                @if (crearActuacionRemota)
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="crearActuacionRemota" class="form-check-input" />
+                            <label class="form-check-label fw-bold">El pase viene con actuación</label>
+                            @if (crearActuacionRemota)
+                            {
+                                @if (esPaseDesdeOficinaRemota)
                                 {
                                     <small class="text-muted d-block mt-1">
                                         Al confirmar, se abrirá Confección de Actuación para registrar el documento en nombre de la oficina remota y luego retornar el expediente a BANDEJA DE ENTRADA.
                                     </small>
                                 }
-                            </div>
-                        }
+                                else
+                                {
+                                    <small class="text-muted d-block mt-1">
+                                        Al confirmar, se abrirá Confección de Actuación y al finalizar se enviará automáticamente el expediente a la oficina destino seleccionada.
+                                    </small>
+                                }
+                            }
+                        </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -333,10 +339,23 @@
 
     private async Task GuardarPase()
     {
-        if (esPaseDesdeOficinaRemota && crearActuacionRemota)
+        if (crearActuacionRemota)
         {
             var idDocumentoPadre = docPadre?.IdDocumento ?? Id;
-            Navegador.NavigateTo($"documentos/nuevo?IdPadre={idDocumentoPadre}&AutoPaseBandeja=true");
+
+            if (esPaseDesdeOficinaRemota)
+            {
+                Navegador.NavigateTo($"documentos/nuevo?IdPadre={idDocumentoPadre}&AutoPaseBandeja=true");
+                return;
+            }
+
+            if (nuevoMovimiento.IdOficinaDestino == 0)
+            {
+                mensajeError = "Debe seleccionar una oficina destino para el pase con actuación.";
+                return;
+            }
+
+            Navegador.NavigateTo($"documentos/nuevo?IdPadre={idDocumentoPadre}&AutoPaseDestino={nuevoMovimiento.IdOficinaDestino}");
             return;
         }
 
