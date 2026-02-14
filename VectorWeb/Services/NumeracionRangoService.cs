@@ -551,7 +551,23 @@ public class NumeracionRangoService
 
         if (existeActivo)
         {
-            var oficinaTexto = rango.IdOficina.HasValue ? $"la oficina {rango.IdOficina}" : "el ámbito global";
+            var oficinaTexto = "el ámbito global";
+
+            if (rango.IdOficina.HasValue)
+            {
+                var nombreOficina = await _context.CatOficinas
+                    .AsNoTracking()
+                    .Where(o => o.IdOficina == rango.IdOficina.Value)
+                    .Select(o => o.Nombre)
+                    .FirstOrDefaultAsync();
+
+                var etiquetaOficina = string.IsNullOrWhiteSpace(nombreOficina)
+                    ? rango.IdOficina.Value.ToString()
+                    : nombreOficina.Trim();
+
+                oficinaTexto = $"la oficina {etiquetaOficina}";
+            }
+
             return $"Ya existe un rango activo para este tipo, año y {oficinaTexto}.";
         }
 
