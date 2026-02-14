@@ -370,13 +370,10 @@
             return;
         }
 
-        try
+        var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
+        if (!resultado.Exitoso)
         {
-            await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
-        }
-        catch (InvalidOperationException ex)
-        {
-            mensajeError = ex.Message;
+            mensajeError = resultado.Mensaje;
             return;
         }
 
@@ -480,13 +477,10 @@
             return;
         }
 
-        try
+        var resultado = await RangoService.GuardarRangoAsync(rangoActual);
+        if (!resultado.Exitoso)
         {
-            await RangoService.GuardarRangoAsync(rangoActual);
-        }
-        catch (InvalidOperationException ex)
-        {
-            mensajeError = ex.Message;
+            mensajeError = resultado.Mensaje;
             return;
         }
         mostrarModal = false;
@@ -502,13 +496,10 @@
         mensajeError = string.Empty;
         mensajeOk = string.Empty;
 
-        try
+        var resultado = await RangoService.EliminarRangoAsync(rango.IdRango);
+        if (!resultado.Exitoso)
         {
-            await RangoService.EliminarRangoAsync(rango.IdRango);
-        }
-        catch (InvalidOperationException ex)
-        {
-            mensajeError = ex.Message;
+            mensajeError = resultado.Mensaje;
             return;
         }
 
