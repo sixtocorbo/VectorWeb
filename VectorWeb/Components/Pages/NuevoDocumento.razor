@@ -193,7 +193,7 @@
 
 @code {
     [CascadingParameter]
-    private Task<AuthenticationState> AuthStateTask { get; set; }
+    private Task<AuthenticationState>? AuthStateTask { get; set; }
 
     [SupplyParameterFromQuery]
     public int? IdPadre { get; set; }
@@ -238,7 +238,7 @@
             .FirstOrDefault(o => string.Equals(o.Nombre, "BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))
             ?.IdOficina;
 
-        var authState = await AuthStateTask;
+        var authState = await (AuthStateTask ?? Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated == true)
