@@ -1,0 +1,256 @@
+@page "/configuracion/rangos"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@using VectorWeb.Services
+@inject NumeracionRangoService RangoService
+@inject IRepository<CatTipoDocumento> RepoTipos
+@inject IRepository<CatOficina> RepoOficinas
+@rendermode InteractiveServer
+
+<h3>Gestión de Rangos de Documentos</h3>
+
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-danger" role="alert">@mensajeError</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(mensajeOk))
+{
+    <div class="alert alert-success" role="alert">@mensajeOk</div>
+}
+
+<button class="btn btn-primary mb-3" @onclick="AbrirNuevoRango">Nuevo Rango</button>
+
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>Tipo</th>
+            <th>Oficina</th>
+            <th>Serie</th>
+            <th>Desde</th>
+            <th>Hasta</th>
+            <th>Último</th>
+            <th>Activo</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var rango in listaRangos)
+        {
+            <tr>
+                <td>@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</td>
+                <td>@(rango.IdOficinaNavigation?.Nombre ?? "Global")</td>
+                <td>@rango.NombreRango</td>
+                <td>@rango.NumeroInicio</td>
+                <td>@rango.NumeroFin</td>
+                <td>@rango.UltimoUtilizado</td>
+                <td>@(rango.Activo ? "Sí" : "No")</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => Editar(rango)">Editar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (mostrarModal)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configurar Rango</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="rangoActual" OnValidSubmit="Guardar">
+                        <DataAnnotationsValidator />
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Tipo de Documento</label>
+                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-control">
+                                    <option value="0">-- Seleccione --</option>
+                                    @foreach (var tipo in tipos)
+                                    {
+                                        <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Oficina (opcional)</label>
+                                <InputSelect Value="OficinaSeleccionada" ValueChanged="OnOficinaChange" ValueExpression="() => OficinaSeleccionada" class="form-control">
+                                    <option value="">Global (todas)</option>
+                                    @foreach (var oficina in oficinas)
+                                    {
+                                        <option value="@oficina.IdOficina.ToString()">@oficina.Nombre</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Serie / Nombre del Rango</label>
+                            <InputText @bind-Value="rangoActual.NombreRango" class="form-control" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label>Desde</label>
+                                <InputNumber @bind-Value="rangoActual.NumeroInicio" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label>Hasta</label>
+                                <InputNumber @bind-Value="rangoActual.NumeroFin" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label>Último utilizado</label>
+                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3 form-check mt-3">
+                            <InputCheckbox @bind-Value="rangoActual.Activo" class="form-check-input" />
+                            <label class="form-check-label">Activo</label>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Guardar</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<MaeNumeracionRango> listaRangos = new();
+    private List<CatTipoDocumento> tipos = new();
+    private List<CatOficina> oficinas = new();
+    private MaeNumeracionRango rangoActual = new();
+    private bool mostrarModal;
+    private string mensajeError = string.Empty;
+    private string mensajeOk = string.Empty;
+
+    private string OficinaSeleccionada
+    {
+        get => rangoActual.IdOficina?.ToString() ?? string.Empty;
+        set
+        {
+            if (int.TryParse(value, out var idOficina))
+            {
+                rangoActual.IdOficina = idOficina;
+            }
+            else
+            {
+                rangoActual.IdOficina = null;
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarCatalogos();
+        await CargarRangos();
+    }
+
+    private async Task CargarCatalogos()
+    {
+        tipos = (await RepoTipos.GetAllAsync()).OrderBy(t => t.Nombre).ToList();
+        oficinas = (await RepoOficinas.GetAllAsync()).OrderBy(o => o.Nombre).ToList();
+    }
+
+    private async Task CargarRangos()
+    {
+        listaRangos = await RangoService.ObtenerRangosAsync();
+    }
+
+    private void AbrirNuevoRango()
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+        rangoActual = new MaeNumeracionRango
+        {
+            NombreRango = string.Empty,
+            NumeroInicio = 1,
+            NumeroFin = 999999,
+            UltimoUtilizado = 0,
+            Activo = true,
+            Anio = DateTime.Now.Year
+        };
+        mostrarModal = true;
+    }
+
+    private void Editar(MaeNumeracionRango rango)
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+        rangoActual = new MaeNumeracionRango
+        {
+            IdRango = rango.IdRango,
+            IdTipo = rango.IdTipo,
+            NombreRango = rango.NombreRango,
+            NumeroInicio = rango.NumeroInicio,
+            NumeroFin = rango.NumeroFin,
+            UltimoUtilizado = rango.UltimoUtilizado,
+            Activo = rango.Activo,
+            FechaCreacion = rango.FechaCreacion,
+            IdOficina = rango.IdOficina,
+            Anio = rango.Anio
+        };
+
+        mostrarModal = true;
+    }
+
+    private void CerrarModal()
+    {
+        mostrarModal = false;
+    }
+
+    private async Task Guardar()
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+
+        if (rangoActual.IdTipo <= 0)
+        {
+            mensajeError = "Debe seleccionar un tipo de documento.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(rangoActual.NombreRango))
+        {
+            mensajeError = "Debe ingresar la serie o nombre del rango.";
+            return;
+        }
+
+        if (rangoActual.NumeroInicio <= 0 || rangoActual.NumeroFin <= 0)
+        {
+            mensajeError = "Los valores de rango deben ser mayores a cero.";
+            return;
+        }
+
+        if (rangoActual.NumeroInicio > rangoActual.NumeroFin)
+        {
+            mensajeError = "El número inicial no puede ser mayor al número final.";
+            return;
+        }
+
+        if (rangoActual.UltimoUtilizado < rangoActual.NumeroInicio - 1 || rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
+        {
+            mensajeError = "El último utilizado debe estar entre (desde - 1) y hasta.";
+            return;
+        }
+
+        await RangoService.GuardarRangoAsync(rangoActual);
+        mostrarModal = false;
+        mensajeOk = "Rango guardado correctamente.";
+        await CargarRangos();
+    }
+
+    private Task OnOficinaChange(string value)
+    {
+        OficinaSeleccionada = value;
+        return Task.CompletedTask;
+    }
+}

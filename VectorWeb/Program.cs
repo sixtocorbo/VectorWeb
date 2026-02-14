@@ -5,6 +5,7 @@ using VectorWeb.Auth;
 using VectorWeb.Components;
 using VectorWeb.Models;
 using VectorWeb.Repositories;
+using VectorWeb.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ builder.Services.AddDbContext<SecretariaDbContext>(options =>
 
 // Generic repository
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<NumeracionRangoService>();
 
 // Blazor auth services
 builder.Services.AddAuthorizationCore();
