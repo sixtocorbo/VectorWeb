@@ -143,12 +143,29 @@
                 {
                     <div class="col-md-6 mb-3">
                         <label>Ubicación Inicial:</label>
-                        <InputSelect @bind-Value="nuevoDoc.IdOficinaActual" class="form-control">
-                            @foreach (var ofi in oficinas)
-                            {
-                                <option value="@ofi.IdOficina">@ofi.Nombre</option>
-                            }
-                        </InputSelect>
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Escriba para buscar oficina..."
+                               value="@oficinaBusqueda"
+                               @oninput="FiltrarOficinas" />
+
+                        @if (oficinasFiltradas.Any())
+                        {
+                            <div class="list-group mt-2">
+                                @foreach (var ofi in oficinasFiltradas)
+                                {
+                                    <button type="button"
+                                            class="list-group-item list-group-item-action"
+                                            @onclick="() => SeleccionarOficina(ofi)">
+                                        @ofi.Nombre
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        <small class="text-muted">
+                            Puede buscar escribiendo palabras en cualquier orden.
+                        </small>
                     </div>
                 }
 
@@ -220,6 +237,8 @@
     private int idOficinaUsuarioActual;
     private string nombreOficinaActualDoc = string.Empty;
     private bool soloTraerSinActuacion;
+    private string oficinaBusqueda = string.Empty;
+    private List<CatOficina> oficinasFiltradas = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -256,6 +275,8 @@
                 nuevoDoc.IdOficinaActual = oid;
             }
         }
+
+        oficinaBusqueda = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual)?.Nombre ?? string.Empty;
 
         if (IdPadre.HasValue)
         {
@@ -362,6 +383,12 @@
             return;
         }
 
+        if (!oficinas.Any(o => o.IdOficina == nuevoDoc.IdOficinaActual))
+        {
+            errorGuardar = "Debe seleccionar una oficina válida.";
+            return;
+        }
+
         await RepoDocs.AddAsync(nuevoDoc);
 
         var obsCreacion = esActuacion
@@ -439,5 +466,52 @@
             documento.IdOficinaActual = oficinaDestino;
             await RepoDocs.UpdateAsync(documento);
         }
+    }
+
+    private void FiltrarOficinas(ChangeEventArgs e)
+    {
+        oficinaBusqueda = e.Value?.ToString() ?? string.Empty;
+        nuevoDoc.IdOficinaActual = 0;
+
+        if (string.IsNullOrWhiteSpace(oficinaBusqueda))
+        {
+            oficinasFiltradas.Clear();
+            return;
+        }
+
+        oficinasFiltradas = BuscarOficinas(oficinaBusqueda)
+            .Take(8)
+            .ToList();
+
+        var coincidenciaExacta = oficinas.FirstOrDefault(o =>
+            string.Equals(o.Nombre, oficinaBusqueda, StringComparison.OrdinalIgnoreCase));
+
+        if (coincidenciaExacta != null)
+        {
+            nuevoDoc.IdOficinaActual = coincidenciaExacta.IdOficina;
+        }
+    }
+
+    private void SeleccionarOficina(CatOficina oficina)
+    {
+        nuevoDoc.IdOficinaActual = oficina.IdOficina;
+        oficinaBusqueda = oficina.Nombre ?? string.Empty;
+        oficinasFiltradas.Clear();
+    }
+
+    private IEnumerable<CatOficina> BuscarOficinas(string terminoBusqueda)
+    {
+        var palabras = terminoBusqueda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (palabras.Length == 0)
+        {
+            return Enumerable.Empty<CatOficina>();
+        }
+
+        return oficinas
+            .Where(o => palabras.All(palabra =>
+                (o.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false)))
+            .OrderBy(o => o.Nombre);
     }
 }
