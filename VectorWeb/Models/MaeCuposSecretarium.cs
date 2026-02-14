@@ -7,6 +7,10 @@ public partial class MaeCuposSecretarium
 {
     public int IdCupo { get; set; }
 
+    public string NombreCupo { get; set; } = null!;
+
+    public int Anio { get; set; }
+
     public DateTime Fecha { get; set; }
 
     public int? IdUsuario { get; set; }

@@ -18,21 +18,60 @@ public class NumeracionRangoService
         return await _context.MaeNumeracionRangos
             .Include(r => r.IdTipoNavigation)
             .Include(r => r.IdOficinaNavigation)
-            .OrderByDescending(r => r.Activo)
+            .OrderByDescending(r => r.Anio)
+            .ThenByDescending(r => r.Activo)
             .ThenBy(r => r.IdTipo)
-            .ThenBy(r => r.NombreRango)
+            .ThenBy(r => r.IdOficina)
             .ToListAsync();
     }
 
     public async Task GuardarRangoAsync(MaeNumeracionRango rango)
     {
+        if (rango.IdTipo <= 0)
+        {
+            throw new InvalidOperationException("Debe seleccionar un tipo de documento válido.");
+        }
+
+        if (rango.NumeroInicio <= 0 || rango.NumeroFin <= 0 || rango.NumeroInicio > rango.NumeroFin)
+        {
+            throw new InvalidOperationException("El rango ingresado no es válido.");
+        }
+
+        var anioObjetivo = rango.Anio > 0 ? rango.Anio : DateTime.Now.Year;
+        rango.Anio = anioObjetivo;
+
+        if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
+        {
+            rango.UltimoUtilizado = rango.NumeroInicio - 1;
+        }
+
+        if (rango.UltimoUtilizado > rango.NumeroFin)
+        {
+            throw new InvalidOperationException("El último utilizado no puede superar el número final.");
+        }
+
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var nombreGenerado = await GenerarNombreRangoAsync(rango.IdTipo, rango.IdOficina, anioObjetivo, rango.NumeroInicio, rango.NumeroFin);
+        rango.NombreRango = nombreGenerado;
+
+        await AsegurarCupoSecretariaAsync(rango.IdTipo, anioObjetivo);
+
+        var consumoSolicitado = rango.NumeroFin - rango.NumeroInicio + 1;
+        var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango);
+        var cupo = await _context.MaeCuposSecretaria
+            .FirstAsync(c => c.IdTipo == rango.IdTipo && c.Anio == anioObjetivo);
+
+        if (consumoAcumulado + consumoSolicitado > cupo.Cantidad)
+        {
+            var disponible = cupo.Cantidad - consumoAcumulado;
+            throw new InvalidOperationException($"No hay cupo suficiente para este rango. Disponible: {Math.Max(0, disponible)} números para el año {anioObjetivo}.");
+        }
+
+        await ValidarUnicoActivoPorTipoOficinaAnioAsync(rango);
+
         if (rango.IdRango == 0)
         {
-            if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
-            {
-                rango.UltimoUtilizado = rango.NumeroInicio - 1;
-            }
-
             rango.FechaCreacion ??= DateTime.Now;
             _context.MaeNumeracionRangos.Add(rango);
         }
@@ -50,17 +89,20 @@ public class NumeracionRangoService
         }
 
         await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
-    public async Task<MaeNumeracionRango?> ObtenerRangoActivoAsync(int idTipoDocumento, int? idOficina)
+    public async Task<MaeNumeracionRango?> ObtenerRangoActivoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
-        return await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, incluirAgotados: false);
+        var anioObjetivo = anio ?? DateTime.Now.Year;
+        return await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: false);
     }
 
-    public async Task<bool> ExisteRangoConfiguradoAsync(int idTipoDocumento, int? idOficina)
+    public async Task<bool> ExisteRangoConfiguradoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
+        var anioObjetivo = anio ?? DateTime.Now.Year;
         var baseQuery = _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipoDocumento && r.Activo);
+            .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anioObjetivo);
 
         if (idOficina.HasValue)
         {
@@ -74,11 +116,12 @@ public class NumeracionRangoService
         return await baseQuery.AnyAsync(r => r.IdOficina == null);
     }
 
-    public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina)
+    public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
+        var anioObjetivo = anio ?? DateTime.Now.Year;
         await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-        var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, incluirAgotados: true);
+        var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: true);
 
         if (rango is null)
         {
@@ -97,10 +140,10 @@ public class NumeracionRangoService
         return rango;
     }
 
-    private async Task<MaeNumeracionRango?> ObtenerRangoAdministradoAsync(int idTipoDocumento, int? idOficina, bool incluirAgotados)
+    private async Task<MaeNumeracionRango?> ObtenerRangoAdministradoAsync(int idTipoDocumento, int? idOficina, int anio, bool incluirAgotados)
     {
         var baseQuery = _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipoDocumento && r.Activo);
+            .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anio);
 
         if (!incluirAgotados)
         {
@@ -111,7 +154,8 @@ public class NumeracionRangoService
         {
             var rangoOficina = await baseQuery
                 .Where(r => r.IdOficina == idOficina)
-                .OrderBy(r => r.IdRango)
+                .OrderBy(r => r.NumeroInicio)
+                .ThenBy(r => r.IdRango)
                 .FirstOrDefaultAsync();
 
             if (rangoOficina is not null)
@@ -122,7 +166,114 @@ public class NumeracionRangoService
 
         return await baseQuery
             .Where(r => r.IdOficina == null)
-            .OrderBy(r => r.IdRango)
+            .OrderBy(r => r.NumeroInicio)
+            .ThenBy(r => r.IdRango)
             .FirstOrDefaultAsync();
+    }
+
+    private async Task ValidarUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)
+    {
+        if (!rango.Activo)
+        {
+            return;
+        }
+
+        var existeActivo = await _context.MaeNumeracionRangos.AnyAsync(r =>
+            r.IdRango != rango.IdRango &&
+            r.IdTipo == rango.IdTipo &&
+            r.Anio == rango.Anio &&
+            r.Activo &&
+            r.IdOficina == rango.IdOficina);
+
+        if (existeActivo)
+        {
+            var oficinaTexto = rango.IdOficina.HasValue ? $"la oficina {rango.IdOficina}" : "el ámbito global";
+            throw new InvalidOperationException($"Ya existe un rango activo para este tipo, año y {oficinaTexto}.");
+        }
+    }
+
+    private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango)
+    {
+        return await _context.MaeNumeracionRangos
+            .Where(r => r.IdTipo == idTipo && r.Anio == anio && (!excluirIdRango.HasValue || r.IdRango != excluirIdRango.Value))
+            .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
+    }
+
+    private async Task AsegurarCupoSecretariaAsync(int idTipo, int anio)
+    {
+        var cupoExistente = await _context.MaeCuposSecretaria
+            .FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
+
+        if (cupoExistente is not null)
+        {
+            return;
+        }
+
+        var tipo = await _context.CatTipoDocumentos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.IdTipo == idTipo);
+
+        var codigoTipo = tipo?.Codigo?.Trim();
+        if (string.IsNullOrWhiteSpace(codigoTipo))
+        {
+            codigoTipo = $"TIPO{idTipo}";
+        }
+
+        _context.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+        {
+            IdTipo = idTipo,
+            Anio = anio,
+            Fecha = DateTime.Now,
+            Cantidad = 0,
+            NombreCupo = $"CUPO-{codigoTipo}-{anio}"
+        });
+
+        await _context.SaveChangesAsync();
+    }
+
+    private async Task<string> GenerarNombreRangoAsync(int idTipo, int? idOficina, int anio, int numeroInicio, int numeroFin)
+    {
+        var tipo = await _context.CatTipoDocumentos
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.IdTipo == idTipo);
+
+        var codigoTipo = tipo?.Codigo?.Trim();
+        if (string.IsNullOrWhiteSpace(codigoTipo))
+        {
+            codigoTipo = $"TIPO{idTipo}";
+        }
+
+        var segmentoOficina = "GLOBAL";
+        if (idOficina.HasValue)
+        {
+            var oficina = await _context.CatOficinas
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => o.IdOficina == idOficina.Value);
+
+            segmentoOficina = NormalizarToken(oficina?.Nombre, $"OFI{idOficina.Value}");
+        }
+
+        return $"{codigoTipo}-{segmentoOficina}-{anio}-{numeroInicio:D6}-{numeroFin:D6}";
+    }
+
+    private static string NormalizarToken(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        var upper = value.Trim().ToUpperInvariant();
+        var normalizado = new string(upper
+            .Select(ch => char.IsLetterOrDigit(ch) ? ch : '-')
+            .ToArray());
+
+        while (normalizado.Contains("--"))
+        {
+            normalizado = normalizado.Replace("--", "-");
+        }
+
+        normalizado = normalizado.Trim('-');
+        return string.IsNullOrWhiteSpace(normalizado) ? fallback : normalizado;
     }
 }

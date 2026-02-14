@@ -26,7 +26,8 @@
         <tr>
             <th>Tipo</th>
             <th>Oficina</th>
-            <th>Serie</th>
+            <th>Año</th>
+            <th>Serie (auto)</th>
             <th>Desde</th>
             <th>Hasta</th>
             <th>Último</th>
@@ -40,6 +41,7 @@
             <tr>
                 <td>@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</td>
                 <td>@(rango.IdOficinaNavigation?.Nombre ?? "Global")</td>
+                <td>@rango.Anio</td>
                 <td>@rango.NombreRango</td>
                 <td>@rango.NumeroInicio</td>
                 <td>@rango.NumeroFin</td>
@@ -90,8 +92,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label>Serie / Nombre del Rango</label>
-                            <InputText @bind-Value="rangoActual.NombreRango" class="form-control" />
+                            <label>Año</label>
+                            <InputNumber @bind-Value="rangoActual.Anio" class="form-control" />
+                            <small class="text-muted">El nombre del rango se genera automáticamente.</small>
                         </div>
 
                         <div class="row">
@@ -171,7 +174,7 @@
         mensajeOk = string.Empty;
         rangoActual = new MaeNumeracionRango
         {
-            NombreRango = string.Empty,
+            NombreRango = "AUTO",
             NumeroInicio = 1,
             NumeroFin = 999999,
             UltimoUtilizado = 0,
@@ -218,11 +221,6 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(rangoActual.NombreRango))
-        {
-            mensajeError = "Debe ingresar la serie o nombre del rango.";
-            return;
-        }
 
         if (rangoActual.NumeroInicio <= 0 || rangoActual.NumeroFin <= 0)
         {
@@ -242,7 +240,21 @@
             return;
         }
 
-        await RangoService.GuardarRangoAsync(rangoActual);
+        if (rangoActual.Anio < 2000 || rangoActual.Anio > 2100)
+        {
+            mensajeError = "Debe indicar un año válido para el rango.";
+            return;
+        }
+
+        try
+        {
+            await RangoService.GuardarRangoAsync(rangoActual);
+        }
+        catch (InvalidOperationException ex)
+        {
+            mensajeError = ex.Message;
+            return;
+        }
         mostrarModal = false;
         mensajeOk = "Rango guardado correctamente.";
         await CargarRangos();

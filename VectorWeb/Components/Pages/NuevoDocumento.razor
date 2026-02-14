@@ -476,7 +476,7 @@
         {
             try
             {
-                var rangoConsumido = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual);
+                var rangoConsumido = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
                 nuevoDoc.NumeroOficial = $"{rangoConsumido.NombreRango}-{rangoConsumido.UltimoUtilizado}";
             }
             catch (InvalidOperationException ex)
@@ -628,7 +628,7 @@
             return;
         }
 
-        var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual);
+        var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
 
         if (rango is not null)
         {
@@ -640,7 +640,7 @@
             return;
         }
 
-        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual);
+        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
         if (existeRangoConfigurado)
         {
             bloqueoPorRangoAgotado = true;
