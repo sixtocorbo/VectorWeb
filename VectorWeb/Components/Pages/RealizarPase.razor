@@ -109,7 +109,7 @@
 
                         <div class="form-check form-switch mb-3">
                             <InputCheckbox @bind-Value="crearActuacionRemota" class="form-check-input" />
-                            <label class="form-check-label fw-bold">El pase viene con actuación</label>
+                            <label class="form-check-label fw-bold">@(esPaseDesdeOficinaRemota ? "El pase viene con actuación" : "El pase sale con actuación")</label>
                             @if (crearActuacionRemota)
                             {
                                 @if (esPaseDesdeOficinaRemota)

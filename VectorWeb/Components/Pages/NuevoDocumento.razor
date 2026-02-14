@@ -99,12 +99,21 @@
             <small class="mb-0 text-muted">
                 <i class="bi bi-geo-alt-fill"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
             </small>
-            <div class="form-check mt-3">
-                <InputCheckbox id="soloTraerSinActuacion" class="form-check-input" @bind-Value="soloTraerSinActuacion" />
-                <label for="soloTraerSinActuacion" class="form-check-label">
-                    La documentación ya está completa, solo deseo traer el expediente sin agregar esta actuación (no se guardará esta actuación ni se agregará al hilo de conversación)
-                </label>
-            </div>
+            @if (paseConActuacionForzado)
+            {
+                <div class="alert alert-info mt-3 mb-0 py-2">
+                    El pase fue confirmado con actuación, por lo que esta actuación se guardará y se aplicará el traslado automático configurado.
+                </div>
+            }
+            else
+            {
+                <div class="form-check mt-3">
+                    <InputCheckbox id="soloTraerSinActuacion" class="form-check-input" @bind-Value="soloTraerSinActuacion" />
+                    <label for="soloTraerSinActuacion" class="form-check-label">
+                        La documentación ya está completa, solo deseo traer el expediente sin agregar esta actuación (no se guardará esta actuación ni se agregará al hilo de conversación)
+                    </label>
+                </div>
+            }
         </div>
     }
 
@@ -252,6 +261,7 @@
     private int idOficinaUsuarioActual;
     private string nombreOficinaActualDoc = string.Empty;
     private bool soloTraerSinActuacion;
+    private bool paseConActuacionForzado => AutoPaseBandeja == true || AutoPaseDestino.HasValue;
     private string oficinaBusqueda = string.Empty;
     private List<CatOficina> oficinasFiltradas = new();
     private int indiceOficinaSeleccionada = -1;
@@ -322,6 +332,11 @@
                 {
                     nuevoDoc.IdTipo = tipoMemo.IdTipo;
                 }
+
+                if (paseConActuacionForzado)
+                {
+                    soloTraerSinActuacion = false;
+                }
             }
         }
     }
@@ -359,6 +374,11 @@
     private async Task Guardar()
     {
         errorGuardar = null;
+
+        if (paseConActuacionForzado)
+        {
+            soloTraerSinActuacion = false;
+        }
 
         if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
         {
