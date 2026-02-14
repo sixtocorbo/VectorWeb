@@ -259,14 +259,12 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.IdTipo, e.Anio }, "UX_Mae_CuposSecretaria_Tipo_Anio").IsUnique();
 
-            entity.Property(e => e.Anio)
-                .HasDefaultValueSql("(datepart(year,getdate()))");
-
+            entity.Property(e => e.Anio).HasDefaultValueSql("(datepart(year,getdate()))");
             entity.Property(e => e.Fecha).HasColumnType("datetime");
-
             entity.Property(e => e.NombreCupo)
                 .HasMaxLength(100)
-                .IsUnicode(false);
+                .IsUnicode(false)
+                .HasDefaultValue("CUPO-SIN-DEFINIR");
 
             entity.HasOne(d => d.IdTipoNavigation).WithMany(p => p.MaeCuposSecretaria)
                 .HasForeignKey(d => d.IdTipo)
@@ -367,8 +365,7 @@ public partial class SecretariaDbContext : DbContext
                 .HasFilter("([Activo]=(1))");
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
-            entity.Property(e => e.Anio)
-                .HasDefaultValueSql("(datepart(year,getdate()))");
+            entity.Property(e => e.Anio).HasDefaultValueSql("(datepart(year,getdate()))");
             entity.Property(e => e.FechaCreacion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
