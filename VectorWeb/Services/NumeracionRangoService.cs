@@ -126,6 +126,7 @@ public class NumeracionRangoService
             throw new InvalidOperationException($"No hay cupo suficiente para este rango. Disponible: {Math.Max(0, disponible)} números para el año {anioObjetivo}.");
         }
 
+        await DesactivarRangosAgotadosAsync(rango);
         await ValidarUnicoActivoPorTipoOficinaAnioAsync(rango);
 
         if (rango.IdRango == 0)
@@ -171,6 +172,34 @@ public class NumeracionRangoService
 
         await _context.SaveChangesAsync();
         await transaction.CommitAsync();
+    }
+
+    private async Task DesactivarRangosAgotadosAsync(MaeNumeracionRango rango)
+    {
+        if (!rango.Activo)
+        {
+            return;
+        }
+
+        var rangosAgotadosActivos = await _context.MaeNumeracionRangos
+            .Where(r =>
+                r.IdRango != rango.IdRango &&
+                r.IdTipo == rango.IdTipo &&
+                r.Anio == rango.Anio &&
+                r.Activo &&
+                r.IdOficina == rango.IdOficina &&
+                r.UltimoUtilizado >= r.NumeroFin)
+            .ToListAsync();
+
+        if (rangosAgotadosActivos.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var rangoAgotado in rangosAgotadosActivos)
+        {
+            rangoAgotado.Activo = false;
+        }
     }
 
     public async Task<int?> ObtenerCantidadCupoAsync(int idTipo, int anio)
