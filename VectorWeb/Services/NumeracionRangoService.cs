@@ -99,96 +99,102 @@ public class NumeracionRangoService
 
     public async Task<OperacionResultado> GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
     {
-        return await EjecutarOperacionControladaAsync(async () =>
+        if (rango.IdTipo <= 0)
         {
-            if (rango.IdTipo <= 0)
-            {
-                throw new InvalidOperationException("Debe seleccionar un tipo de documento válido.");
-            }
+            return OperacionResultado.Fail("Debe seleccionar un tipo de documento válido.");
+        }
 
         if (rango.NumeroInicio <= 0 || rango.NumeroFin <= 0 || rango.NumeroInicio > rango.NumeroFin)
         {
-            throw new InvalidOperationException("El rango ingresado no es válido.");
-        }
-
-        var anioObjetivo = rango.Anio > 0 ? rango.Anio : DateTime.Now.Year;
-        rango.Anio = anioObjetivo;
-
-        if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
-        {
-            rango.UltimoUtilizado = rango.NumeroInicio - 1;
+            return OperacionResultado.Fail("El rango ingresado no es válido.");
         }
 
         if (rango.UltimoUtilizado > rango.NumeroFin)
         {
-            throw new InvalidOperationException("El último utilizado no puede superar el número final.");
+            return OperacionResultado.Fail("El último utilizado no puede superar el número final.");
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-
-        var nombreGenerado = await GenerarNombreRangoAsync(rango.IdTipo, rango.IdOficina, anioObjetivo, rango.NumeroInicio, rango.NumeroFin);
-        rango.NombreRango = nombreGenerado;
-
-        await AsegurarCupoSecretariaAsync(rango.IdTipo, anioObjetivo);
-
-        var consumoSolicitado = rango.NumeroFin - rango.NumeroInicio + 1;
-        var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango, rango.IdOficina);
-        var cupo = await _context.MaeCuposSecretaria
-            .FirstAsync(c => c.IdTipo == rango.IdTipo && c.Anio == anioObjetivo);
-
-        if (consumoAcumulado + consumoSolicitado > cupo.Cantidad)
+        return await EjecutarOperacionControladaAsync(async () =>
         {
-            var disponible = cupo.Cantidad - consumoAcumulado;
-            throw new InvalidOperationException($"No hay cupo suficiente para este rango. Disponible: {Math.Max(0, disponible)} números para el año {anioObjetivo}.");
-        }
+            var anioObjetivo = rango.Anio > 0 ? rango.Anio : DateTime.Now.Year;
+            rango.Anio = anioObjetivo;
 
-        await DesactivarRangosAgotadosAsync(rango);
-        await DesactivarRangosActivosEnConflictoAsync(rango);
-        await ValidarUnicoActivoPorTipoOficinaAnioAsync(rango);
-
-        if (rango.IdRango == 0)
-        {
-            rango.FechaCreacion ??= DateTime.Now;
-            _context.MaeNumeracionRangos.Add(rango);
-
-            await RegistrarBitacoraAsync(
-                entidad: "RANGO",
-                accion: "APERTURA",
-                detalle: $"Apertura de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
-                idTipo: rango.IdTipo,
-                anio: rango.Anio,
-                idOficina: rango.IdOficina,
-                idUsuario: idUsuario,
-                idReferencia: rango.IdRango == 0 ? null : rango.IdRango);
-        }
-        else
-        {
-            var rangoExistente = await _context.MaeNumeracionRangos
-                .FirstOrDefaultAsync(r => r.IdRango == rango.IdRango);
-
-            if (rangoExistente is null)
+            if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
             {
-                throw new InvalidOperationException("El rango que intenta actualizar no existe.");
+                rango.UltimoUtilizado = rango.NumeroInicio - 1;
             }
 
-            var accion = DeterminarAccionRango(rangoExistente, rango);
-            var detalle = ConstruirDetalleCambioRango(rangoExistente, rango);
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-            _context.Entry(rangoExistente).CurrentValues.SetValues(rango);
+            var nombreGenerado = await GenerarNombreRangoAsync(rango.IdTipo, rango.IdOficina, anioObjetivo, rango.NumeroInicio, rango.NumeroFin);
+            rango.NombreRango = nombreGenerado;
 
-            await RegistrarBitacoraAsync(
-                entidad: "RANGO",
-                accion: accion,
-                detalle: detalle,
-                idTipo: rango.IdTipo,
-                anio: rango.Anio,
-                idOficina: rango.IdOficina,
-                idUsuario: idUsuario,
-                idReferencia: rango.IdRango);
-        }
+            await AsegurarCupoSecretariaAsync(rango.IdTipo, anioObjetivo);
+
+            var consumoSolicitado = rango.NumeroFin - rango.NumeroInicio + 1;
+            var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango, rango.IdOficina);
+            var cupo = await _context.MaeCuposSecretaria
+                .FirstAsync(c => c.IdTipo == rango.IdTipo && c.Anio == anioObjetivo);
+
+            if (consumoAcumulado + consumoSolicitado > cupo.Cantidad)
+            {
+                var disponible = cupo.Cantidad - consumoAcumulado;
+                return OperacionResultado.Fail($"No hay cupo suficiente para este rango. Disponible: {Math.Max(0, disponible)} números para el año {anioObjetivo}.");
+            }
+
+            await DesactivarRangosAgotadosAsync(rango);
+            await DesactivarRangosActivosEnConflictoAsync(rango);
+
+            var mensajeConflictoActivo = await ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(rango);
+            if (!string.IsNullOrWhiteSpace(mensajeConflictoActivo))
+            {
+                return OperacionResultado.Fail(mensajeConflictoActivo);
+            }
+
+            if (rango.IdRango == 0)
+            {
+                rango.FechaCreacion ??= DateTime.Now;
+                _context.MaeNumeracionRangos.Add(rango);
+
+                await RegistrarBitacoraAsync(
+                    entidad: "RANGO",
+                    accion: "APERTURA",
+                    detalle: $"Apertura de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
+                    idTipo: rango.IdTipo,
+                    anio: rango.Anio,
+                    idOficina: rango.IdOficina,
+                    idUsuario: idUsuario,
+                    idReferencia: rango.IdRango == 0 ? null : rango.IdRango);
+            }
+            else
+            {
+                var rangoExistente = await _context.MaeNumeracionRangos
+                    .FirstOrDefaultAsync(r => r.IdRango == rango.IdRango);
+
+                if (rangoExistente is null)
+                {
+                    return OperacionResultado.Fail("El rango que intenta actualizar no existe.");
+                }
+
+                var accion = DeterminarAccionRango(rangoExistente, rango);
+                var detalle = ConstruirDetalleCambioRango(rangoExistente, rango);
+
+                _context.Entry(rangoExistente).CurrentValues.SetValues(rango);
+
+                await RegistrarBitacoraAsync(
+                    entidad: "RANGO",
+                    accion: accion,
+                    detalle: detalle,
+                    idTipo: rango.IdTipo,
+                    anio: rango.Anio,
+                    idOficina: rango.IdOficina,
+                    idUsuario: idUsuario,
+                    idReferencia: rango.IdRango);
+            }
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+            return OperacionResultado.Ok();
         }, "No fue posible guardar el rango en este momento.", "guardar rango de numeración");
     }
 
@@ -283,100 +289,102 @@ public class NumeracionRangoService
             var rango = await _context.MaeNumeracionRangos
                 .FirstOrDefaultAsync(r => r.IdRango == idRango);
 
-        if (rango is null)
-        {
-            throw new InvalidOperationException("El rango que intenta eliminar no existe.");
-        }
+            if (rango is null)
+            {
+                return OperacionResultado.Fail("El rango que intenta eliminar no existe.");
+            }
 
-        _context.MaeNumeracionRangos.Remove(rango);
+            _context.MaeNumeracionRangos.Remove(rango);
 
-        await RegistrarBitacoraAsync(
-            entidad: "RANGO",
-            accion: "ELIMINACION",
-            detalle: $"Eliminación de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
-            idTipo: rango.IdTipo,
-            anio: rango.Anio,
-            idOficina: rango.IdOficina,
-            idUsuario: idUsuario,
-            idReferencia: rango.IdRango);
+            await RegistrarBitacoraAsync(
+                entidad: "RANGO",
+                accion: "ELIMINACION",
+                detalle: $"Eliminación de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
+                idTipo: rango.IdTipo,
+                anio: rango.Anio,
+                idOficina: rango.IdOficina,
+                idUsuario: idUsuario,
+                idReferencia: rango.IdRango);
 
             await _context.SaveChangesAsync();
+            return OperacionResultado.Ok();
         }, "No fue posible eliminar el rango en este momento.", "eliminar rango de numeración");
     }
 
     public async Task<OperacionResultado> GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
     {
-        return await EjecutarOperacionControladaAsync(async () =>
+        if (idTipo <= 0)
         {
-            if (idTipo <= 0)
-            {
-                throw new InvalidOperationException("Debe seleccionar un tipo de documento válido para configurar el cupo.");
-            }
+            return OperacionResultado.Fail("Debe seleccionar un tipo de documento válido para configurar el cupo.");
+        }
 
         if (anio <= 0)
         {
-            throw new InvalidOperationException("Debe indicar un año válido para configurar el cupo.");
+            return OperacionResultado.Fail("Debe indicar un año válido para configurar el cupo.");
         }
 
         if (cantidad < 0)
         {
-            throw new InvalidOperationException("El cupo no puede ser negativo.");
+            return OperacionResultado.Fail("El cupo no puede ser negativo.");
         }
 
-        var cupoExistente = await _context.MaeCuposSecretaria
-            .FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
-
-        if (cupoExistente is null)
+        return await EjecutarOperacionControladaAsync(async () =>
         {
-            var tipo = await _context.CatTipoDocumentos
-                .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.IdTipo == idTipo);
+            var cupoExistente = await _context.MaeCuposSecretaria
+                .FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
 
-            var codigoTipo = tipo?.Codigo?.Trim();
-            if (string.IsNullOrWhiteSpace(codigoTipo))
+            if (cupoExistente is null)
             {
-                codigoTipo = $"TIPO{idTipo}";
+                var tipo = await _context.CatTipoDocumentos
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.IdTipo == idTipo);
+
+                var codigoTipo = tipo?.Codigo?.Trim();
+                if (string.IsNullOrWhiteSpace(codigoTipo))
+                {
+                    codigoTipo = $"TIPO{idTipo}";
+                }
+
+                cupoExistente = new MaeCuposSecretarium
+                {
+                    IdTipo = idTipo,
+                    Anio = anio,
+                    Fecha = DateTime.Now,
+                    Cantidad = cantidad,
+                    NombreCupo = $"CUPO-{codigoTipo}-{anio}"
+                };
+
+                _context.MaeCuposSecretaria.Add(cupoExistente);
+
+                await RegistrarBitacoraAsync(
+                    entidad: "CUPO",
+                    accion: "APERTURA",
+                    detalle: $"Creación de cupo anual con cantidad {cantidad}.",
+                    idTipo: idTipo,
+                    anio: anio,
+                    idOficina: null,
+                    idUsuario: idUsuario,
+                    idReferencia: null);
+            }
+            else
+            {
+                var cantidadAnterior = cupoExistente.Cantidad;
+                cupoExistente.Cantidad = cantidad;
+                cupoExistente.Fecha = DateTime.Now;
+
+                await RegistrarBitacoraAsync(
+                    entidad: "CUPO",
+                    accion: "CAMBIO",
+                    detalle: $"Actualización de cupo anual de {cantidadAnterior} a {cantidad}.",
+                    idTipo: idTipo,
+                    anio: anio,
+                    idOficina: null,
+                    idUsuario: idUsuario,
+                    idReferencia: cupoExistente.IdCupo);
             }
 
-            cupoExistente = new MaeCuposSecretarium
-            {
-                IdTipo = idTipo,
-                Anio = anio,
-                Fecha = DateTime.Now,
-                Cantidad = cantidad,
-                NombreCupo = $"CUPO-{codigoTipo}-{anio}"
-            };
-
-            _context.MaeCuposSecretaria.Add(cupoExistente);
-
-            await RegistrarBitacoraAsync(
-                entidad: "CUPO",
-                accion: "APERTURA",
-                detalle: $"Creación de cupo anual con cantidad {cantidad}.",
-                idTipo: idTipo,
-                anio: anio,
-                idOficina: null,
-                idUsuario: idUsuario,
-                idReferencia: null);
-        }
-        else
-        {
-            var cantidadAnterior = cupoExistente.Cantidad;
-            cupoExistente.Cantidad = cantidad;
-            cupoExistente.Fecha = DateTime.Now;
-
-            await RegistrarBitacoraAsync(
-                entidad: "CUPO",
-                accion: "CAMBIO",
-                detalle: $"Actualización de cupo anual de {cantidadAnterior} a {cantidad}.",
-                idTipo: idTipo,
-                anio: anio,
-                idOficina: null,
-                idUsuario: idUsuario,
-                idReferencia: cupoExistente.IdCupo);
-        }
-
             await _context.SaveChangesAsync();
+            return OperacionResultado.Ok();
         }, "No fue posible guardar el cupo en este momento.", "guardar cupo de numeración");
     }
 
@@ -417,23 +425,23 @@ public class NumeracionRangoService
             var anioObjetivo = anio ?? DateTime.Now.Year;
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-        var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: true);
+            var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: true);
 
-        if (rango is null)
-        {
-            throw new InvalidOperationException("No hay un rango activo configurado para la oficina y tipo de documento seleccionados.");
-        }
+            if (rango is null)
+            {
+                return OperacionResultado<MaeNumeracionRango>.Fail("No hay un rango activo configurado para la oficina y tipo de documento seleccionados.");
+            }
 
-        if (rango.UltimoUtilizado >= rango.NumeroFin)
-        {
-            throw new InvalidOperationException($"Rango agotado ({rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}). Debe registrar un nuevo rango para continuar.");
-        }
+            if (rango.UltimoUtilizado >= rango.NumeroFin)
+            {
+                return OperacionResultado<MaeNumeracionRango>.Fail($"Rango agotado ({rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}). Debe registrar un nuevo rango para continuar.");
+            }
 
             rango.UltimoUtilizado++;
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            return rango;
+            return OperacionResultado<MaeNumeracionRango>.Ok(rango);
         }, "No fue posible consumir el siguiente número oficial.", "consumir siguiente número");
     }
 
@@ -450,17 +458,11 @@ public class NumeracionRangoService
         }
     }
 
-    private async Task<OperacionResultado> EjecutarOperacionControladaAsync(Func<Task> accion, string mensajeUsuario, string operacion)
+    private async Task<OperacionResultado> EjecutarOperacionControladaAsync(Func<Task<OperacionResultado>> accion, string mensajeUsuario, string operacion)
     {
         try
         {
-            await accion();
-            return OperacionResultado.Ok();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Validación al {Operacion}.", operacion);
-            return OperacionResultado.Fail(ex.Message);
+            return await accion();
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -479,17 +481,11 @@ public class NumeracionRangoService
         }
     }
 
-    private async Task<OperacionResultado<T>> EjecutarOperacionControladaAsync<T>(Func<Task<T>> accion, string mensajeUsuario, string operacion)
+    private async Task<OperacionResultado<T>> EjecutarOperacionControladaAsync<T>(Func<Task<OperacionResultado<T>>> accion, string mensajeUsuario, string operacion)
     {
         try
         {
-            var data = await accion();
-            return OperacionResultado<T>.Ok(data);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Validación al {Operacion}.", operacion);
-            return OperacionResultado<T>.Fail(ex.Message);
+            return await accion();
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -539,11 +535,11 @@ public class NumeracionRangoService
             .FirstOrDefaultAsync();
     }
 
-    private async Task ValidarUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)
+    private async Task<string?> ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)
     {
         if (!rango.Activo)
         {
-            return;
+            return null;
         }
 
         var existeActivo = await _context.MaeNumeracionRangos.AnyAsync(r =>
@@ -556,8 +552,10 @@ public class NumeracionRangoService
         if (existeActivo)
         {
             var oficinaTexto = rango.IdOficina.HasValue ? $"la oficina {rango.IdOficina}" : "el ámbito global";
-            throw new InvalidOperationException($"Ya existe un rango activo para este tipo, año y {oficinaTexto}.");
+            return $"Ya existe un rango activo para este tipo, año y {oficinaTexto}.";
         }
+
+        return null;
     }
 
     private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango, int? idOficina)
