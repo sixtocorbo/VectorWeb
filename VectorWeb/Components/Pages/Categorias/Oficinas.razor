@@ -1,10 +1,17 @@
 @page "/configuracion/oficinas"
+@using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<CatOficina> RepoOficina
+@inject SecretariaDbContext DbContext
 @rendermode InteractiveServer
 
 <h3>Gestión de Oficinas</h3>
+
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-warning" role="alert">@mensajeError</div>
+}
 
 <div class="row mb-3 g-2">
     <div class="col-md-5">
@@ -42,6 +49,7 @@
     private IEnumerable<CatOficina> listaOficinas = new List<CatOficina>();
     private string nuevaOficinaNombre = string.Empty;
     private string busquedaOficina = string.Empty;
+    private string mensajeError = string.Empty;
 
     private IEnumerable<CatOficina> OficinasFiltradas
     {
@@ -71,6 +79,7 @@
     {
         if (!string.IsNullOrWhiteSpace(nuevaOficinaNombre))
         {
+            mensajeError = string.Empty;
             await RepoOficina.AddAsync(new CatOficina { Nombre = nuevaOficinaNombre.Trim() });
             nuevaOficinaNombre = string.Empty;
             await Cargar();
@@ -79,6 +88,36 @@
 
     private async Task Eliminar(int id)
     {
+        var oficina = listaOficinas.FirstOrDefault(o => o.IdOficina == id);
+        if (oficina is null)
+        {
+            mensajeError = "No se encontró la oficina que intentas eliminar.";
+            return;
+        }
+
+        var tieneDocumentos = await DbContext.MaeDocumentos
+            .AsNoTracking()
+            .AnyAsync(d => d.IdOficinaActual == id);
+
+        var tieneMovimientos = await DbContext.TraMovimientos
+            .AsNoTracking()
+            .AnyAsync(m => m.IdOficinaOrigen == id || m.IdOficinaDestino == id);
+
+        var tieneUsuarios = await DbContext.CatUsuarios
+            .AsNoTracking()
+            .AnyAsync(u => u.IdOficina == id);
+
+        var tieneNumeraciones = await DbContext.MaeNumeracionRangos
+            .AsNoTracking()
+            .AnyAsync(n => n.IdOficina == id);
+
+        if (tieneDocumentos || tieneMovimientos || tieneUsuarios || tieneNumeraciones)
+        {
+            mensajeError = $"No se puede eliminar la oficina '{oficina.Nombre}' porque está siendo utilizada en documentos, movimientos, usuarios o numeraciones.";
+            return;
+        }
+
+        mensajeError = string.Empty;
         await RepoOficina.DeleteAsync(id);
         await Cargar();
     }
