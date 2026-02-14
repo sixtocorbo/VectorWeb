@@ -109,7 +109,7 @@
                                 @if (crearActuacionRemota)
                                 {
                                     <small class="text-muted d-block mt-1">
-                                        El sistema no generará automáticamente el registro de actuación previa. Podrás cargar la actuación manualmente con los datos que correspondan.
+                                        Al confirmar, se abrirá Confección de Actuación para registrar el documento en nombre de la oficina remota y luego retornar el expediente a BANDEJA DE ENTRADA.
                                     </small>
                                 }
                             </div>
@@ -327,6 +327,13 @@
 
     private async Task GuardarPase()
     {
+        if (esPaseDesdeOficinaRemota && crearActuacionRemota)
+        {
+            var idDocumentoPadre = docPadre?.IdDocumento ?? Id;
+            Navegador.NavigateTo($"documentos/nuevo?IdPadre={idDocumentoPadre}&AutoPaseBandeja=true");
+            return;
+        }
+
         if (esPaseDesdeOficinaRemota)
         {
             if (!idOficinaBandejaEntrada.HasValue)
@@ -347,10 +354,6 @@
 
         try
         {
-            // La actuación en pases remotos se registra manualmente desde el flujo de NuevoDocumento.
-            // Aunque el usuario marque "viene con actuación", no se crea automáticamente un documento
-            // "actuación previa" para evitar registros incompletos o duplicados.
-
             // Ejecución del Pase Masivo (Igual que frmPase.vb -> btnConfirmar_Click)
             foreach (var doc in documentosAEnviar)
             {
