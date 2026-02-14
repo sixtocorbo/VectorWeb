@@ -230,6 +230,9 @@
     [SupplyParameterFromQuery]
     public bool? AutoPaseBandeja { get; set; }
 
+    [SupplyParameterFromQuery]
+    public int? AutoPaseDestino { get; set; }
+
     private bool esActuacion = false;
     private MaeDocumento nuevoDoc = new MaeDocumento
     {
@@ -429,6 +432,13 @@
                 docPadreSeleccionado.IdHiloConversacion,
                 idOficinaUsuarioActual,
                 $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
+        }
+        else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
+        {
+            await MoverFamiliaADestino(
+                docPadreSeleccionado.IdHiloConversacion,
+                AutoPaseDestino.Value,
+                $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
         }
         else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
         {
