@@ -38,7 +38,15 @@ public class NumeracionRangoService
         }
         else
         {
-            _context.MaeNumeracionRangos.Update(rango);
+            var rangoExistente = await _context.MaeNumeracionRangos
+                .FirstOrDefaultAsync(r => r.IdRango == rango.IdRango);
+
+            if (rangoExistente is null)
+            {
+                throw new InvalidOperationException("El rango que intenta actualizar no existe.");
+            }
+
+            _context.Entry(rangoExistente).CurrentValues.SetValues(rango);
         }
 
         await _context.SaveChangesAsync();
