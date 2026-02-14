@@ -628,6 +628,14 @@
             return;
         }
 
+        var oficinaSeleccionada = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
+        if (oficinaSeleccionada?.EsExterna == true)
+        {
+            esNumeracionExterna = true;
+            mensajeNumeracion = "Oficina externa: ingrese manualmente el número oficial con validación de unicidad por oficina, tipo y año.";
+            return;
+        }
+
         var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
 
         if (rango is not null)

@@ -29,6 +29,7 @@
     <thead>
         <tr>
             <th>Nombre</th>
+            <th>Tipo</th>
             <th>Acciones</th>
         </tr>
     </thead>
@@ -37,6 +38,12 @@
         {
             <tr>
                 <td>@oficina.Nombre</td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" checked="@(oficina.EsExterna == true)" @onchange="(e) => CambiarTipoOficina(oficina, e)" />
+                        <label class="form-check-label">@(oficina.EsExterna == true ? "Externa" : "Interna")</label>
+                    </div>
+                </td>
                 <td>
                     <button class="btn btn-danger btn-sm" @onclick="() => Eliminar(oficina.IdOficina)">Eliminar</button>
                 </td>
@@ -80,10 +87,33 @@
         if (!string.IsNullOrWhiteSpace(nuevaOficinaNombre))
         {
             mensajeError = string.Empty;
-            await RepoOficina.AddAsync(new CatOficina { Nombre = nuevaOficinaNombre.Trim() });
+            await RepoOficina.AddAsync(new CatOficina { Nombre = nuevaOficinaNombre.Trim(), EsExterna = false });
             nuevaOficinaNombre = string.Empty;
             await Cargar();
         }
+    }
+
+
+    private async Task CambiarTipoOficina(CatOficina oficina, ChangeEventArgs e)
+    {
+        if (oficina is null)
+        {
+            return;
+        }
+
+        var esExterna = false;
+        if (e.Value is bool valorBooleano)
+        {
+            esExterna = valorBooleano;
+        }
+        else if (bool.TryParse(e.Value?.ToString(), out var valorParseado))
+        {
+            esExterna = valorParseado;
+        }
+
+        oficina.EsExterna = esExterna;
+        await RepoOficina.UpdateAsync(oficina);
+        await Cargar();
     }
 
     private async Task Eliminar(int id)
