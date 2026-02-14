@@ -25,7 +25,21 @@ public class NumeracionRangoService
             .ToListAsync();
     }
 
-    public async Task GuardarRangoAsync(MaeNumeracionRango rango)
+    public async Task<List<MaeNumeracionBitacora>> ObtenerBitacoraAsync(int cantidad = 200)
+    {
+        var limite = cantidad <= 0 ? 200 : Math.Min(cantidad, 1000);
+
+        return await _context.MaeNumeracionBitacoras
+            .Include(b => b.IdTipoNavigation)
+            .Include(b => b.IdOficinaNavigation)
+            .Include(b => b.IdUsuarioNavigation)
+            .OrderByDescending(b => b.Fecha)
+            .ThenByDescending(b => b.IdBitacora)
+            .Take(limite)
+            .ToListAsync();
+    }
+
+    public async Task GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
     {
         if (rango.IdTipo <= 0)
         {
@@ -74,6 +88,16 @@ public class NumeracionRangoService
         {
             rango.FechaCreacion ??= DateTime.Now;
             _context.MaeNumeracionRangos.Add(rango);
+
+            await RegistrarBitacoraAsync(
+                entidad: "RANGO",
+                accion: "APERTURA",
+                detalle: $"Apertura de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}).",
+                idTipo: rango.IdTipo,
+                anio: rango.Anio,
+                idOficina: rango.IdOficina,
+                idUsuario: idUsuario,
+                idReferencia: rango.IdRango == 0 ? null : rango.IdRango);
         }
         else
         {
@@ -85,7 +109,20 @@ public class NumeracionRangoService
                 throw new InvalidOperationException("El rango que intenta actualizar no existe.");
             }
 
+            var accion = DeterminarAccionRango(rangoExistente, rango);
+            var detalle = ConstruirDetalleCambioRango(rangoExistente, rango);
+
             _context.Entry(rangoExistente).CurrentValues.SetValues(rango);
+
+            await RegistrarBitacoraAsync(
+                entidad: "RANGO",
+                accion: accion,
+                detalle: detalle,
+                idTipo: rango.IdTipo,
+                anio: rango.Anio,
+                idOficina: rango.IdOficina,
+                idUsuario: idUsuario,
+                idReferencia: rango.IdRango);
         }
 
         await _context.SaveChangesAsync();
@@ -115,7 +152,7 @@ public class NumeracionRangoService
         return await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango);
     }
 
-    public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad)
+    public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
     {
         if (idTipo <= 0)
         {
@@ -157,11 +194,32 @@ public class NumeracionRangoService
             };
 
             _context.MaeCuposSecretaria.Add(cupoExistente);
+
+            await RegistrarBitacoraAsync(
+                entidad: "CUPO",
+                accion: "APERTURA",
+                detalle: $"Creación de cupo anual con cantidad {cantidad}.",
+                idTipo: idTipo,
+                anio: anio,
+                idOficina: null,
+                idUsuario: idUsuario,
+                idReferencia: null);
         }
         else
         {
+            var cantidadAnterior = cupoExistente.Cantidad;
             cupoExistente.Cantidad = cantidad;
             cupoExistente.Fecha = DateTime.Now;
+
+            await RegistrarBitacoraAsync(
+                entidad: "CUPO",
+                accion: "CAMBIO",
+                detalle: $"Actualización de cupo anual de {cantidadAnterior} a {cantidad}.",
+                idTipo: idTipo,
+                anio: anio,
+                idOficina: null,
+                idUsuario: idUsuario,
+                idReferencia: cupoExistente.IdCupo);
         }
 
         await _context.SaveChangesAsync();
@@ -350,5 +408,83 @@ public class NumeracionRangoService
 
         normalizado = normalizado.Trim('-');
         return string.IsNullOrWhiteSpace(normalizado) ? fallback : normalizado;
+    }
+
+    private async Task RegistrarBitacoraAsync(
+        string entidad,
+        string accion,
+        string detalle,
+        int idTipo,
+        int anio,
+        int? idOficina,
+        int? idUsuario,
+        int? idReferencia)
+    {
+        _context.MaeNumeracionBitacoras.Add(new MaeNumeracionBitacora
+        {
+            Fecha = DateTime.Now,
+            Entidad = entidad,
+            Accion = accion,
+            Detalle = detalle,
+            IdTipo = idTipo,
+            Anio = anio,
+            IdOficina = idOficina,
+            IdUsuario = idUsuario,
+            IdReferencia = idReferencia
+        });
+
+        await Task.CompletedTask;
+    }
+
+    private static string DeterminarAccionRango(MaeNumeracionRango anterior, MaeNumeracionRango actualizado)
+    {
+        if (anterior.Activo && !actualizado.Activo)
+        {
+            return "CIERRE";
+        }
+
+        if (!anterior.Activo && actualizado.Activo)
+        {
+            return "REAPERTURA";
+        }
+
+        return "CAMBIO";
+    }
+
+    private static string ConstruirDetalleCambioRango(MaeNumeracionRango anterior, MaeNumeracionRango actualizado)
+    {
+        var cambios = new List<string>();
+
+        if (anterior.NumeroInicio != actualizado.NumeroInicio || anterior.NumeroFin != actualizado.NumeroFin)
+        {
+            cambios.Add($"intervalo {anterior.NumeroInicio}-{anterior.NumeroFin} -> {actualizado.NumeroInicio}-{actualizado.NumeroFin}");
+        }
+
+        if (anterior.UltimoUtilizado != actualizado.UltimoUtilizado)
+        {
+            cambios.Add($"último utilizado {anterior.UltimoUtilizado} -> {actualizado.UltimoUtilizado}");
+        }
+
+        if (anterior.IdOficina != actualizado.IdOficina)
+        {
+            cambios.Add($"oficina {(anterior.IdOficina?.ToString() ?? "GLOBAL")} -> {(actualizado.IdOficina?.ToString() ?? "GLOBAL")}");
+        }
+
+        if (anterior.Anio != actualizado.Anio)
+        {
+            cambios.Add($"año {anterior.Anio} -> {actualizado.Anio}");
+        }
+
+        if (anterior.Activo != actualizado.Activo)
+        {
+            cambios.Add($"estado {(anterior.Activo ? "activo" : "inactivo")} -> {(actualizado.Activo ? "activo" : "inactivo")}");
+        }
+
+        if (cambios.Count == 0)
+        {
+            return $"Actualización sin cambios de campos de control en el rango {actualizado.NombreRango}.";
+        }
+
+        return $"Actualización de rango {actualizado.NombreRango}: {string.Join(", ", cambios)}.";
     }
 }
