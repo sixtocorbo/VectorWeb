@@ -92,6 +92,81 @@ public class NumeracionRangoService
         await transaction.CommitAsync();
     }
 
+    public async Task<int?> ObtenerCantidadCupoAsync(int idTipo, int anio)
+    {
+        if (idTipo <= 0 || anio <= 0)
+        {
+            return null;
+        }
+
+        return await _context.MaeCuposSecretaria
+            .Where(c => c.IdTipo == idTipo && c.Anio == anio)
+            .Select(c => (int?)c.Cantidad)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<int> ObtenerConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango = null)
+    {
+        if (idTipo <= 0 || anio <= 0)
+        {
+            return 0;
+        }
+
+        return await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango);
+    }
+
+    public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad)
+    {
+        if (idTipo <= 0)
+        {
+            throw new InvalidOperationException("Debe seleccionar un tipo de documento válido para configurar el cupo.");
+        }
+
+        if (anio <= 0)
+        {
+            throw new InvalidOperationException("Debe indicar un año válido para configurar el cupo.");
+        }
+
+        if (cantidad < 0)
+        {
+            throw new InvalidOperationException("El cupo no puede ser negativo.");
+        }
+
+        var cupoExistente = await _context.MaeCuposSecretaria
+            .FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
+
+        if (cupoExistente is null)
+        {
+            var tipo = await _context.CatTipoDocumentos
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.IdTipo == idTipo);
+
+            var codigoTipo = tipo?.Codigo?.Trim();
+            if (string.IsNullOrWhiteSpace(codigoTipo))
+            {
+                codigoTipo = $"TIPO{idTipo}";
+            }
+
+            cupoExistente = new MaeCuposSecretarium
+            {
+                IdTipo = idTipo,
+                Anio = anio,
+                Fecha = DateTime.Now,
+                Cantidad = cantidad,
+                NombreCupo = $"CUPO-{codigoTipo}-{anio}"
+            };
+
+            _context.MaeCuposSecretaria.Add(cupoExistente);
+        }
+        else
+        {
+            cupoExistente.Cantidad = cantidad;
+            cupoExistente.Fecha = DateTime.Now;
+        }
+
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<MaeNumeracionRango?> ObtenerRangoActivoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
         var anioObjetivo = anio ?? DateTime.Now.Year;
