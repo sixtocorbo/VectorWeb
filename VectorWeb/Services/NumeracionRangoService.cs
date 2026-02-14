@@ -54,9 +54,41 @@ public class NumeracionRangoService
 
     public async Task<MaeNumeracionRango?> ObtenerRangoActivoAsync(int idTipoDocumento, int? idOficina)
     {
+        return await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, incluirAgotados: false);
+    }
+
+    public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
+        var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, incluirAgotados: true);
+
+        if (rango is null)
+        {
+            throw new InvalidOperationException("No hay un rango activo configurado para la oficina y tipo de documento seleccionados.");
+        }
+
+        if (rango.UltimoUtilizado >= rango.NumeroFin)
+        {
+            throw new InvalidOperationException($"Rango agotado ({rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}). Debe registrar un nuevo rango para continuar.");
+        }
+
+        rango.UltimoUtilizado++;
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return rango;
+    }
+
+    private async Task<MaeNumeracionRango?> ObtenerRangoAdministradoAsync(int idTipoDocumento, int? idOficina, bool incluirAgotados)
+    {
         var baseQuery = _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipoDocumento && r.Activo)
-            .Where(r => r.UltimoUtilizado < r.NumeroFin);
+            .Where(r => r.IdTipo == idTipoDocumento && r.Activo);
+
+        if (!incluirAgotados)
+        {
+            baseQuery = baseQuery.Where(r => r.UltimoUtilizado < r.NumeroFin);
+        }
 
         if (idOficina.HasValue)
         {
@@ -75,28 +107,5 @@ public class NumeracionRangoService
             .Where(r => r.IdOficina == null)
             .OrderBy(r => r.IdRango)
             .FirstOrDefaultAsync();
-    }
-
-    public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina)
-    {
-        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-
-        var rango = await ObtenerRangoActivoAsync(idTipoDocumento, idOficina);
-
-        if (rango is null)
-        {
-            throw new InvalidOperationException("No hay un rango activo para el tipo de documento seleccionado.");
-        }
-
-        if (rango.UltimoUtilizado >= rango.NumeroFin)
-        {
-            throw new InvalidOperationException("El rango configurado ya se encuentra agotado.");
-        }
-
-        rango.UltimoUtilizado++;
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        return rango;
     }
 }

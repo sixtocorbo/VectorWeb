@@ -34,6 +34,11 @@
         <div class="alert alert-danger" role="alert">@errorGuardar</div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(mensajeNumeracion))
+    {
+        <div class="alert alert-info" role="alert">@mensajeNumeracion</div>
+    }
+
     @if (!esActuacion)
     {
         <div class="card mb-3 border-primary">
@@ -144,7 +149,11 @@
                         }
                         else
                         {
-                            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" placeholder="Ej. MEMO-2024-001" />
+                            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" />
+                            @if (esNumeracionExterna)
+                            {
+                                <small class="text-muted">Numeración externa: ingrese el número oficial provisto por la entidad de origen.</small>
+                            }
                         }
                     </div>
                 </div>
@@ -280,6 +289,8 @@
     private int indiceOficinaSeleccionada = -1;
     private bool mostrarSugerenciasArriba = true;
     private bool esNumeracionAutomatica;
+    private bool esNumeracionExterna;
+    private string mensajeNumeracion = string.Empty;
     private string serieNumeracionAutomatica = string.Empty;
     private int proximoNumeroAutomatico;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
@@ -463,6 +474,36 @@
                 return;
             }
         }
+        else
+        {
+            nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial?.Trim();
+
+            if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
+            {
+                errorGuardar = "Debe ingresar el número oficial para numeración externa.";
+                return;
+            }
+
+            if (nuevoDoc.NumeroOficial.Length > 50)
+            {
+                errorGuardar = "El número oficial no puede superar los 50 caracteres.";
+                return;
+            }
+
+            var documentosExistentes = await RepoDocs.GetAllAsync();
+            var existeDuplicado = documentosExistentes.Any(d =>
+                d.IdTipo == nuevoDoc.IdTipo &&
+                d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
+                d.FechaCreacion.HasValue &&
+                d.FechaCreacion.Value.Year == (nuevoDoc.FechaCreacion ?? DateTime.Now).Year &&
+                string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
+
+            if (existeDuplicado)
+            {
+                errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
+                return;
+            }
+        }
 
         await RepoDocs.AddAsync(nuevoDoc);
 
@@ -565,6 +606,8 @@
     private async Task EvaluarNumeracionAutomaticaAsync(int idTipoDocumento)
     {
         esNumeracionAutomatica = false;
+        esNumeracionExterna = false;
+        mensajeNumeracion = string.Empty;
         serieNumeracionAutomatica = string.Empty;
         proximoNumeroAutomatico = 0;
 
@@ -575,18 +618,21 @@
 
         var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual);
 
-        if (rango is null)
+        if (rango is not null)
         {
+            esNumeracionAutomatica = true;
+            serieNumeracionAutomatica = rango.NombreRango;
+            proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
+            nuevoDoc.NumeroOficial = string.Empty;
+            mensajeNumeracion = "Modo administrado por rango: el número se asignará automáticamente al guardar.";
             return;
         }
 
-        esNumeracionAutomatica = true;
-        serieNumeracionAutomatica = rango.NombreRango;
-        proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
-        nuevoDoc.NumeroOficial = string.Empty;
+        esNumeracionExterna = true;
+        mensajeNumeracion = "Modo numeración externa: ingrese manualmente el número oficial con validación de unicidad por oficina, tipo y año.";
     }
 
-    private void FiltrarOficinas(ChangeEventArgs e)
+    private async Task FiltrarOficinas(ChangeEventArgs e)
     {
         oficinaBusqueda = e.Value?.ToString() ?? string.Empty;
         nuevoDoc.IdOficinaActual = 0;
@@ -608,15 +654,25 @@
         if (coincidenciaExacta != null)
         {
             nuevoDoc.IdOficinaActual = coincidenciaExacta.IdOficina;
+
+            if (nuevoDoc.IdTipo > 0)
+            {
+                await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+            }
         }
     }
 
-    private void SeleccionarOficina(CatOficina oficina)
+    private async Task SeleccionarOficina(CatOficina oficina)
     {
         nuevoDoc.IdOficinaActual = oficina.IdOficina;
         oficinaBusqueda = oficina.Nombre ?? string.Empty;
         oficinasFiltradas.Clear();
         indiceOficinaSeleccionada = -1;
+
+        if (nuevoDoc.IdTipo > 0)
+        {
+            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+        }
     }
 
     private void MostrarSugerenciasOficina()
