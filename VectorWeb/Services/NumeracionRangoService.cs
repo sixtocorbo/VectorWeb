@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using VectorWeb.Models;
 
 namespace VectorWeb.Services;
@@ -7,88 +8,103 @@ namespace VectorWeb.Services;
 public class NumeracionRangoService
 {
     private readonly SecretariaDbContext _context;
+    private readonly ILogger<NumeracionRangoService> _logger;
 
-    public NumeracionRangoService(SecretariaDbContext context)
+    public NumeracionRangoService(SecretariaDbContext context, ILogger<NumeracionRangoService> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public async Task<List<MaeNumeracionRango>> ObtenerRangosAsync()
     {
-        return await _context.MaeNumeracionRangos
-            .Include(r => r.IdTipoNavigation)
-            .Include(r => r.IdOficinaNavigation)
-            .OrderByDescending(r => r.Anio)
-            .ThenByDescending(r => r.Activo)
-            .ThenBy(r => r.IdTipo)
-            .ThenBy(r => r.IdOficina)
-            .ToListAsync();
+        return await EjecutarLecturaSeguraAsync(async () =>
+            await _context.MaeNumeracionRangos
+                .Include(r => r.IdTipoNavigation)
+                .Include(r => r.IdOficinaNavigation)
+                .OrderByDescending(r => r.Anio)
+                .ThenByDescending(r => r.Activo)
+                .ThenBy(r => r.IdTipo)
+                .ThenBy(r => r.IdOficina)
+                .ToListAsync(),
+            fallback: new List<MaeNumeracionRango>(),
+            operacion: "obtener rangos de numeración");
     }
 
     public async Task<List<MaeNumeracionBitacora>> ObtenerBitacoraAsync(int cantidad = 200)
     {
         var limite = cantidad <= 0 ? 200 : Math.Min(cantidad, 1000);
 
-        return await _context.MaeNumeracionBitacoras
-            .Include(b => b.IdTipoNavigation)
-            .Include(b => b.IdOficinaNavigation)
-            .Include(b => b.IdUsuarioNavigation)
-            .OrderByDescending(b => b.Fecha)
-            .ThenByDescending(b => b.IdBitacora)
-            .Take(limite)
-            .ToListAsync();
+        return await EjecutarLecturaSeguraAsync(async () =>
+            await _context.MaeNumeracionBitacoras
+                .Include(b => b.IdTipoNavigation)
+                .Include(b => b.IdOficinaNavigation)
+                .Include(b => b.IdUsuarioNavigation)
+                .OrderByDescending(b => b.Fecha)
+                .ThenByDescending(b => b.IdBitacora)
+                .Take(limite)
+                .ToListAsync(),
+            fallback: new List<MaeNumeracionBitacora>(),
+            operacion: "obtener bitácora de numeración");
     }
 
     public async Task<List<CupoLibroMayorItem>> ObtenerLibroMayorCuposAsync()
     {
-        var cupos = await _context.MaeCuposSecretaria
-            .AsNoTracking()
-            .Include(c => c.IdTipoNavigation)
-            .OrderByDescending(c => c.Anio)
-            .ThenBy(c => c.IdTipoNavigation.Nombre)
-            .ToListAsync();
-
-        if (cupos.Count == 0)
+        return await EjecutarLecturaSeguraAsync(async () =>
         {
-            return new List<CupoLibroMayorItem>();
-        }
+            var cupos = await _context.MaeCuposSecretaria
+                .AsNoTracking()
+                .Include(c => c.IdTipoNavigation)
+                .OrderByDescending(c => c.Anio)
+                .ThenBy(c => c.IdTipoNavigation.Nombre)
+                .ToListAsync();
 
-        var consumoPorTipoAnio = await _context.MaeNumeracionRangos
-            .AsNoTracking()
-            .GroupBy(r => new { r.IdTipo, r.Anio })
-            .Select(g => new
+            if (cupos.Count == 0)
             {
-                g.Key.IdTipo,
-                g.Key.Anio,
-                Consumo = g.Sum(x => x.NumeroFin - x.NumeroInicio + 1)
-            })
-            .ToListAsync();
+                return new List<CupoLibroMayorItem>();
+            }
 
-        var consumoLookup = consumoPorTipoAnio.ToDictionary(x => (x.IdTipo, x.Anio), x => x.Consumo);
-
-        return cupos
-            .Select(c =>
-            {
-                consumoLookup.TryGetValue((c.IdTipo, c.Anio), out var consumido);
-                return new CupoLibroMayorItem
+            var consumoPorTipoAnio = await _context.MaeNumeracionRangos
+                .AsNoTracking()
+                .GroupBy(r => new { r.IdTipo, r.Anio })
+                .Select(g => new
                 {
-                    Tipo = c.IdTipoNavigation?.Nombre ?? $"Tipo {c.IdTipo}",
-                    Anio = c.Anio,
-                    Cantidad = c.Cantidad,
-                    Consumido = consumido,
-                    Disponible = Math.Max(0, c.Cantidad - consumido),
-                    Fecha = c.Fecha
-                };
-            })
-            .ToList();
+                    g.Key.IdTipo,
+                    g.Key.Anio,
+                    Consumo = g.Sum(x => x.NumeroFin - x.NumeroInicio + 1)
+                })
+                .ToListAsync();
+
+            var consumoLookup = consumoPorTipoAnio.ToDictionary(x => (x.IdTipo, x.Anio), x => x.Consumo);
+
+            return cupos
+                .Select(c =>
+                {
+                    consumoLookup.TryGetValue((c.IdTipo, c.Anio), out var consumido);
+                    return new CupoLibroMayorItem
+                    {
+                        Tipo = c.IdTipoNavigation?.Nombre ?? $"Tipo {c.IdTipo}",
+                        Anio = c.Anio,
+                        Cantidad = c.Cantidad,
+                        Consumido = consumido,
+                        Disponible = Math.Max(0, c.Cantidad - consumido),
+                        Fecha = c.Fecha
+                    };
+                })
+                .ToList();
+        },
+            fallback: new List<CupoLibroMayorItem>(),
+            operacion: "obtener libro mayor de cupos");
     }
 
     public async Task GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
     {
-        if (rango.IdTipo <= 0)
+        await EjecutarOperacionSeguraAsync(async () =>
         {
-            throw new InvalidOperationException("Debe seleccionar un tipo de documento válido.");
-        }
+            if (rango.IdTipo <= 0)
+            {
+                throw new InvalidOperationException("Debe seleccionar un tipo de documento válido.");
+            }
 
         if (rango.NumeroInicio <= 0 || rango.NumeroFin <= 0 || rango.NumeroInicio > rango.NumeroFin)
         {
@@ -170,8 +186,9 @@ public class NumeracionRangoService
                 idReferencia: rango.IdRango);
         }
 
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }, "No fue posible guardar el rango en este momento.", "guardar rango de numeración");
     }
 
     private async Task DesactivarRangosAgotadosAsync(MaeNumeracionRango rango)
@@ -209,10 +226,13 @@ public class NumeracionRangoService
             return null;
         }
 
-        return await _context.MaeCuposSecretaria
-            .Where(c => c.IdTipo == idTipo && c.Anio == anio)
-            .Select(c => (int?)c.Cantidad)
-            .FirstOrDefaultAsync();
+        return await EjecutarLecturaSeguraAsync(async () =>
+            await _context.MaeCuposSecretaria
+                .Where(c => c.IdTipo == idTipo && c.Anio == anio)
+                .Select(c => (int?)c.Cantidad)
+                .FirstOrDefaultAsync(),
+            fallback: null,
+            operacion: "obtener cantidad de cupo");
     }
 
     public async Task<int> ObtenerConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango = null)
@@ -222,13 +242,18 @@ public class NumeracionRangoService
             return 0;
         }
 
-        return await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango, null);
+        return await EjecutarLecturaSeguraAsync(async () =>
+            await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango, null),
+            fallback: 0,
+            operacion: "obtener consumo acumulado");
     }
 
     public async Task EliminarRangoAsync(int idRango, int? idUsuario = null)
     {
-        var rango = await _context.MaeNumeracionRangos
-            .FirstOrDefaultAsync(r => r.IdRango == idRango);
+        await EjecutarOperacionSeguraAsync(async () =>
+        {
+            var rango = await _context.MaeNumeracionRangos
+                .FirstOrDefaultAsync(r => r.IdRango == idRango);
 
         if (rango is null)
         {
@@ -247,15 +272,18 @@ public class NumeracionRangoService
             idUsuario: idUsuario,
             idReferencia: rango.IdRango);
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+        }, "No fue posible eliminar el rango en este momento.", "eliminar rango de numeración");
     }
 
     public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
     {
-        if (idTipo <= 0)
+        await EjecutarOperacionSeguraAsync(async () =>
         {
-            throw new InvalidOperationException("Debe seleccionar un tipo de documento válido para configurar el cupo.");
-        }
+            if (idTipo <= 0)
+            {
+                throw new InvalidOperationException("Debe seleccionar un tipo de documento válido para configurar el cupo.");
+            }
 
         if (anio <= 0)
         {
@@ -320,20 +348,26 @@ public class NumeracionRangoService
                 idReferencia: cupoExistente.IdCupo);
         }
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+        }, "No fue posible guardar el cupo en este momento.", "guardar cupo de numeración");
     }
 
     public async Task<MaeNumeracionRango?> ObtenerRangoActivoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
         var anioObjetivo = anio ?? DateTime.Now.Year;
-        return await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: false);
+        return await EjecutarLecturaSeguraAsync(async () =>
+            await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: false),
+            fallback: null,
+            operacion: "obtener rango activo");
     }
 
     public async Task<bool> ExisteRangoConfiguradoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
         var anioObjetivo = anio ?? DateTime.Now.Year;
-        var baseQuery = _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anioObjetivo);
+        return await EjecutarLecturaSeguraAsync(async () =>
+        {
+            var baseQuery = _context.MaeNumeracionRangos
+                .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anioObjetivo);
 
         if (idOficina.HasValue)
         {
@@ -344,13 +378,16 @@ public class NumeracionRangoService
             }
         }
 
-        return await baseQuery.AnyAsync(r => r.IdOficina == null);
+            return await baseQuery.AnyAsync(r => r.IdOficina == null);
+        }, fallback: false, operacion: "verificar existencia de rango configurado");
     }
 
     public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
-        var anioObjetivo = anio ?? DateTime.Now.Year;
-        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+        return await EjecutarOperacionSeguraAsync(async () =>
+        {
+            var anioObjetivo = anio ?? DateTime.Now.Year;
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
         var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: true);
 
@@ -364,11 +401,79 @@ public class NumeracionRangoService
             throw new InvalidOperationException($"Rango agotado ({rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}). Debe registrar un nuevo rango para continuar.");
         }
 
-        rango.UltimoUtilizado++;
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
+            rango.UltimoUtilizado++;
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
-        return rango;
+            return rango;
+        }, "No fue posible consumir el siguiente número oficial.", "consumir siguiente número");
+    }
+
+    private async Task<T> EjecutarLecturaSeguraAsync<T>(Func<Task<T>> accion, T fallback, string operacion)
+    {
+        try
+        {
+            return await accion();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al {Operacion}.", operacion);
+            return fallback;
+        }
+    }
+
+    private async Task EjecutarOperacionSeguraAsync(Func<Task> accion, string mensajeUsuario, string operacion)
+    {
+        try
+        {
+            await accion();
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogError(ex, "Conflicto de concurrencia al {Operacion}.", operacion);
+            throw new InvalidOperationException("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.", ex);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Error de base de datos al {Operacion}.", operacion);
+            throw new InvalidOperationException(mensajeUsuario, ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error inesperado al {Operacion}.", operacion);
+            throw new InvalidOperationException(mensajeUsuario, ex);
+        }
+    }
+
+    private async Task<T> EjecutarOperacionSeguraAsync<T>(Func<Task<T>> accion, string mensajeUsuario, string operacion)
+    {
+        try
+        {
+            return await accion();
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogError(ex, "Conflicto de concurrencia al {Operacion}.", operacion);
+            throw new InvalidOperationException("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.", ex);
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(ex, "Error de base de datos al {Operacion}.", operacion);
+            throw new InvalidOperationException(mensajeUsuario, ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error inesperado al {Operacion}.", operacion);
+            throw new InvalidOperationException(mensajeUsuario, ex);
+        }
     }
 
     private async Task<MaeNumeracionRango?> ObtenerRangoAdministradoAsync(int idTipoDocumento, int? idOficina, int anio, bool incluirAgotados)
