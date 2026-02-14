@@ -474,16 +474,15 @@
 
         if (esNumeracionAutomatica)
         {
-            try
+            var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+            if (!resultadoNumeracion.Exitoso || resultadoNumeracion.Data is null)
             {
-                var rangoConsumido = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
-                nuevoDoc.NumeroOficial = $"{rangoConsumido.NombreRango}-{rangoConsumido.UltimoUtilizado}";
-            }
-            catch (InvalidOperationException ex)
-            {
-                errorGuardar = ex.Message;
+                errorGuardar = resultadoNumeracion.Mensaje;
                 return;
             }
+
+            var rangoConsumido = resultadoNumeracion.Data;
+            nuevoDoc.NumeroOficial = $"{rangoConsumido.NombreRango}-{rangoConsumido.UltimoUtilizado}";
         }
         else
         {

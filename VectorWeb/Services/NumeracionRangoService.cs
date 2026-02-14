@@ -97,9 +97,9 @@ public class NumeracionRangoService
             operacion: "obtener libro mayor de cupos");
     }
 
-    public async Task GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
+    public async Task<OperacionResultado> GuardarRangoAsync(MaeNumeracionRango rango, int? idUsuario = null)
     {
-        await EjecutarOperacionSeguraAsync(async () =>
+        return await EjecutarOperacionControladaAsync(async () =>
         {
             if (rango.IdTipo <= 0)
             {
@@ -248,9 +248,9 @@ public class NumeracionRangoService
             operacion: "obtener consumo acumulado");
     }
 
-    public async Task EliminarRangoAsync(int idRango, int? idUsuario = null)
+    public async Task<OperacionResultado> EliminarRangoAsync(int idRango, int? idUsuario = null)
     {
-        await EjecutarOperacionSeguraAsync(async () =>
+        return await EjecutarOperacionControladaAsync(async () =>
         {
             var rango = await _context.MaeNumeracionRangos
                 .FirstOrDefaultAsync(r => r.IdRango == idRango);
@@ -276,9 +276,9 @@ public class NumeracionRangoService
         }, "No fue posible eliminar el rango en este momento.", "eliminar rango de numeración");
     }
 
-    public async Task GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
+    public async Task<OperacionResultado> GuardarCupoAsync(int idTipo, int anio, int cantidad, int? idUsuario = null)
     {
-        await EjecutarOperacionSeguraAsync(async () =>
+        return await EjecutarOperacionControladaAsync(async () =>
         {
             if (idTipo <= 0)
             {
@@ -382,9 +382,9 @@ public class NumeracionRangoService
         }, fallback: false, operacion: "verificar existencia de rango configurado");
     }
 
-    public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina, int? anio = null)
+    public async Task<OperacionResultado<MaeNumeracionRango>> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
-        return await EjecutarOperacionSeguraAsync(async () =>
+        return await EjecutarOperacionControladaAsync(async () =>
         {
             var anioObjetivo = anio ?? DateTime.Now.Year;
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -422,57 +422,61 @@ public class NumeracionRangoService
         }
     }
 
-    private async Task EjecutarOperacionSeguraAsync(Func<Task> accion, string mensajeUsuario, string operacion)
+    private async Task<OperacionResultado> EjecutarOperacionControladaAsync(Func<Task> accion, string mensajeUsuario, string operacion)
     {
         try
         {
             await accion();
+            return OperacionResultado.Ok();
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            throw;
+            _logger.LogWarning(ex, "Validación al {Operacion}.", operacion);
+            return OperacionResultado.Fail(ex.Message);
         }
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogError(ex, "Conflicto de concurrencia al {Operacion}.", operacion);
-            throw new InvalidOperationException("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.", ex);
+            return OperacionResultado.Fail("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.");
         }
         catch (DbUpdateException ex)
         {
             _logger.LogError(ex, "Error de base de datos al {Operacion}.", operacion);
-            throw new InvalidOperationException(mensajeUsuario, ex);
+            return OperacionResultado.Fail(mensajeUsuario);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error inesperado al {Operacion}.", operacion);
-            throw new InvalidOperationException(mensajeUsuario, ex);
+            return OperacionResultado.Fail(mensajeUsuario);
         }
     }
 
-    private async Task<T> EjecutarOperacionSeguraAsync<T>(Func<Task<T>> accion, string mensajeUsuario, string operacion)
+    private async Task<OperacionResultado<T>> EjecutarOperacionControladaAsync<T>(Func<Task<T>> accion, string mensajeUsuario, string operacion)
     {
         try
         {
-            return await accion();
+            var data = await accion();
+            return OperacionResultado<T>.Ok(data);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            throw;
+            _logger.LogWarning(ex, "Validación al {Operacion}.", operacion);
+            return OperacionResultado<T>.Fail(ex.Message);
         }
         catch (DbUpdateConcurrencyException ex)
         {
             _logger.LogError(ex, "Conflicto de concurrencia al {Operacion}.", operacion);
-            throw new InvalidOperationException("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.", ex);
+            return OperacionResultado<T>.Fail("Otro usuario modificó la información al mismo tiempo. Recargue la vista e intente nuevamente.");
         }
         catch (DbUpdateException ex)
         {
             _logger.LogError(ex, "Error de base de datos al {Operacion}.", operacion);
-            throw new InvalidOperationException(mensajeUsuario, ex);
+            return OperacionResultado<T>.Fail(mensajeUsuario);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error inesperado al {Operacion}.", operacion);
-            throw new InvalidOperationException(mensajeUsuario, ex);
+            return OperacionResultado<T>.Fail(mensajeUsuario);
         }
     }
 
@@ -697,6 +701,44 @@ public class NumeracionRangoService
 
         return $"Actualización de rango {actualizado.NombreRango}: {string.Join(", ", cambios)}.";
     }
+}
+
+
+public sealed class OperacionResultado
+{
+    public bool Exitoso { get; private set; }
+    public string Mensaje { get; private set; } = string.Empty;
+
+    public static OperacionResultado Ok() => new() { Exitoso = true };
+
+    public static OperacionResultado Fail(string mensaje) => new()
+    {
+        Exitoso = false,
+        Mensaje = string.IsNullOrWhiteSpace(mensaje)
+            ? "No fue posible completar la operación."
+            : mensaje
+    };
+}
+
+public sealed class OperacionResultado<T>
+{
+    public bool Exitoso { get; private set; }
+    public string Mensaje { get; private set; } = string.Empty;
+    public T? Data { get; private set; }
+
+    public static OperacionResultado<T> Ok(T data) => new()
+    {
+        Exitoso = true,
+        Data = data
+    };
+
+    public static OperacionResultado<T> Fail(string mensaje) => new()
+    {
+        Exitoso = false,
+        Mensaje = string.IsNullOrWhiteSpace(mensaje)
+            ? "No fue posible completar la operación."
+            : mensaje
+    };
 }
 
 public sealed class CupoLibroMayorItem
