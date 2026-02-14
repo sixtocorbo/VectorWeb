@@ -28,9 +28,20 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-8">
-                        <h4 class="card-title text-primary">@documento.NumeroOficial</h4>
-                        <h6 class="card-subtitle mb-2 text-muted">@documento.IdTipoNavigation?.Nombre</h6>
-                        <p class="card-text mt-3">@documento.Asunto</p>
+                        <h4 class="card-title text-primary">@documento.IdTipoNavigation?.Nombre @documento.NumeroOficial</h4>
+
+                        <p class="card-text mt-3 mb-1">
+                            <span class="text-muted">Asunto:</span>
+                            <strong>@documento.Asunto</strong>
+                        </p>
+
+                        @if (!string.IsNullOrWhiteSpace(documento.Descripcion))
+                        {
+                            <p class="card-text mb-0">
+                                <span class="text-muted">Descripción:</span>
+                                <span>@documento.Descripcion</span>
+                            </p>
+                        }
                     </div>
                     <div class="col-md-4 text-end">
                         <span class="badge bg-secondary p-2">Estado actual: @documento.IdEstadoActualNavigation?.Nombre</span>
