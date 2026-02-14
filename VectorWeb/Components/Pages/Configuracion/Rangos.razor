@@ -79,7 +79,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Oficina (opcional)</label>
-                                <InputSelect Value="OficinaSeleccionada" ValueChanged="OnOficinaChange" ValueExpression="() => OficinaSeleccionada" class="form-control">
+                                <InputSelect @bind-Value="OficinaSeleccionada" class="form-control">
                                     <option value="">Global (todas)</option>
                                     @foreach (var oficina in oficinas)
                                     {
@@ -246,11 +246,5 @@
         mostrarModal = false;
         mensajeOk = "Rango guardado correctamente.";
         await CargarRangos();
-    }
-
-    private Task OnOficinaChange(string value)
-    {
-        OficinaSeleccionada = value;
-        return Task.CompletedTask;
     }
 }
