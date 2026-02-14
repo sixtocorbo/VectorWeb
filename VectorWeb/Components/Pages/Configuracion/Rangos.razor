@@ -88,6 +88,53 @@
     </tbody>
 </table>
 
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="card-title mb-0">Bitácora de cupos y rangos</h5>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="RecargarBitacora">Actualizar</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Entidad</th>
+                        <th>Acción</th>
+                        <th>Tipo</th>
+                        <th>Oficina</th>
+                        <th>Año</th>
+                        <th>Detalle</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (bitacora.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">No hay eventos registrados.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var evento in bitacora)
+                        {
+                            <tr>
+                                <td>@evento.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@evento.Entidad</td>
+                                <td>@evento.Accion</td>
+                                <td>@(evento.IdTipoNavigation?.Nombre ?? $"Tipo {evento.IdTipo}")</td>
+                                <td>@(evento.IdOficinaNavigation?.Nombre ?? "Global")</td>
+                                <td>@evento.Anio</td>
+                                <td>@evento.Detalle</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 @if (mostrarModal)
 {
     <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
@@ -171,6 +218,7 @@
     private int cupoAnio = DateTime.Now.Year;
     private int cupoCantidad;
     private int cupoConsumido;
+    private List<MaeNumeracionBitacora> bitacora = new();
 
     private string OficinaSeleccionada
     {
@@ -193,6 +241,7 @@
         await CargarCatalogos();
         await CargarRangos();
         await CargarDatosCupoAsync();
+        await RecargarBitacora();
     }
 
     private async Task CargarCatalogos()
@@ -204,6 +253,11 @@
     private async Task CargarRangos()
     {
         listaRangos = await RangoService.ObtenerRangosAsync();
+    }
+
+    private async Task RecargarBitacora()
+    {
+        bitacora = await RangoService.ObtenerBitacoraAsync();
     }
 
     private async Task CargarDatosCupoAsync()
@@ -265,6 +319,7 @@
 
         mensajeOk = "Cupo guardado correctamente.";
         await CargarDatosCupoAsync();
+        await RecargarBitacora();
     }
 
     private void AbrirNuevoRango()
@@ -361,5 +416,6 @@
         mensajeOk = "Rango guardado correctamente.";
         await CargarRangos();
         await CargarDatosCupoAsync();
+        await RecargarBitacora();
     }
 }
