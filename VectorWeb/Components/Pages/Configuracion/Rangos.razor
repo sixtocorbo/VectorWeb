@@ -19,39 +19,9 @@
     <div class="alert alert-success" role="alert">@mensajeOk</div>
 }
 
-<button class="btn btn-primary mb-3" @onclick="AbrirNuevoRango">Nuevo Rango</button>
-
-<div class="card mb-3">
-    <div class="card-body">
-        <h5 class="card-title">Cupo anual por tipo</h5>
-        <div class="row g-2 align-items-end">
-            <div class="col-md-4">
-                <label>Tipo de Documento</label>
-                <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-control" @onchange="OnCupoFiltroCambio">
-                    <option value="0">-- Seleccione --</option>
-                    @foreach (var tipo in tipos)
-                    {
-                        <option value="@tipo.IdTipo">@tipo.Nombre</option>
-                    }
-                </InputSelect>
-            </div>
-            <div class="col-md-3">
-                <label>Año</label>
-                <InputNumber @bind-Value="cupoAnio" class="form-control" />
-            </div>
-            <div class="col-md-3">
-                <label>Cantidad de cupo</label>
-                <InputNumber @bind-Value="cupoCantidad" class="form-control" />
-            </div>
-            <div class="col-md-2 d-grid">
-                <button type="button" class="btn btn-outline-primary" @onclick="GuardarCupo">Guardar cupo</button>
-            </div>
-        </div>
-        @if (cupoTipoSeleccionado > 0)
-        {
-            <small class="text-muted d-block mt-2">Consumido en rangos: @cupoConsumido de @cupoCantidad (año @cupoAnio).</small>
-        }
-    </div>
+<div class="d-flex gap-2 mb-3">
+    <button class="btn btn-primary" @onclick="AbrirNuevoRango">Nuevo Rango</button>
+    <button class="btn btn-outline-primary" @onclick="AbrirNuevoCupo">Nuevo Cupo</button>
 </div>
 
 <table class="table table-striped table-sm">
@@ -82,6 +52,7 @@
                 <td>@(rango.Activo ? "Sí" : "No")</td>
                 <td>
                     <button class="btn btn-sm btn-secondary" @onclick="() => Editar(rango)">Editar</button>
+                    <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => EliminarRango(rango)">Eliminar</button>
                 </td>
             </tr>
         }
@@ -126,6 +97,48 @@
                                 <td>@(evento.IdOficinaNavigation?.Nombre ?? "Global")</td>
                                 <td>@evento.Anio</td>
                                 <td>@evento.Detalle</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Libro mayor de cupos</h5>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Año</th>
+                        <th>Cupo</th>
+                        <th>Consumido</th>
+                        <th>Disponible</th>
+                        <th>Última gestión</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (libroMayorCupos.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No hay cupos registrados.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in libroMayorCupos)
+                        {
+                            <tr>
+                                <td>@item.Tipo</td>
+                                <td>@item.Anio</td>
+                                <td>@item.Cantidad</td>
+                                <td>@item.Consumido</td>
+                                <td>@item.Disponible</td>
+                                <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
                             </tr>
                         }
                     }
@@ -206,6 +219,48 @@
     </div>
 }
 
+@if (mostrarModalCupo)
+{
+    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Configurar Cupo</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalCupo"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label>Tipo de Documento</label>
+                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-control" @onchange="OnCupoFiltroCambio">
+                            <option value="0">-- Seleccione --</option>
+                            @foreach (var tipo in tipos)
+                            {
+                                <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="mb-3">
+                        <label>Año</label>
+                        <InputNumber @bind-Value="cupoAnio" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label>Cantidad de cupo</label>
+                        <InputNumber @bind-Value="cupoCantidad" class="form-control" />
+                    </div>
+                    @if (cupoTipoSeleccionado > 0)
+                    {
+                        <small class="text-muted d-block mb-3">Consumido en rangos activos: @cupoConsumido de @cupoCantidad (año @cupoAnio).</small>
+                    }
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-primary" @onclick="GuardarCupo">Guardar cupo</button>
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModalCupo">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<MaeNumeracionRango> listaRangos = new();
     private List<CatTipoDocumento> tipos = new();
@@ -219,6 +274,8 @@
     private int cupoCantidad;
     private int cupoConsumido;
     private List<MaeNumeracionBitacora> bitacora = new();
+    private bool mostrarModalCupo;
+    private List<CupoLibroMayorItem> libroMayorCupos = new();
 
     private string OficinaSeleccionada
     {
@@ -241,7 +298,13 @@
         await CargarCatalogos();
         await CargarRangos();
         await CargarDatosCupoAsync();
+        await CargarLibroMayorCuposAsync();
         await RecargarBitacora();
+    }
+
+    private async Task CargarLibroMayorCuposAsync()
+    {
+        libroMayorCupos = await RangoService.ObtenerLibroMayorCuposAsync();
     }
 
     private async Task CargarCatalogos()
@@ -319,7 +382,16 @@
 
         mensajeOk = "Cupo guardado correctamente.";
         await CargarDatosCupoAsync();
+        await CargarLibroMayorCuposAsync();
         await RecargarBitacora();
+        mostrarModalCupo = false;
+    }
+
+    private void AbrirNuevoCupo()
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+        mostrarModalCupo = true;
     }
 
     private void AbrirNuevoRango()
@@ -365,6 +437,11 @@
     private void CerrarModal()
     {
         mostrarModal = false;
+    }
+
+    private void CerrarModalCupo()
+    {
+        mostrarModalCupo = false;
     }
 
     private async Task Guardar()
@@ -416,6 +493,30 @@
         mensajeOk = "Rango guardado correctamente.";
         await CargarRangos();
         await CargarDatosCupoAsync();
+        await CargarLibroMayorCuposAsync();
         await RecargarBitacora();
     }
+
+    private async Task EliminarRango(MaeNumeracionRango rango)
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+
+        try
+        {
+            await RangoService.EliminarRangoAsync(rango.IdRango);
+        }
+        catch (InvalidOperationException ex)
+        {
+            mensajeError = ex.Message;
+            return;
+        }
+
+        mensajeOk = "Rango eliminado correctamente.";
+        await CargarRangos();
+        await CargarDatosCupoAsync();
+        await CargarLibroMayorCuposAsync();
+        await RecargarBitacora();
+    }
+
 }
