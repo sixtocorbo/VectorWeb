@@ -57,6 +57,23 @@ public class NumeracionRangoService
         return await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, incluirAgotados: false);
     }
 
+    public async Task<bool> ExisteRangoConfiguradoAsync(int idTipoDocumento, int? idOficina)
+    {
+        var baseQuery = _context.MaeNumeracionRangos
+            .Where(r => r.IdTipo == idTipoDocumento && r.Activo);
+
+        if (idOficina.HasValue)
+        {
+            var existeRangoOficina = await baseQuery.AnyAsync(r => r.IdOficina == idOficina);
+            if (existeRangoOficina)
+            {
+                return true;
+            }
+        }
+
+        return await baseQuery.AnyAsync(r => r.IdOficina == null);
+    }
+
     public async Task<MaeNumeracionRango> ConsumirSiguienteNumeroAsync(int idTipoDocumento, int? idOficina)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);

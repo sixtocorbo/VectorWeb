@@ -149,8 +149,12 @@
                         }
                         else
                         {
-                            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" />
-                            @if (esNumeracionExterna)
+                            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" disabled="@bloqueoPorRangoAgotado" />
+                            @if (bloqueoPorRangoAgotado)
+                            {
+                                <small class="text-danger">No disponible: hubo rango configurado para esta oficina/tipo y está agotado. Debe crear uno nuevo.</small>
+                            }
+                            else if (esNumeracionExterna)
                             {
                                 <small class="text-muted">Numeración externa: ingrese el número oficial provisto por la entidad de origen.</small>
                             }
@@ -226,7 +230,7 @@
     </div>
 
     <div class="d-grid gap-2 d-md-block">
-        <button type="submit" class="btn btn-success btn-lg">
+        <button type="submit" class="btn btn-success btn-lg" disabled="@bloqueoPorRangoAgotado">
             @if (esActuacion)
             {
                 @if (soloTraerSinActuacion)
@@ -290,6 +294,7 @@
     private bool mostrarSugerenciasArriba = true;
     private bool esNumeracionAutomatica;
     private bool esNumeracionExterna;
+    private bool bloqueoPorRangoAgotado;
     private string mensajeNumeracion = string.Empty;
     private string serieNumeracionAutomatica = string.Empty;
     private int proximoNumeroAutomatico;
@@ -461,6 +466,12 @@
             return;
         }
 
+        if (bloqueoPorRangoAgotado)
+        {
+            errorGuardar = "No puede continuar: el rango de numeración está agotado para esta oficina/tipo. Debe configurar un nuevo rango.";
+            return;
+        }
+
         if (esNumeracionAutomatica)
         {
             try
@@ -607,6 +618,7 @@
     {
         esNumeracionAutomatica = false;
         esNumeracionExterna = false;
+        bloqueoPorRangoAgotado = false;
         mensajeNumeracion = string.Empty;
         serieNumeracionAutomatica = string.Empty;
         proximoNumeroAutomatico = 0;
@@ -625,6 +637,14 @@
             proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
             nuevoDoc.NumeroOficial = string.Empty;
             mensajeNumeracion = "Modo administrado por rango: el número se asignará automáticamente al guardar.";
+            return;
+        }
+
+        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual);
+        if (existeRangoConfigurado)
+        {
+            bloqueoPorRangoAgotado = true;
+            mensajeNumeracion = "Rango agotado para esta oficina/tipo. Debe registrar un nuevo rango para continuar.";
             return;
         }
 
