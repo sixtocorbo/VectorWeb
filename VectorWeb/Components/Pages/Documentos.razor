@@ -89,16 +89,23 @@ else
                     <td>@doc.Asunto</td>
                     <td>@doc.IdTipoNavigation?.Nombre</td>
                     <td>
-                        @if (TieneVinculos(doc))
+                        @if (doc.IdDocumentoPadre is not null)
                         {
                             <a href="documentos/vinculos/@doc.IdDocumento" class="btn btn-link btn-sm p-0 text-decoration-none" title="Ver vínculos del documento">
-                                <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Vinculado
+                                <i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>Es hijo
+                                <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+                            </a>
+                        }
+                        else if (documentosConHijos.Contains(doc.IdDocumento))
+                        {
+                            <a href="documentos/vinculos/@doc.IdDocumento" class="btn btn-link btn-sm p-0 text-decoration-none" title="Ver vínculos del documento">
+                                <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Es padre
                                 <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
                             </a>
                         }
                         else
                         {
-                            <span class="badge bg-light text-dark border"><i class="bi bi-slash-circle me-1" aria-hidden="true"></i>Sin padre</span>
+                            <span class="badge bg-light text-dark border"><i class="bi bi-slash-circle me-1" aria-hidden="true"></i>Sin vínculo</span>
                         }
                     </td>
                     <td>
@@ -274,9 +281,6 @@ else
             doc.IdTipoNavigation?.Nombre,
             doc.IdOficinaActualNavigation?.Nombre,
             doc.IdEstadoActualNavigation?.Nombre);
-
-    private bool TieneVinculos(MaeDocumento doc)
-        => doc.IdDocumentoPadre is not null || documentosConHijos.Contains(doc.IdDocumento);
 
     private void PaginaAnterior()
     {
