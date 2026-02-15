@@ -3,9 +3,7 @@
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
 @using VectorWeb.Models
-@using VectorWeb.Repositories
-@inject IRepository<MaeDocumento> RepoDocs
-@inject IRepository<CatOficina> RepoOficinas
+@inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
@@ -213,7 +211,10 @@ else
 
                 if (idOficinaUsuario > 0)
                 {
-                    var oficina = await RepoOficinas.GetQueryable().FirstOrDefaultAsync(o => o.IdOficina == oficinaId);
+                    await using var dbContext = await DbContextFactory.CreateDbContextAsync();
+                    var oficina = await dbContext.CatOficinas
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(o => o.IdOficina == oficinaId);
                     nombreOficinaUsuario = oficina?.Nombre ?? $"Mi Oficina ({oficinaId})";
                 }
                 else
@@ -233,7 +234,16 @@ else
 
     private async Task CargarDocumentos()
     {
-        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation,IdDocumentoPadreNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
+        await using var dbContext = await DbContextFactory.CreateDbContextAsync();
+
+        var query = dbContext.MaeDocumentos
+            .AsNoTracking()
+            .Include(d => d.IdTipoNavigation)
+            .Include(d => d.IdOficinaActualNavigation)
+            .Include(d => d.IdEstadoActualNavigation)
+            .Include(d => d.IdDocumentoPadreNavigation)
+                .ThenInclude(d => d!.IdTipoNavigation)
+            .AsQueryable();
 
         if (!verTodo && idOficinaUsuario > 0)
         {
@@ -259,7 +269,8 @@ else
         var hilosPagina = listaDocs.Select(d => d.IdHiloConversacion).Distinct().ToList();
         var idsPadreConHijos = idsPagina.Count == 0
             ? []
-            : await RepoDocs.GetQueryable()
+            : await dbContext.MaeDocumentos
+                .AsNoTracking()
                 .Where(d => d.IdDocumentoPadre != null && idsPagina.Contains(d.IdDocumentoPadre.Value))
                 .Select(d => d.IdDocumentoPadre!.Value)
                 .Distinct()
@@ -272,7 +283,8 @@ else
         }
         else
         {
-            var hilosConRelacion = await RepoDocs.GetQueryable()
+            var hilosConRelacion = await dbContext.MaeDocumentos
+                .AsNoTracking()
                 .Where(d => hilosPagina.Contains(d.IdHiloConversacion))
                 .GroupBy(d => d.IdHiloConversacion)
                 .Where(g => g.Count() > 1)
@@ -281,7 +293,8 @@ else
 
             idsRelacionadosPorHilo = hilosConRelacion.Count == 0
                 ? []
-                : await RepoDocs.GetQueryable()
+                : await dbContext.MaeDocumentos
+                    .AsNoTracking()
                     .Where(d => hilosConRelacion.Contains(d.IdHiloConversacion))
                     .Select(d => d.IdDocumento)
                     .ToListAsync();

@@ -14,6 +14,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Database
+builder.Services.AddDbContextFactory<SecretariaDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddDbContext<SecretariaDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")),
     contextLifetime: ServiceLifetime.Transient);
