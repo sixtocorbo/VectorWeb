@@ -45,14 +45,13 @@
     {
         <div class="card mb-3 border-primary">
             <div class="card-header bg-light">
-                <i class="bi bi-link-45deg"></i> Vinculación (Opcional)
+                <i class="bi bi-link-45deg"></i> Vinculación
             </div>
             <div class="card-body">
                 @if (docPadreSeleccionado == null)
                 {
                     <p class="mb-2 text-muted">
-                        Podés vincular este documento a un expediente/documento padre existente. Al presionar <strong>Buscar</strong>
-                        se abrirá una bandeja con el detalle completo para elegir correctamente.
+                        Si corresponde podés adjuntar este documento a un expediente padre existente.
                     </p>
                     <button type="button" class="btn btn-outline-primary" @onclick="AbrirModalPadres">
                         <i class="bi bi-search"></i> Buscar documento padre
