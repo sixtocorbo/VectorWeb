@@ -253,13 +253,15 @@ else
             .ToListAsync();
 
         var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
-        documentosConHijos = idsPagina.Count == 0
+        var idsPadreConHijos = idsPagina.Count == 0
             ? []
             : await RepoDocs.GetQueryable()
-                .Where(d => d.IdDocumentoPadre is not null && idsPagina.Contains(d.IdDocumentoPadre.Value))
+                .Where(d => d.IdDocumentoPadre != null && idsPagina.Contains(d.IdDocumentoPadre.Value))
                 .Select(d => d.IdDocumentoPadre!.Value)
                 .Distinct()
-                .ToHashSetAsync();
+                .ToListAsync();
+
+        documentosConHijos = idsPadreConHijos.ToHashSet();
 
         StateHasChanged();
     }
