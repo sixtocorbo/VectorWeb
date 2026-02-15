@@ -265,14 +265,27 @@ else
                 .Distinct()
                 .ToListAsync();
 
-        var idsRelacionadosPorHilo = hilosPagina.Count == 0
-            ? []
-            : await RepoDocs.GetQueryable()
+        List<long> idsRelacionadosPorHilo;
+        if (hilosPagina.Count == 0)
+        {
+            idsRelacionadosPorHilo = [];
+        }
+        else
+        {
+            var hilosConRelacion = await RepoDocs.GetQueryable()
                 .Where(d => hilosPagina.Contains(d.IdHiloConversacion))
                 .GroupBy(d => d.IdHiloConversacion)
                 .Where(g => g.Count() > 1)
-                .SelectMany(g => g.Select(d => d.IdDocumento))
+                .Select(g => g.Key)
                 .ToListAsync();
+
+            idsRelacionadosPorHilo = hilosConRelacion.Count == 0
+                ? []
+                : await RepoDocs.GetQueryable()
+                    .Where(d => hilosConRelacion.Contains(d.IdHiloConversacion))
+                    .Select(d => d.IdDocumento)
+                    .ToListAsync();
+        }
 
         documentosConHijos = idsPadreConHijos.ToHashSet();
         documentosRelacionadosPorHilo = idsRelacionadosPorHilo.ToHashSet();
