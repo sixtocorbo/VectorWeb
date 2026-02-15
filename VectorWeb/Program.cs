@@ -21,6 +21,7 @@ builder.Services.AddDbContext<SecretariaDbContext>(options =>
 // Generic repository
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<NumeracionRangoService>();
+builder.Services.AddScoped<DocumentoVinculacionService>();
 
 // Blazor auth services
 builder.Services.AddAuthorizationCore();

@@ -1,0 +1,266 @@
+@page "/documentos/vinculacion"
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@using VectorWeb.Services
+@inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<CatTipoDocumento> RepoTipos
+@inject DocumentoVinculacionService VinculacionService
+@rendermode InteractiveServer
+
+<PageTitle>Vinculación de Documentos</PageTitle>
+
+<h3><i class="bi bi-diagram-3"></i> Vinculación Dinámica de Documentos</h3>
+<p class="text-muted">Definí un documento padre y agregá dinámicamente los hijos a vincular. El sistema valida ciclos y mantiene la consistencia del hilo para todo subárbol involucrado.</p>
+
+@if (!string.IsNullOrWhiteSpace(mensajeResultado))
+{
+    <div class="alert @(resultadoExitoso ? "alert-success" : "alert-danger")" role="alert">@mensajeResultado</div>
+}
+
+<div class="card mb-3">
+    <div class="card-header bg-light"><strong>1) Seleccionar documento padre</strong></div>
+    <div class="card-body">
+        <label class="form-label">Buscador de documentos</label>
+        <input class="form-control"
+               placeholder="Buscar por número, asunto o tipo"
+               @bind="filtroPadre"
+               @bind:event="oninput" />
+
+        <div class="table-responsive mt-3">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Nro.</th>
+                        <th>Asunto</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in DocumentosPadreDisponibles)
+                    {
+                        <tr class="@(docPadre?.IdDocumento == doc.IdDocumento ? "table-primary" : string.Empty)">
+                            <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
+                            <td>@doc.Asunto</td>
+                            <td>@NombreTipo(doc.IdTipo)</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-primary" @onclick="() => DefinirPadre(doc)">Definir padre</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (docPadre is not null)
+        {
+            <div class="alert alert-info mb-0 mt-2">
+                <strong>Padre seleccionado:</strong>
+                #@docPadre.IdDocumento - @(string.IsNullOrWhiteSpace(docPadre.NumeroOficial) ? "S/N" : docPadre.NumeroOficial) - @docPadre.Asunto
+            </div>
+        }
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header bg-light"><strong>2) Agregar documentos hijos</strong></div>
+    <div class="card-body">
+        <label class="form-label">Buscador de potenciales hijos</label>
+        <input class="form-control"
+               placeholder="Buscar por número, asunto o tipo"
+               @bind="filtroHijos"
+               @bind:event="oninput" />
+
+        <div class="table-responsive mt-3">
+            <table class="table table-sm table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nro.</th>
+                        <th>Asunto</th>
+                        <th>Padre actual</th>
+                        <th>Hijos directos</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in DocumentosHijosDisponibles)
+                    {
+                        <tr>
+                            <td>@doc.IdDocumento</td>
+                            <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
+                            <td>@doc.Asunto</td>
+                            <td>@(doc.IdDocumentoPadre?.ToString() ?? "Sin padre")</td>
+                            <td>@CantidadHijosDirectos(doc.IdDocumento)</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-success"
+                                        disabled="@hijosSeleccionados.Contains(doc.IdDocumento)"
+                                        @onclick="() => AgregarHijo(doc.IdDocumento)">
+                                    Agregar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!hijosSeleccionados.Any())
+        {
+            <p class="text-muted mb-0">No hay documentos hijos seleccionados.</p>
+        }
+        else
+        {
+            <div class="mt-2">
+                <strong>Hijos seleccionados:</strong>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    @foreach (var id in hijosSeleccionados)
+                    {
+                        var doc = documentosPorId[id];
+                        <span class="badge text-bg-secondary">
+                            #@id - @(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)
+                            <button class="btn btn-sm btn-link text-white p-0 ms-1" @onclick="() => QuitarHijo(id)"><i class="bi bi-x-circle"></i></button>
+                        </span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="d-grid d-md-block mb-3">
+    <button class="btn btn-primary" disabled="@(docPadre is null || !hijosSeleccionados.Any())" @onclick="EjecutarVinculacion">
+        <i class="bi bi-link-45deg"></i> Ejecutar vinculación
+    </button>
+</div>
+
+@if (ultimoResultado?.Detalles?.Any() == true)
+{
+    <div class="card">
+        <div class="card-header bg-light"><strong>Resultado de operación</strong></div>
+        <div class="card-body">
+            <p class="mb-2"><strong>Registros afectados:</strong> @ultimoResultado.TotalRegistrosAfectados</p>
+            <ul class="mb-0">
+                @foreach (var detalle in ultimoResultado.Detalles)
+                {
+                    var doc = documentosPorId.GetValueOrDefault(detalle.IdDocumento);
+                    <li>
+                        Documento #@detalle.IdDocumento (@(doc?.NumeroOficial ?? "S/N")): @detalle.Estado
+                        @if (detalle.CantidadDescendientes > 0)
+                        {
+                            <span>(incluye @detalle.CantidadDescendientes hijo(s) descendiente(s))</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    private List<MaeDocumento> documentos = [];
+    private Dictionary<long, MaeDocumento> documentosPorId = new();
+    private Dictionary<int, string> nombresTipo = new();
+    private string filtroPadre = string.Empty;
+    private string filtroHijos = string.Empty;
+    private MaeDocumento? docPadre;
+    private HashSet<long> hijosSeleccionados = [];
+    private string? mensajeResultado;
+    private bool resultadoExitoso;
+    private VinculacionResultado? ultimoResultado;
+
+    private IEnumerable<MaeDocumento> DocumentosPadreDisponibles
+        => Filtrar(filtroPadre).Take(15);
+
+    private IEnumerable<MaeDocumento> DocumentosHijosDisponibles
+        => Filtrar(filtroHijos)
+            .Where(d => docPadre is null || d.IdDocumento != docPadre.IdDocumento)
+            .Take(20);
+
+    protected override async Task OnInitializedAsync()
+    {
+        documentos = await RepoDocs.GetQueryable()
+            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
+            .ToListAsync();
+
+        documentosPorId = documentos.ToDictionary(d => d.IdDocumento);
+
+        nombresTipo = (await RepoTipos.GetAllAsync())
+            .Where(t => !string.IsNullOrWhiteSpace(t.Nombre))
+            .ToDictionary(t => t.IdTipo, t => t.Nombre);
+    }
+
+    private IEnumerable<MaeDocumento> Filtrar(string texto)
+    {
+        var terminos = (texto ?? string.Empty)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (!terminos.Any())
+        {
+            return documentos;
+        }
+
+        return documentos.Where(d => terminos.All(t => ConstruirIndice(d).Contains(t, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private string ConstruirIndice(MaeDocumento d)
+        => string.Join(' ', d.IdDocumento, d.NumeroOficial, d.Asunto, NombreTipo(d.IdTipo));
+
+    private string NombreTipo(int idTipo)
+        => nombresTipo.GetValueOrDefault(idTipo, $"Tipo #{idTipo}");
+
+    private void DefinirPadre(MaeDocumento doc)
+    {
+        docPadre = doc;
+        hijosSeleccionados.Remove(doc.IdDocumento);
+        mensajeResultado = null;
+    }
+
+    private void AgregarHijo(long idDocumento)
+    {
+        hijosSeleccionados.Add(idDocumento);
+        mensajeResultado = null;
+    }
+
+    private void QuitarHijo(long idDocumento)
+    {
+        hijosSeleccionados.Remove(idDocumento);
+    }
+
+    private int CantidadHijosDirectos(long idDocumento)
+        => documentos.Count(d => d.IdDocumentoPadre == idDocumento);
+
+    private async Task EjecutarVinculacion()
+    {
+        if (docPadre is null || !hijosSeleccionados.Any())
+        {
+            mensajeResultado = "Debe seleccionar un padre y al menos un hijo.";
+            resultadoExitoso = false;
+            return;
+        }
+
+        var resultado = await VinculacionService.VincularAsync(docPadre.IdDocumento, hijosSeleccionados);
+        ultimoResultado = resultado;
+        mensajeResultado = resultado.Mensaje;
+        resultadoExitoso = resultado.Exitoso;
+
+        if (!resultado.Exitoso)
+        {
+            return;
+        }
+
+        hijosSeleccionados.Clear();
+
+        documentos = await RepoDocs.GetQueryable()
+            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
+            .ToListAsync();
+
+        documentosPorId = documentos.ToDictionary(d => d.IdDocumento);
+
+        if (docPadre is not null)
+        {
+            docPadre = documentosPorId.GetValueOrDefault(docPadre.IdDocumento);
+        }
+    }
+}
