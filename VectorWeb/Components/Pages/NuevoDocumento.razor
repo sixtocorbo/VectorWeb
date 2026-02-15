@@ -270,9 +270,8 @@
                             <label class="form-label">Buscador en bandeja</label>
                             <input class="form-control"
                                    placeholder="Buscar por número, asunto, tipo, oficina o estado"
-                                   @bind="filtroModalPadre"
-                                   @bind:event="oninput"
-                                   @bind:after="ResetearPaginaPadres" />
+                                   @bind="FiltroModalPadre"
+                                   @bind:event="oninput" />
                         </div>
                         <div class="col-md-5 text-md-end">
                             <div class="form-check form-switch d-inline-block">
@@ -366,6 +365,11 @@
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
 
     private string filtroModalPadre = string.Empty;
+    private List<MaeDocumento> documentosPadreFiltrados = new();
+    private readonly Dictionary<int, string> nombresOficinas = new();
+    private readonly Dictionary<int, string> nombresTipos = new();
+    private readonly Dictionary<int, string> nombresEstados = new();
+    private readonly Dictionary<int, string> indicesBusquedaPadre = new();
     private List<MaeDocumento> documentosDisponibles = new();
     private bool mostrarModalPadres;
     private int paginaPadreActual = 1;
@@ -403,9 +407,45 @@
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+
+        nombresOficinas.Clear();
+        foreach (var oficina in oficinas)
+        {
+            if (!string.IsNullOrWhiteSpace(oficina.Nombre))
+            {
+                nombresOficinas[oficina.IdOficina] = oficina.Nombre;
+            }
+        }
+
+        nombresTipos.Clear();
+        foreach (var tipo in tipos)
+        {
+            if (!string.IsNullOrWhiteSpace(tipo.Nombre))
+            {
+                nombresTipos[tipo.IdTipo] = tipo.Nombre;
+            }
+        }
+
+        nombresEstados.Clear();
+        foreach (var estado in estados)
+        {
+            if (!string.IsNullOrWhiteSpace(estado.Nombre))
+            {
+                nombresEstados[estado.IdEstado] = estado.Nombre;
+            }
+        }
+
         documentosDisponibles = (await RepoDocs.GetAllAsync())
             .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
             .ToList();
+
+        indicesBusquedaPadre.Clear();
+        foreach (var documento in documentosDisponibles)
+        {
+            indicesBusquedaPadre[documento.IdDocumento] = ConstruirIndiceBusquedaPadre(documento);
+        }
+
+        RecalcularDocumentosPadreFiltrados();
 
         var estadoInicial = estados.FirstOrDefault();
         if (estadoInicial != null)
@@ -482,29 +522,14 @@
         }
     }
 
-    private IEnumerable<MaeDocumento> DocumentosPadreFiltrados
-    {
-        get
-        {
-            var terminos = filtroModalPadre
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            if (terminos.Length == 0)
-            {
-                return documentosDisponibles;
-            }
-
-            return documentosDisponibles.Where(d => terminos.All(termino =>
-                ConstruirIndiceBusquedaPadre(d).Contains(termino, StringComparison.OrdinalIgnoreCase)));
-        }
-    }
+    private IEnumerable<MaeDocumento> DocumentosPadreFiltrados => documentosPadreFiltrados;
 
     private IEnumerable<MaeDocumento> DocumentosPadrePaginados
         => DocumentosPadreFiltrados
             .Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre)
             .Take(tamanoPaginaPadre);
 
-    private int TotalRegistrosPadre => DocumentosPadreFiltrados.Count();
+    private int TotalRegistrosPadre => documentosPadreFiltrados.Count;
     private int TotalPaginasPadre => Math.Max(1, (int)Math.Ceiling(TotalRegistrosPadre / (double)tamanoPaginaPadre));
     private int PaginaPadreEfectiva => Math.Min(paginaPadreActual, TotalPaginasPadre);
     private int DesdeRegistroPadre => TotalRegistrosPadre == 0 ? 0 : ((PaginaPadreEfectiva - 1) * tamanoPaginaPadre) + 1;
@@ -520,9 +545,20 @@
         mostrarModalPadres = false;
     }
 
-    private void ResetearPaginaPadres()
+    private string FiltroModalPadre
     {
-        paginaPadreActual = 1;
+        get => filtroModalPadre;
+        set
+        {
+            if (filtroModalPadre == value)
+            {
+                return;
+            }
+
+            filtroModalPadre = value;
+            paginaPadreActual = 1;
+            RecalcularDocumentosPadreFiltrados();
+        }
     }
 
     private void PaginaPadreAnterior()
@@ -552,8 +588,7 @@
         docPadreSeleccionado = padre;
         nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
         nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
-        filtroModalPadre = string.Empty;
-        paginaPadreActual = 1;
+        FiltroModalPadre = string.Empty;
     }
 
     private void QuitarVinculo()
@@ -974,14 +1009,31 @@
             NombreEstado(doc.IdEstadoActual),
             doc.FechaCreacion?.ToString("dd/MM/yyyy"));
 
+    private void RecalcularDocumentosPadreFiltrados()
+    {
+        var terminos = filtroModalPadre
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (terminos.Length == 0)
+        {
+            documentosPadreFiltrados = documentosDisponibles;
+            return;
+        }
+
+        documentosPadreFiltrados = documentosDisponibles
+            .Where(d => indicesBusquedaPadre.TryGetValue(d.IdDocumento, out var indice)
+                && terminos.All(termino => indice.Contains(termino, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
     private string NombreOficina(int idOficina)
-        => oficinas.FirstOrDefault(o => o.IdOficina == idOficina)?.Nombre ?? $"Oficina {idOficina}";
+        => nombresOficinas.GetValueOrDefault(idOficina) ?? $"Oficina {idOficina}";
 
     private string NombreTipo(int idTipo)
-        => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"Tipo {idTipo}";
+        => nombresTipos.GetValueOrDefault(idTipo) ?? $"Tipo {idTipo}";
 
     private string NombreEstado(int idEstado)
-        => estados.FirstOrDefault(e => e.IdEstado == idEstado)?.Nombre ?? $"Estado {idEstado}";
+        => nombresEstados.GetValueOrDefault(idEstado) ?? $"Estado {idEstado}";
 
     private async Task AjustarScrollSugerenciaAsync(ElementReference panelRef, int indiceSugerencia)
     {
