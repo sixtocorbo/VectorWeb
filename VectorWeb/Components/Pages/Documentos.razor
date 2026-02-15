@@ -35,12 +35,13 @@
                class="form-control"
                placeholder="Buscar por número, asunto, tipo, oficina o estado"
                @bind="FiltroBusqueda"
-               @bind:event="oninput" />
+               @bind:event="oninput"
+               @bind:after="OnFiltroBusquedaChanged" />
         <small class="text-muted">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
     </div>
     <div class="col-md-3">
         <label for="tamanoPagina" class="form-label">Resultados por página</label>
-        <select id="tamanoPagina" class="form-select" @bind="TamanoPagina">
+        <select id="tamanoPagina" class="form-select" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
             @foreach (var opcion in opcionesTamanoPagina)
             {
                 <option value="@opcion">@opcion</option>
@@ -153,31 +154,11 @@ else
     private bool verTodo;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
 
-    private IEnumerable<MaeDocumento> DocumentosFiltrados
-    {
-        get
-        {
-            if (listaDocs is null)
-            {
-                return [];
-            }
+    private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
 
-            var terminos = filtroBusqueda
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            return listaDocs.Where(doc => terminos.All(termino =>
-                ConstruirIndiceBusqueda(doc).Contains(termino, StringComparison.OrdinalIgnoreCase)));
-        }
-    }
-
-    private IEnumerable<MaeDocumento> DocumentosPaginados
-        => DocumentosFiltrados
-            .Skip((PaginaActualEfectiva - 1) * tamanoPagina)
-            .Take(tamanoPagina);
-
-    private int TotalRegistros => DocumentosFiltrados.Count();
+    private int TotalRegistros { get; set; }
     private int TotalPaginas => Math.Max(1, (int)Math.Ceiling(TotalRegistros / (double)tamanoPagina));
-    private int PaginaActualEfectiva => Math.Min(paginaActual, TotalPaginas);
+    private int PaginaActualEfectiva => Math.Max(1, Math.Min(paginaActual, TotalPaginas));
     private int DesdeRegistro => TotalRegistros == 0 ? 0 : ((PaginaActualEfectiva - 1) * tamanoPagina) + 1;
     private int HastaRegistro => Math.Min(PaginaActualEfectiva * tamanoPagina, TotalRegistros);
 
@@ -211,6 +192,10 @@ else
         }
     }
 
+    private Task OnFiltroBusquedaChanged() => CargarDocumentos();
+
+    private Task OnTamanoPaginaChanged() => CargarDocumentos();
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -243,7 +228,7 @@ else
         await CargarDocumentos();
     }
 
-    private Task CargarDocumentos()
+    private async Task CargarDocumentos()
     {
         var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation,IdDocumentoPadreNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
 
@@ -252,48 +237,72 @@ else
             query = query.Where(d => d.IdOficinaActual == idOficinaUsuario);
         }
 
-        listaDocs = query
+        query = AplicarFiltroBusqueda(query);
+
+        TotalRegistros = await query.CountAsync();
+
+        if (paginaActual > TotalPaginas)
+        {
+            paginaActual = TotalPaginas;
+        }
+
+        listaDocs = await query
             .OrderByDescending(d => d.FechaCreacion)
-            .ToList();
+            .Skip((PaginaActualEfectiva - 1) * tamanoPagina)
+            .Take(tamanoPagina)
+            .ToListAsync();
 
-        documentosConHijos = listaDocs
-            .Where(d => d.IdDocumentoPadre is not null)
-            .Select(d => d.IdDocumentoPadre!.Value)
-            .ToHashSet();
+        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
+        documentosConHijos = idsPagina.Count == 0
+            ? []
+            : await RepoDocs.GetQueryable()
+                .Where(d => d.IdDocumentoPadre is not null && idsPagina.Contains(d.IdDocumentoPadre.Value))
+                .Select(d => d.IdDocumentoPadre!.Value)
+                .Distinct()
+                .ToHashSetAsync();
 
-        paginaActual = 1;
-        return Task.CompletedTask;
+        StateHasChanged();
     }
 
-    private static string ConstruirIndiceBusqueda(MaeDocumento doc)
-        => string.Join(' ',
-            // Mantener el índice alineado con lo que se le promete al usuario en el placeholder.
-            // Evita "falsos positivos" por campos técnicos/ocultos (p.ej. número interno o fecha).
-            doc.NumeroOficial,
-            doc.Asunto,
-            doc.IdTipoNavigation?.Nombre,
-            doc.IdOficinaActualNavigation?.Nombre,
-            doc.IdEstadoActualNavigation?.Nombre);
+    private IQueryable<MaeDocumento> AplicarFiltroBusqueda(IQueryable<MaeDocumento> query)
+    {
+        var terminos = filtroBusqueda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    private void PaginaAnterior()
+        foreach (var termino in terminos)
+        {
+            var patron = $"%{termino}%";
+            query = query.Where(doc =>
+                EF.Functions.Like(doc.NumeroOficial ?? string.Empty, patron)
+                || EF.Functions.Like(doc.Asunto ?? string.Empty, patron)
+                || EF.Functions.Like(doc.IdTipoNavigation!.Nombre ?? string.Empty, patron)
+                || EF.Functions.Like(doc.IdOficinaActualNavigation!.Nombre ?? string.Empty, patron)
+                || EF.Functions.Like(doc.IdEstadoActualNavigation!.Nombre ?? string.Empty, patron));
+        }
+
+        return query;
+    }
+
+    private async Task PaginaAnterior()
     {
         if (PaginaActualEfectiva > 1)
         {
             paginaActual = PaginaActualEfectiva - 1;
+            await CargarDocumentos();
         }
     }
 
-    private void PaginaSiguiente()
+    private async Task PaginaSiguiente()
     {
         if (PaginaActualEfectiva < TotalPaginas)
         {
             paginaActual = PaginaActualEfectiva + 1;
+            await CargarDocumentos();
         }
     }
 
     private static bool EsRojo(string? estadoSemaforo)
-        => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase)
-        || string.Equals(estadoSemaforo, "Rojo", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase);
 
     private void IrAPase(MaeDocumento doc)
     {
