@@ -89,9 +89,12 @@ else
                     <td>@doc.Asunto</td>
                     <td>@doc.IdTipoNavigation?.Nombre</td>
                     <td>
-                        @if (doc.IdDocumentoPadre is not null)
+                        @if (TieneVinculos(doc))
                         {
-                            <span><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>@ObtenerEtiquetaVinculacion(doc)</span>
+                            <a href="documentos/vinculos/@doc.IdDocumento" class="btn btn-link btn-sm p-0 text-decoration-none" title="Ver vínculos del documento">
+                                <i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>Vinculado
+                                <i class="bi bi-box-arrow-up-right ms-1" aria-hidden="true"></i>
+                            </a>
                         }
                         else
                         {
@@ -141,6 +144,7 @@ else
 
 @code {
     private List<MaeDocumento>? listaDocs;
+    private HashSet<long> documentosConHijos = [];
     private string filtroBusqueda = string.Empty;
     private int paginaActual = 1;
     private int tamanoPagina = 10;
@@ -252,6 +256,11 @@ else
             .OrderByDescending(d => d.FechaCreacion)
             .ToList();
 
+        documentosConHijos = listaDocs
+            .Where(d => d.IdDocumentoPadre is not null)
+            .Select(d => d.IdDocumentoPadre!.Value)
+            .ToHashSet();
+
         paginaActual = 1;
         return Task.CompletedTask;
     }
@@ -266,23 +275,8 @@ else
             doc.IdOficinaActualNavigation?.Nombre,
             doc.IdEstadoActualNavigation?.Nombre);
 
-    private static string ObtenerEtiquetaVinculacion(MaeDocumento doc)
-    {
-        if (doc.IdDocumentoPadreNavigation is null)
-        {
-            return $"Vinculado DOC {doc.IdDocumentoPadre}";
-        }
-
-        var tipo = string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.IdTipoNavigation?.Nombre)
-            ? "DOC"
-            : doc.IdDocumentoPadreNavigation.IdTipoNavigation?.Nombre;
-
-        var numero = string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.NumeroOficial)
-            ? doc.IdDocumentoPadreNavigation.NumeroInterno
-            : doc.IdDocumentoPadreNavigation.NumeroOficial;
-
-        return $"Vinculado {tipo} {numero}";
-    }
+    private bool TieneVinculos(MaeDocumento doc)
+        => doc.IdDocumentoPadre is not null || documentosConHijos.Contains(doc.IdDocumento);
 
     private void PaginaAnterior()
     {
