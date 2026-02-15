@@ -50,56 +50,28 @@
             <div class="card-body">
                 @if (docPadreSeleccionado == null)
                 {
-                    <div class="position-relative">
-                        <input type="text"
-                               class="form-control"
-                               placeholder="Buscar documento padre por número o asunto..."
-                               value="@busquedaPadre"
-                               autocomplete="off"
-                               @oninput="FiltrarPadres"
-                               @onfocus="MostrarSugerenciasPadre"
-                               @onkeydown="ManejarTecladoPadres" />
-
-                        @if (resultadosBusqueda.Any())
-                        {
-                            <div class="list-group position-absolute start-0 end-0 shadow-sm"
-                                 @ref="panelSugerenciasPadreRef"
-                                 style="z-index: 20; top: calc(100% + .25rem); max-height: 16rem; overflow-y: auto;">
-                                @for (var i = 0; i < resultadosBusqueda.Count; i++)
-                                {
-                                    var d = resultadosBusqueda[i];
-                                    var cssItem = i == indicePadreSeleccionado
-                                    ? "list-group-item list-group-item-action active"
-                                    : "list-group-item list-group-item-action";
-
-                                    <button type="button"
-                                            data-indice-sugerencia="@i"
-                                            class="@cssItem"
-                                            @onclick="() => SeleccionarPadre(d)">
-                                        <div class="d-flex justify-content-between gap-3">
-                                            <span class="fw-semibold">@(string.IsNullOrWhiteSpace(d.NumeroOficial) ? "S/N" : d.NumeroOficial)</span>
-                                            <small>@((d.FechaCreacion ?? DateTime.MinValue).ToString("dd/MM/yyyy"))</small>
-                                        </div>
-                                        <div class="small text-truncate">@d.Asunto</div>
-                                    </button>
-                                }
-                            </div>
-                        }
-                    </div>
-
-                    <small class="text-muted">
-                        Escriba al menos 2 caracteres. Use ↑ ↓ y Enter para seleccionar rápidamente.
-                    </small>
+                    <p class="mb-2 text-muted">
+                        Podés vincular este documento a un expediente/documento padre existente. Al presionar <strong>Buscar</strong>
+                        se abrirá una bandeja con el detalle completo para elegir correctamente.
+                    </p>
+                    <button type="button" class="btn btn-outline-primary" @onclick="AbrirModalPadres">
+                        <i class="bi bi-search"></i> Buscar documento padre
+                    </button>
                 }
                 else
                 {
                     <div class="alert alert-info d-flex justify-content-between align-items-center">
-                        <span>
+                        <span class="me-2">
                             <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
                         </span>
-                        <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
-                            <i class="bi bi-x-circle"></i> Quitar
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AbrirModalPadres">
+                                <i class="bi bi-search"></i> Cambiar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
+                                <i class="bi bi-x-circle"></i> Quitar
+                            </button>
+                        </div>
                     </div>
                 }
             </div>
@@ -283,6 +255,90 @@
 
 </EditForm>
 
+@if (mostrarModalPadres)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,.45);">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-diagram-3"></i> Seleccionar documento padre</h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" @onclick="CerrarModalPadres"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-7">
+                            <label class="form-label">Buscador en bandeja</label>
+                            <input class="form-control"
+                                   placeholder="Buscar por número, asunto, tipo, oficina o estado"
+                                   @bind="filtroModalPadre"
+                                   @bind:event="oninput"
+                                   @bind:after="ResetearPaginaPadres" />
+                        </div>
+                        <div class="col-md-5 text-md-end">
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" checked disabled>
+                                <label class="form-check-label">Ver documentos de otras oficinas</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="table table-striped table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Fecha creación</th>
+                                <th>Nro. Oficial</th>
+                                <th>Asunto</th>
+                                <th>Tipo</th>
+                                <th>Ubicación actual</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!DocumentosPadrePaginados.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-3">No se encontraron documentos.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var doc in DocumentosPadrePaginados)
+                                {
+                                    <tr>
+                                        <td>@doc.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
+                                        <td>@doc.Asunto</td>
+                                        <td>@NombreTipo(doc.IdTipo)</td>
+                                        <td>@NombreOficina(doc.IdOficinaActual)</td>
+                                        <td>@NombreEstado(doc.IdEstadoActual)</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadreDesdeModal(doc)">
+                                                Seleccionar
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">Mostrando @DesdeRegistroPadre a @HastaRegistroPadre de @TotalRegistrosPadre documento(s)</small>
+                        <div class="btn-group" role="group" aria-label="Paginación padres">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="PaginaPadreAnterior" disabled="@(PaginaPadreEfectiva == 1)">Anterior</button>
+                            <button type="button" class="btn btn-outline-secondary disabled">Página @PaginaPadreEfectiva de @TotalPaginasPadre</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="PaginaPadreSiguiente" disabled="@(PaginaPadreEfectiva >= TotalPaginasPadre)">Siguiente</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CerrarModalPadres">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [CascadingParameter]
     private Task<AuthenticationState>? AuthStateTask { get; set; }
@@ -309,10 +365,11 @@
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
 
-    private string busquedaPadre = string.Empty;
-    private List<MaeDocumento> resultadosBusqueda = new();
+    private string filtroModalPadre = string.Empty;
     private List<MaeDocumento> documentosDisponibles = new();
-    private int indicePadreSeleccionado = -1;
+    private bool mostrarModalPadres;
+    private int paginaPadreActual = 1;
+    private int tamanoPaginaPadre = 10;
     private MaeDocumento? docPadreSeleccionado;
     private int? idOficinaBandejaEntrada;
     private int idOficinaUsuarioActual;
@@ -336,7 +393,6 @@
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
-    private ElementReference panelSugerenciasPadreRef;
     private ElementReference panelSugerenciasOficinaRef;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
         ? "z-index: 20; bottom: calc(100% + .25rem);"
@@ -426,64 +482,69 @@
         }
     }
 
-    private void FiltrarPadres(ChangeEventArgs e)
+    private IEnumerable<MaeDocumento> DocumentosPadreFiltrados
     {
-        busquedaPadre = e.Value?.ToString() ?? string.Empty;
-        indicePadreSeleccionado = -1;
-
-        if (busquedaPadre.Trim().Length < 2)
+        get
         {
-            resultadosBusqueda.Clear();
-            return;
-        }
+            var terminos = filtroModalPadre
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        var palabrasBusqueda = busquedaPadre
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (terminos.Length == 0)
+            {
+                return documentosDisponibles;
+            }
 
-        resultadosBusqueda = documentosDisponibles
-            .Where(d => CoincideBusquedaPorPalabras(d.Asunto, d.NumeroOficial, palabrasBusqueda))
-            .Take(8)
-            .ToList();
-    }
-
-    private void MostrarSugerenciasPadre()
-    {
-        if (busquedaPadre.Trim().Length >= 2)
-        {
-            FiltrarPadres(new ChangeEventArgs { Value = busquedaPadre });
+            return documentosDisponibles.Where(d => terminos.All(termino =>
+                ConstruirIndiceBusquedaPadre(d).Contains(termino, StringComparison.OrdinalIgnoreCase)));
         }
     }
 
-    private async Task ManejarTecladoPadres(KeyboardEventArgs e)
-    {
-        if (!resultadosBusqueda.Any())
-        {
-            return;
-        }
+    private IEnumerable<MaeDocumento> DocumentosPadrePaginados
+        => DocumentosPadreFiltrados
+            .Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre)
+            .Take(tamanoPaginaPadre);
 
-        switch (e.Key)
+    private int TotalRegistrosPadre => DocumentosPadreFiltrados.Count();
+    private int TotalPaginasPadre => Math.Max(1, (int)Math.Ceiling(TotalRegistrosPadre / (double)tamanoPaginaPadre));
+    private int PaginaPadreEfectiva => Math.Min(paginaPadreActual, TotalPaginasPadre);
+    private int DesdeRegistroPadre => TotalRegistrosPadre == 0 ? 0 : ((PaginaPadreEfectiva - 1) * tamanoPaginaPadre) + 1;
+    private int HastaRegistroPadre => Math.Min(PaginaPadreEfectiva * tamanoPaginaPadre, TotalRegistrosPadre);
+
+    private void AbrirModalPadres()
+    {
+        mostrarModalPadres = true;
+    }
+
+    private void CerrarModalPadres()
+    {
+        mostrarModalPadres = false;
+    }
+
+    private void ResetearPaginaPadres()
+    {
+        paginaPadreActual = 1;
+    }
+
+    private void PaginaPadreAnterior()
+    {
+        if (PaginaPadreEfectiva > 1)
         {
-            case "ArrowDown":
-                indicePadreSeleccionado = (indicePadreSeleccionado + 1) % resultadosBusqueda.Count;
-                await AjustarScrollSugerenciaAsync(panelSugerenciasPadreRef, indicePadreSeleccionado);
-                break;
-            case "ArrowUp":
-                indicePadreSeleccionado = indicePadreSeleccionado <= 0
-                    ? resultadosBusqueda.Count - 1
-                    : indicePadreSeleccionado - 1;
-                await AjustarScrollSugerenciaAsync(panelSugerenciasPadreRef, indicePadreSeleccionado);
-                break;
-            case "Enter":
-                if (indicePadreSeleccionado >= 0 && indicePadreSeleccionado < resultadosBusqueda.Count)
-                {
-                    SeleccionarPadre(resultadosBusqueda[indicePadreSeleccionado]);
-                }
-                break;
-            case "Escape":
-                resultadosBusqueda.Clear();
-                indicePadreSeleccionado = -1;
-                break;
+            paginaPadreActual = PaginaPadreEfectiva - 1;
         }
+    }
+
+    private void PaginaPadreSiguiente()
+    {
+        if (PaginaPadreEfectiva < TotalPaginasPadre)
+        {
+            paginaPadreActual = PaginaPadreEfectiva + 1;
+        }
+    }
+
+    private void SeleccionarPadreDesdeModal(MaeDocumento padre)
+    {
+        SeleccionarPadre(padre);
+        mostrarModalPadres = false;
     }
 
     private void SeleccionarPadre(MaeDocumento padre)
@@ -491,9 +552,8 @@
         docPadreSeleccionado = padre;
         nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
         nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
-        resultadosBusqueda.Clear();
-        indicePadreSeleccionado = -1;
-        busquedaPadre = string.Empty;
+        filtroModalPadre = string.Empty;
+        paginaPadreActual = 1;
     }
 
     private void QuitarVinculo()
@@ -905,17 +965,23 @@
             .OrderBy(o => o.Nombre);
     }
 
-    private static bool CoincideBusquedaPorPalabras(string? asunto, string? numeroOficial, string[] palabrasBusqueda)
-    {
-        if (palabrasBusqueda.Length == 0)
-        {
-            return false;
-        }
+    private string ConstruirIndiceBusquedaPadre(MaeDocumento doc)
+        => string.Join(' ',
+            doc.NumeroOficial,
+            doc.Asunto,
+            NombreTipo(doc.IdTipo),
+            NombreOficina(doc.IdOficinaActual),
+            NombreEstado(doc.IdEstadoActual),
+            doc.FechaCreacion?.ToString("dd/MM/yyyy"));
 
-        var textoBusqueda = $"{numeroOficial} {asunto}";
-        return palabrasBusqueda.All(palabra =>
-            textoBusqueda.Contains(palabra, StringComparison.OrdinalIgnoreCase));
-    }
+    private string NombreOficina(int idOficina)
+        => oficinas.FirstOrDefault(o => o.IdOficina == idOficina)?.Nombre ?? $"Oficina {idOficina}";
+
+    private string NombreTipo(int idTipo)
+        => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"Tipo {idTipo}";
+
+    private string NombreEstado(int idEstado)
+        => estados.FirstOrDefault(e => e.IdEstado == idEstado)?.Nombre ?? $"Estado {idEstado}";
 
     private async Task AjustarScrollSugerenciaAsync(ElementReference panelRef, int indiceSugerencia)
     {
