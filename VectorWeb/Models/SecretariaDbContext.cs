@@ -326,6 +326,7 @@ public partial class SecretariaDbContext : DbContext
             entity.Property(e => e.FechaCreacion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
+            entity.Property(e => e.AnioDocumento);
             entity.Property(e => e.FechaRecepcion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
@@ -335,7 +336,7 @@ public partial class SecretariaDbContext : DbContext
             entity.Property(e => e.NumeroInterno)
                 .HasMaxLength(37)
                 .IsUnicode(false)
-                .HasComputedColumnSql("(concat([IdDocumento],'/',datepart(year,[FechaCreacion])))", false);
+                .HasComputedColumnSql("(concat([IdDocumento],'/',isnull([AnioDocumento],datepart(year,[FechaCreacion]))))", false);
             entity.Property(e => e.NumeroOficial)
                 .HasMaxLength(50)
                 .IsUnicode(false);

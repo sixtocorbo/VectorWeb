@@ -19,6 +19,8 @@ public partial class MaeDocumento
 
     public DateTime? FechaCreacion { get; set; }
 
+    public int? AnioDocumento { get; set; }
+
     public DateTime? FechaRecepcion { get; set; }
 
     public int? Fojas { get; set; }
