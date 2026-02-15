@@ -3,6 +3,7 @@
 @using VectorWeb.Repositories
 @using VectorWeb.Services
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
 @using System.Security.Claims
 @inject IRepository<MaeDocumento> RepoDocs
@@ -12,6 +13,7 @@
 @inject IRepository<CatEstado> RepoEstados
 @inject NumeracionRangoService RangoService
 @inject NavigationManager Navegador
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <h3>
@@ -61,6 +63,7 @@
                         @if (resultadosBusqueda.Any())
                         {
                             <div class="list-group position-absolute start-0 end-0 shadow-sm"
+                                 @ref="panelSugerenciasPadreRef"
                                  style="z-index: 20; top: calc(100% + .25rem); max-height: 16rem; overflow-y: auto;">
                                 @for (var i = 0; i < resultadosBusqueda.Count; i++)
                                 {
@@ -70,6 +73,7 @@
                                     : "list-group-item list-group-item-action";
 
                                     <button type="button"
+                                            data-indice-sugerencia="@i"
                                             class="@cssItem"
                                             @onclick="() => SeleccionarPadre(d)">
                                         <div class="d-flex justify-content-between gap-3">
@@ -214,6 +218,7 @@
                             @if (oficinasFiltradas.Any())
                             {
                                 <div class="list-group position-absolute start-0 end-0 shadow-sm"
+                                     @ref="panelSugerenciasOficinaRef"
                                      style="@EstiloPanelSugerencias">
                                     @for (var i = 0; i < oficinasFiltradas.Count; i++)
                                     {
@@ -223,6 +228,7 @@
                                             : "list-group-item list-group-item-action";
 
                                         <button type="button"
+                                                data-indice-sugerencia="@i"
                                                 class="@cssItem"
                                                 @onclick="() => SeleccionarOficina(ofi)">
                                             @ofi.Nombre
@@ -330,6 +336,8 @@
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
+    private ElementReference panelSugerenciasPadreRef;
+    private ElementReference panelSugerenciasOficinaRef;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
         ? "z-index: 20; bottom: calc(100% + .25rem);"
         : "z-index: 20; top: calc(100% + .25rem);";
@@ -429,11 +437,11 @@
             return;
         }
 
-        var termino = busquedaPadre.Trim();
+        var palabrasBusqueda = busquedaPadre
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
         resultadosBusqueda = documentosDisponibles
-            .Where(d =>
-                (d.Asunto?.Contains(termino, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                (!string.IsNullOrWhiteSpace(d.NumeroOficial) && d.NumeroOficial.Contains(termino, StringComparison.OrdinalIgnoreCase)))
+            .Where(d => CoincideBusquedaPorPalabras(d.Asunto, d.NumeroOficial, palabrasBusqueda))
             .Take(8)
             .ToList();
     }
@@ -446,7 +454,7 @@
         }
     }
 
-    private void ManejarTecladoPadres(KeyboardEventArgs e)
+    private async Task ManejarTecladoPadres(KeyboardEventArgs e)
     {
         if (!resultadosBusqueda.Any())
         {
@@ -457,11 +465,13 @@
         {
             case "ArrowDown":
                 indicePadreSeleccionado = (indicePadreSeleccionado + 1) % resultadosBusqueda.Count;
+                await AjustarScrollSugerenciaAsync(panelSugerenciasPadreRef, indicePadreSeleccionado);
                 break;
             case "ArrowUp":
                 indicePadreSeleccionado = indicePadreSeleccionado <= 0
                     ? resultadosBusqueda.Count - 1
                     : indicePadreSeleccionado - 1;
+                await AjustarScrollSugerenciaAsync(panelSugerenciasPadreRef, indicePadreSeleccionado);
                 break;
             case "Enter":
                 if (indicePadreSeleccionado >= 0 && indicePadreSeleccionado < resultadosBusqueda.Count)
@@ -845,7 +855,7 @@
         }
     }
 
-    private void ManejarTecladoOficinas(KeyboardEventArgs e)
+    private async Task ManejarTecladoOficinas(KeyboardEventArgs e)
     {
         if (!oficinasFiltradas.Any())
         {
@@ -855,12 +865,14 @@
         if (e.Key == "ArrowDown")
         {
             indiceOficinaSeleccionada = Math.Min(indiceOficinaSeleccionada + 1, oficinasFiltradas.Count - 1);
+            await AjustarScrollSugerenciaAsync(panelSugerenciasOficinaRef, indiceOficinaSeleccionada);
             return;
         }
 
         if (e.Key == "ArrowUp")
         {
             indiceOficinaSeleccionada = Math.Max(indiceOficinaSeleccionada - 1, 0);
+            await AjustarScrollSugerenciaAsync(panelSugerenciasOficinaRef, indiceOficinaSeleccionada);
             return;
         }
 
@@ -891,5 +903,27 @@
             .Where(o => palabras.All(palabra =>
                 (o.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false)))
             .OrderBy(o => o.Nombre);
+    }
+
+    private static bool CoincideBusquedaPorPalabras(string? asunto, string? numeroOficial, string[] palabrasBusqueda)
+    {
+        if (palabrasBusqueda.Length == 0)
+        {
+            return false;
+        }
+
+        var textoBusqueda = $"{numeroOficial} {asunto}";
+        return palabrasBusqueda.All(palabra =>
+            textoBusqueda.Contains(palabra, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private async Task AjustarScrollSugerenciaAsync(ElementReference panelRef, int indiceSugerencia)
+    {
+        if (indiceSugerencia < 0)
+        {
+            return;
+        }
+
+        await JS.InvokeVoidAsync("scrollSugerenciaVisible", panelRef, indiceSugerencia);
     }
 }
