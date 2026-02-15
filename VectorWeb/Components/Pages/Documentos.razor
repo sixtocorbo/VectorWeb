@@ -91,11 +91,11 @@ else
                     <td>
                         @if (doc.IdDocumentoPadre is not null)
                         {
-                            <span>@ObtenerEtiquetaVinculacion(doc)</span>
+                            <span><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i>@ObtenerEtiquetaVinculacion(doc)</span>
                         }
                         else
                         {
-                            <span class="badge bg-light text-dark border">Sin padre</span>
+                            <span class="badge bg-light text-dark border"><i class="bi bi-slash-circle me-1" aria-hidden="true"></i>Sin padre</span>
                         }
                     </td>
                     <td>
