@@ -74,6 +74,7 @@ else
                 <th>Nro. Oficial</th>
                 <th>Asunto</th>
                 <th>Tipo</th>
+                <th>Vinculación</th>
                 <th>Ubicación Actual</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -87,6 +88,19 @@ else
                     <td>@doc.NumeroOficial</td>
                     <td>@doc.Asunto</td>
                     <td>@doc.IdTipoNavigation?.Nombre</td>
+                    <td>
+                        @if (doc.IdDocumentoPadre is long idPadre)
+                        {
+                            <span class="badge bg-primary" title="Documento vinculado al expediente padre">Vinculado</span>
+                            <a href="documentos/historial/@idPadre" class="ms-1" title="Ver historial del documento padre">
+                                @ObtenerEtiquetaDocumentoPadre(doc)
+                            </a>
+                        }
+                        else
+                        {
+                            <span class="badge bg-light text-dark border">Sin padre</span>
+                        }
+                    </td>
                     <td>
                         @if (doc.IdOficinaActual == idOficinaUsuario)
                         {
@@ -230,7 +244,7 @@ else
 
     private Task CargarDocumentos()
     {
-        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation");
+        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation,IdDocumentoPadreNavigation");
 
         if (!verTodo && idOficinaUsuario > 0)
         {
@@ -253,9 +267,23 @@ else
             doc.IdTipoNavigation?.Nombre,
             doc.IdOficinaActualNavigation?.Nombre,
             doc.IdEstadoActualNavigation?.Nombre,
+            doc.IdDocumentoPadreNavigation?.NumeroOficial,
+            doc.IdDocumentoPadreNavigation?.NumeroInterno,
             doc.EstadoSemaforo,
             doc.NumeroInterno,
             doc.FechaCreacion?.ToString("dd/MM/yyyy"));
+
+    private static string ObtenerEtiquetaDocumentoPadre(MaeDocumento doc)
+    {
+        if (doc.IdDocumentoPadreNavigation is null)
+        {
+            return $"Padre #{doc.IdDocumentoPadre}";
+        }
+
+        return string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.NumeroOficial)
+            ? doc.IdDocumentoPadreNavigation.NumeroInterno
+            : doc.IdDocumentoPadreNavigation.NumeroOficial;
+    }
 
     private void PaginaAnterior()
     {
