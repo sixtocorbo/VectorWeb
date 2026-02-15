@@ -147,6 +147,18 @@
                             <input type="text" class="form-control" value="Automático (se asigna al guardar)" disabled />
                             <small class="text-muted">Serie: <strong>@serieNumeracionAutomatica</strong> | Próximo estimado: @proximoNumeroAutomatico</small>
                         }
+                        else if (esNumeracionManualInterna)
+                        {
+                            <InputNumber @bind-Value="numeroManualInterno" class="form-control" placeholder="Ej. 200" disabled="@bloqueoPorRangoAgotado" />
+                            @if (bloqueoPorRangoAgotado)
+                            {
+                                <small class="text-danger">@mensajeNumeracion</small>
+                            }
+                            else
+                            {
+                                <small class="text-muted">@mensajeNumeracion</small>
+                            }
+                        }
                         else
                         {
                             <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" disabled="@bloqueoPorRangoAgotado" />
@@ -294,10 +306,13 @@
     private bool mostrarSugerenciasArriba = true;
     private bool esNumeracionAutomatica;
     private bool esNumeracionExterna;
+    private bool esNumeracionManualInterna;
     private bool bloqueoPorRangoAgotado;
     private string mensajeNumeracion = string.Empty;
     private string serieNumeracionAutomatica = string.Empty;
     private int proximoNumeroAutomatico;
+    private MaeNumeracionRango? rangoManualInternoActivo;
+    private int? numeroManualInterno;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
         ? "z-index: 20; bottom: calc(100% + .25rem);"
         : "z-index: 20; top: calc(100% + .25rem);";
@@ -482,7 +497,38 @@
             }
 
             var rangoConsumido = resultadoNumeracion.Data;
-            nuevoDoc.NumeroOficial = $"{rangoConsumido.NombreRango}-{rangoConsumido.UltimoUtilizado}";
+            nuevoDoc.NumeroOficial = rangoConsumido.UltimoUtilizado.ToString();
+        }
+        else if (esNumeracionManualInterna)
+        {
+            if (!numeroManualInterno.HasValue)
+            {
+                errorGuardar = "Debe ingresar el número oficial para la oficina interna.";
+                return;
+            }
+
+            if (numeroManualInterno <= 0)
+            {
+                errorGuardar = "El número oficial debe ser mayor que cero.";
+                return;
+            }
+
+            var rango = rangoManualInternoActivo
+                ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+
+            if (rango is null)
+            {
+                errorGuardar = "No hay un rango activo configurado para validar el número ingresado.";
+                return;
+            }
+
+            if (numeroManualInterno < rango.NumeroInicio || numeroManualInterno > rango.NumeroFin)
+            {
+                errorGuardar = $"El número ingresado está fuera del rango permitido ({rango.NumeroInicio}-{rango.NumeroFin}).";
+                return;
+            }
+
+            nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
         }
         else
         {
@@ -500,19 +546,20 @@
                 return;
             }
 
-            var documentosExistentes = await RepoDocs.GetAllAsync();
-            var existeDuplicado = documentosExistentes.Any(d =>
-                d.IdTipo == nuevoDoc.IdTipo &&
-                d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
-                d.FechaCreacion.HasValue &&
-                d.FechaCreacion.Value.Year == (nuevoDoc.FechaCreacion ?? DateTime.Now).Year &&
-                string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
+        }
 
-            if (existeDuplicado)
-            {
-                errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
-                return;
-            }
+        var documentosExistentes = await RepoDocs.GetAllAsync();
+        var existeDuplicado = documentosExistentes.Any(d =>
+            d.IdTipo == nuevoDoc.IdTipo &&
+            d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
+            d.FechaCreacion.HasValue &&
+            d.FechaCreacion.Value.Year == (nuevoDoc.FechaCreacion ?? DateTime.Now).Year &&
+            string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
+
+        if (existeDuplicado)
+        {
+            errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
+            return;
         }
 
         await RepoDocs.AddAsync(nuevoDoc);
@@ -617,10 +664,14 @@
     {
         esNumeracionAutomatica = false;
         esNumeracionExterna = false;
+        esNumeracionManualInterna = false;
         bloqueoPorRangoAgotado = false;
         mensajeNumeracion = string.Empty;
         serieNumeracionAutomatica = string.Empty;
         proximoNumeroAutomatico = 0;
+        rangoManualInternoActivo = null;
+        numeroManualInterno = null;
+        nuevoDoc.NumeroOficial = string.Empty;
 
         if (idTipoDocumento <= 0)
         {
@@ -628,6 +679,7 @@
         }
 
         var oficinaSeleccionada = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
+        var esBandejaEntrada = idOficinaBandejaEntrada.HasValue && nuevoDoc.IdOficinaActual == idOficinaBandejaEntrada.Value;
         if (oficinaSeleccionada?.EsExterna == true)
         {
             esNumeracionExterna = true;
@@ -637,13 +689,20 @@
 
         var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
 
-        if (rango is not null)
+        if (rango is not null && esBandejaEntrada)
         {
             esNumeracionAutomatica = true;
             serieNumeracionAutomatica = rango.NombreRango;
             proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
-            nuevoDoc.NumeroOficial = string.Empty;
             mensajeNumeracion = "Modo administrado por rango: el número se asignará automáticamente al guardar.";
+            return;
+        }
+
+        if (rango is not null)
+        {
+            esNumeracionManualInterna = true;
+            rangoManualInternoActivo = rango;
+            mensajeNumeracion = $"Numeración manual controlada: ingrese solo números. Rango activo habilitado: {rango.NumeroInicio} a {rango.NumeroFin}.";
             return;
         }
 
