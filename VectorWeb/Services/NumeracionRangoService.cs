@@ -400,19 +400,26 @@ public class NumeracionRangoService
     public async Task<bool> ExisteRangoConfiguradoAsync(int idTipoDocumento, int? idOficina, int? anio = null)
     {
         var anioObjetivo = anio ?? DateTime.Now.Year;
+        var esHistorico = anioObjetivo < DateTime.Now.Year;
+
         return await EjecutarLecturaSeguraAsync(async () =>
         {
             var baseQuery = _context.MaeNumeracionRangos
-                .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anioObjetivo);
+                .Where(r => r.IdTipo == idTipoDocumento && r.Anio == anioObjetivo);
 
-        if (idOficina.HasValue)
-        {
-            var existeRangoOficina = await baseQuery.AnyAsync(r => r.IdOficina == idOficina);
-            if (existeRangoOficina)
+            if (!esHistorico)
             {
-                return true;
+                baseQuery = baseQuery.Where(r => r.Activo);
             }
-        }
+
+            if (idOficina.HasValue)
+            {
+                var existeRangoOficina = await baseQuery.AnyAsync(r => r.IdOficina == idOficina);
+                if (existeRangoOficina)
+                {
+                    return true;
+                }
+            }
 
             return await baseQuery.AnyAsync(r => r.IdOficina == null);
         }, fallback: false, operacion: "verificar existencia de rango configurado");
@@ -429,7 +436,7 @@ public class NumeracionRangoService
 
             if (rango is null)
             {
-                return OperacionResultado<MaeNumeracionRango>.Fail("No hay un rango activo configurado para la oficina y tipo de documento seleccionados.");
+                return OperacionResultado<MaeNumeracionRango>.Fail("No hay un rango configurado para la oficina, tipo y año seleccionados.");
             }
 
             if (rango.UltimoUtilizado >= rango.NumeroFin)
@@ -506,21 +513,28 @@ public class NumeracionRangoService
 
     private async Task<MaeNumeracionRango?> ObtenerRangoAdministradoAsync(int idTipoDocumento, int? idOficina, int anio, bool incluirAgotados)
     {
-        var baseQuery = _context.MaeNumeracionRangos
-            .Where(r => r.IdTipo == idTipoDocumento && r.Activo && r.Anio == anio);
+        var esHistorico = anio < DateTime.Now.Year;
 
-        if (!incluirAgotados)
+        var baseQuery = _context.MaeNumeracionRangos
+            .Where(r => r.IdTipo == idTipoDocumento && r.Anio == anio);
+
+        if (!esHistorico)
+        {
+            baseQuery = baseQuery.Where(r => r.Activo);
+        }
+
+        if (!incluirAgotados || esHistorico)
         {
             baseQuery = baseQuery.Where(r => r.UltimoUtilizado < r.NumeroFin);
         }
 
         if (idOficina.HasValue)
         {
-            var rangoOficina = await baseQuery
-                .Where(r => r.IdOficina == idOficina)
-                .OrderBy(r => r.NumeroInicio)
-                .ThenBy(r => r.IdRango)
-                .FirstOrDefaultAsync();
+            var queryOficina = baseQuery.Where(r => r.IdOficina == idOficina);
+
+            var rangoOficina = esHistorico
+                ? await queryOficina.OrderByDescending(r => r.IdRango).ThenByDescending(r => r.NumeroInicio).FirstOrDefaultAsync()
+                : await queryOficina.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
 
             if (rangoOficina is not null)
             {
@@ -528,11 +542,10 @@ public class NumeracionRangoService
             }
         }
 
-        return await baseQuery
-            .Where(r => r.IdOficina == null)
-            .OrderBy(r => r.NumeroInicio)
-            .ThenBy(r => r.IdRango)
-            .FirstOrDefaultAsync();
+        var queryGlobal = baseQuery.Where(r => r.IdOficina == null);
+        return esHistorico
+            ? await queryGlobal.OrderByDescending(r => r.IdRango).ThenByDescending(r => r.NumeroInicio).FirstOrDefaultAsync()
+            : await queryGlobal.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
     }
 
     private async Task<string?> ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)

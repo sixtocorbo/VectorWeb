@@ -129,7 +129,7 @@
             @if (!(esActuacion && soloTraerSinActuacion))
             {
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label>Tipo de Documento:</label>
                         <select class="form-control" value="@nuevoDoc.IdTipo" @onchange="OnTipoDocumentoChanged">
                             <option value="0">-- Seleccione Tipo --</option>
@@ -140,7 +140,16 @@
                         </select>
                     </div>
 
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
+                        <label>Año fiscal / numeración:</label>
+                        <InputNumber @bind-Value="anioNumeracionSeleccionado" @bind-Value:after="OnAnioNumeracionChanged" class="form-control" min="2000" max="2100" />
+                        @if (anioNumeracionSeleccionado < DateTime.Now.Year)
+                        {
+                            <small class="text-warning">Atención: se usará numeración histórica del año @anioNumeracionSeleccionado.</small>
+                        }
+                    </div>
+
+                    <div class="col-md-4 mb-3">
                         <label>Número Oficial:</label>
                         @if (esNumeracionAutomatica)
                         {
@@ -281,6 +290,7 @@
     private MaeDocumento nuevoDoc = new MaeDocumento
     {
         FechaCreacion = DateTime.Now,
+        AnioDocumento = DateTime.Now.Year,
         Asunto = string.Empty
     };
     private string? errorGuardar;
@@ -311,6 +321,7 @@
     private string mensajeNumeracion = string.Empty;
     private string serieNumeracionAutomatica = string.Empty;
     private int proximoNumeroAutomatico;
+    private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
@@ -385,6 +396,11 @@
                     soloTraerSinActuacion = false;
                 }
             }
+        }
+
+        if (nuevoDoc.AnioDocumento.HasValue && nuevoDoc.AnioDocumento.Value > 0)
+        {
+            anioNumeracionSeleccionado = nuevoDoc.AnioDocumento.Value;
         }
 
         if (nuevoDoc.IdTipo > 0)
@@ -487,9 +503,11 @@
             return;
         }
 
+        nuevoDoc.AnioDocumento = anioNumeracionSeleccionado;
+
         if (esNumeracionAutomatica)
         {
-            var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+            var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
             if (!resultadoNumeracion.Exitoso || resultadoNumeracion.Data is null)
             {
                 errorGuardar = resultadoNumeracion.Mensaje;
@@ -514,7 +532,7 @@
             }
 
             var rango = rangoManualInternoActivo
-                ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+                ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
 
             if (rango is null)
             {
@@ -553,7 +571,7 @@
             d.IdTipo == nuevoDoc.IdTipo &&
             d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
             d.FechaCreacion.HasValue &&
-            d.FechaCreacion.Value.Year == (nuevoDoc.FechaCreacion ?? DateTime.Now).Year &&
+            (d.AnioDocumento ?? d.FechaCreacion.Value.Year) == anioNumeracionSeleccionado &&
             string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
 
         if (existeDuplicado)
@@ -687,7 +705,7 @@
             return;
         }
 
-        var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+        var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
 
         if (rango is not null && esBandejaEntrada)
         {
@@ -706,11 +724,19 @@
             return;
         }
 
-        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
+        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
         bloqueoPorRangoAgotado = true;
         mensajeNumeracion = existeRangoConfigurado
             ? "Rango agotado para esta oficina/tipo. Debe registrar un nuevo rango para continuar."
             : "Oficina interna: debe configurar un rango de numeración para esta oficina/tipo antes de crear el documento.";
+    }
+
+    private async Task OnAnioNumeracionChanged()
+    {
+        if (nuevoDoc.IdTipo > 0)
+        {
+            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+        }
     }
 
     private async Task FiltrarOficinas(ChangeEventArgs e)
@@ -749,7 +775,6 @@
         oficinaBusqueda = oficina.Nombre ?? string.Empty;
         oficinasFiltradas.Clear();
         indiceOficinaSeleccionada = -1;
-
         if (nuevoDoc.IdTipo > 0)
         {
             await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
