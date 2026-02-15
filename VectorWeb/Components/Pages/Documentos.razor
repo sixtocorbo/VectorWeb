@@ -106,7 +106,9 @@ else
                         }
                     </td>
                     <td class="text-center">
-                        @if (doc.IdDocumentoPadre is not null || documentosConHijos.Contains(doc.IdDocumento))
+                        @if (doc.IdDocumentoPadre is not null
+                            || documentosConHijos.Contains(doc.IdDocumento)
+                            || documentosRelacionadosPorHilo.Contains(doc.IdDocumento))
                         {
                             <a href="documentos/vinculos/@doc.IdDocumento" class="text-primary" title="Ver vínculos del documento">
                                 <i class="bi bi-diagram-3" aria-hidden="true"></i>
@@ -146,6 +148,7 @@ else
 @code {
     private List<MaeDocumento>? listaDocs;
     private HashSet<long> documentosConHijos = [];
+    private HashSet<long> documentosRelacionadosPorHilo = [];
     private string filtroBusqueda = string.Empty;
     private int paginaActual = 1;
     private int tamanoPagina = 10;
@@ -253,6 +256,7 @@ else
             .ToListAsync();
 
         var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
+        var hilosPagina = listaDocs.Select(d => d.IdHiloConversacion).Distinct().ToList();
         var idsPadreConHijos = idsPagina.Count == 0
             ? []
             : await RepoDocs.GetQueryable()
@@ -261,7 +265,17 @@ else
                 .Distinct()
                 .ToListAsync();
 
+        var idsRelacionadosPorHilo = hilosPagina.Count == 0
+            ? []
+            : await RepoDocs.GetQueryable()
+                .Where(d => hilosPagina.Contains(d.IdHiloConversacion))
+                .GroupBy(d => d.IdHiloConversacion)
+                .Where(g => g.Count() > 1)
+                .SelectMany(g => g.Select(d => d.IdDocumento))
+                .ToListAsync();
+
         documentosConHijos = idsPadreConHijos.ToHashSet();
+        documentosRelacionadosPorHilo = idsRelacionadosPorHilo.ToHashSet();
 
         StateHasChanged();
     }
