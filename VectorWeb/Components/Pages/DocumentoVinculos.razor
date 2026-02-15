@@ -55,11 +55,7 @@ else
                 {
                     <tr>
                         <td>
-                            @if (relacion.Tipo == TipoRelacionVinculo.Seleccionado)
-                            {
-                                <span class="badge bg-secondary">Seleccionado</span>
-                            }
-                            else if (relacion.Tipo == TipoRelacionVinculo.Padre)
+                            @if (relacion.Tipo == TipoRelacionVinculo.Padre)
                             {
                                 <span class="badge bg-primary">Padre</span>
                             }
@@ -68,7 +64,11 @@ else
                                 <span class="badge bg-success">Hijo</span>
                             }
                         </td>
-                        <td>@ObtenerEtiquetaDocumento(relacion.Documento)</td>
+                        <td>
+                            <a href="/documentos/vinculos/@relacion.Documento.IdDocumento">
+                                @ObtenerEtiquetaDocumento(relacion.Documento)
+                            </a>
+                        </td>
                         <td>@relacion.Documento.Asunto</td>
                     </tr>
                 }
@@ -104,7 +104,7 @@ else
             .OrderByDescending(d => d.FechaCreacion)
             .ToListAsync();
 
-        relaciones = [new RelacionVinculo(documentoActual, TipoRelacionVinculo.Seleccionado)];
+        relaciones = [];
 
         if (documentoActual.IdDocumentoPadreNavigation is not null)
         {
@@ -130,7 +130,6 @@ else
 
     private enum TipoRelacionVinculo
     {
-        Seleccionado,
         Padre,
         Hijo
     }
