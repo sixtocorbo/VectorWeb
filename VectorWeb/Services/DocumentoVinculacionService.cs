@@ -14,7 +14,7 @@ public sealed class DocumentoVinculacionService
 
     public async Task<VinculacionResultado> VincularAsync(long idPadre, IEnumerable<long> idsHijos)
     {
-        var hijosSolicitados = idsHijos
+        var hijosSolicitados = (idsHijos ?? Enumerable.Empty<long>())
             .Where(id => id > 0)
             .Distinct()
             .Where(id => id != idPadre)
