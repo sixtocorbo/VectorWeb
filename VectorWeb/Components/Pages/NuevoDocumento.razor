@@ -152,7 +152,7 @@
                             <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" disabled="@bloqueoPorRangoAgotado" />
                             @if (bloqueoPorRangoAgotado)
                             {
-                                <small class="text-danger">No disponible: hubo rango configurado para esta oficina/tipo y está agotado. Debe crear uno nuevo.</small>
+                                <small class="text-danger">@mensajeNumeracion</small>
                             }
                             else if (esNumeracionExterna)
                             {
@@ -468,7 +468,7 @@
 
         if (bloqueoPorRangoAgotado)
         {
-            errorGuardar = "No puede continuar: el rango de numeración está agotado para esta oficina/tipo. Debe configurar un nuevo rango.";
+            errorGuardar = $"No puede continuar: {mensajeNumeracion}";
             return;
         }
 
@@ -648,15 +648,10 @@
         }
 
         var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, DateTime.Now.Year);
-        if (existeRangoConfigurado)
-        {
-            bloqueoPorRangoAgotado = true;
-            mensajeNumeracion = "Rango agotado para esta oficina/tipo. Debe registrar un nuevo rango para continuar.";
-            return;
-        }
-
-        esNumeracionExterna = true;
-        mensajeNumeracion = "Modo numeración manual: no existe rango configurado para esta oficina/tipo en el año actual. Ingrese el número oficial con validación de unicidad por oficina, tipo y año.";
+        bloqueoPorRangoAgotado = true;
+        mensajeNumeracion = existeRangoConfigurado
+            ? "Rango agotado para esta oficina/tipo. Debe registrar un nuevo rango para continuar."
+            : "Oficina interna: debe configurar un rango de numeración para esta oficina/tipo antes de crear el documento.";
     }
 
     private async Task FiltrarOficinas(ChangeEventArgs e)
