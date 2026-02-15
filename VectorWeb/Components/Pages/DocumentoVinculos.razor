@@ -1,0 +1,126 @@
+@page "/documentos/vinculos/{IdDocumento:long}"
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@inject NavigationManager Navegador
+@rendermode InteractiveServer
+
+<PageTitle>Vínculos del documento</PageTitle>
+
+<h3><i class="bi bi-diagram-3"></i> Vínculos del documento</h3>
+
+<div class="mb-3">
+    <button class="btn btn-outline-secondary btn-sm" @onclick="VolverABandeja">
+        <i class="bi bi-arrow-left"></i> Volver a la bandeja
+    </button>
+</div>
+
+@if (cargando)
+{
+    <p><em>Cargando vínculos...</em></p>
+}
+else if (documentoActual is null)
+{
+    <div class="alert alert-warning">No se encontró el documento solicitado.</div>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title mb-1">Documento seleccionado</h5>
+            <p class="mb-0">
+                <strong>@ObtenerEtiquetaDocumento(documentoActual)</strong>
+                <span class="text-muted ms-2">ID @documentoActual.IdDocumento</span>
+            </p>
+        </div>
+    </div>
+
+    @if (!relaciones.Any())
+    {
+        <div class="alert alert-info">Este documento no tiene vínculos cargados.</div>
+    }
+    else
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Tipo de relación</th>
+                    <th>Documento</th>
+                    <th>Asunto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var relacion in relaciones)
+                {
+                    <tr>
+                        <td>
+                            @if (relacion.EsPadre)
+                            {
+                                <span class="badge bg-primary">Padre</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">Hijo</span>
+                            }
+                        </td>
+                        <td>@ObtenerEtiquetaDocumento(relacion.Documento)</td>
+                        <td>@relacion.Documento.Asunto</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    [Parameter] public long IdDocumento { get; set; }
+
+    private MaeDocumento? documentoActual;
+    private List<RelacionVinculo> relaciones = [];
+    private bool cargando = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+
+        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdDocumentoPadreNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
+
+        documentoActual = await query.FirstOrDefaultAsync(d => d.IdDocumento == IdDocumento);
+
+        if (documentoActual is null)
+        {
+            relaciones = [];
+            cargando = false;
+            return;
+        }
+
+        var hijos = await query
+            .Where(d => d.IdDocumentoPadre == IdDocumento)
+            .OrderByDescending(d => d.FechaCreacion)
+            .ToListAsync();
+
+        relaciones = [];
+
+        if (documentoActual.IdDocumentoPadreNavigation is not null)
+        {
+            relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, true));
+        }
+
+        relaciones.AddRange(hijos.Select(h => new RelacionVinculo(h, false)));
+
+        cargando = false;
+    }
+
+    private static string ObtenerEtiquetaDocumento(MaeDocumento doc)
+    {
+        var tipo = string.IsNullOrWhiteSpace(doc.IdTipoNavigation?.Nombre) ? "DOC" : doc.IdTipoNavigation.Nombre;
+        var numero = string.IsNullOrWhiteSpace(doc.NumeroOficial) ? doc.NumeroInterno : doc.NumeroOficial;
+        return $"{tipo} {numero}";
+    }
+
+    private void VolverABandeja()
+        => Navegador.NavigateTo("/documentos");
+
+    private sealed record RelacionVinculo(MaeDocumento Documento, bool EsPadre);
+}
