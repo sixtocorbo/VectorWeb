@@ -132,13 +132,13 @@ else
         </tbody>
     </table>
 
-    <div class="d-flex justify-content-between align-items-center">
-        <small class="text-muted">Mostrando @DesdeRegistro a @HastaRegistro de @TotalRegistros documento(s)</small>
+    <div class="d-flex flex-column align-items-center gap-2 mt-3">
         <div class="btn-group" role="group" aria-label="Paginación">
             <button class="btn btn-outline-secondary" @onclick="PaginaAnterior" disabled="@(PaginaActualEfectiva == 1)">Anterior</button>
             <button class="btn btn-outline-secondary disabled">Página @PaginaActualEfectiva de @TotalPaginas</button>
             <button class="btn btn-outline-secondary" @onclick="PaginaSiguiente" disabled="@(PaginaActualEfectiva >= TotalPaginas)">Siguiente</button>
         </div>
+        <small class="text-muted">Mostrando @DesdeRegistro a @HastaRegistro de @TotalRegistros documento(s)</small>
     </div>
 }
 
