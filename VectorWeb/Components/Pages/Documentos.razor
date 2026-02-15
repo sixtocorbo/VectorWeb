@@ -89,12 +89,9 @@ else
                     <td>@doc.Asunto</td>
                     <td>@doc.IdTipoNavigation?.Nombre</td>
                     <td>
-                        @if (doc.IdDocumentoPadre is long idPadre)
+                        @if (doc.IdDocumentoPadre is not null)
                         {
-                            <span class="badge bg-primary" title="Documento vinculado al expediente padre">Vinculado</span>
-                            <a href="documentos/historial/@idPadre" class="ms-1" title="Ver historial del documento padre">
-                                @ObtenerEtiquetaDocumentoPadre(doc)
-                            </a>
+                            <span>@ObtenerEtiquetaVinculacion(doc)</span>
                         }
                         else
                         {
@@ -244,7 +241,7 @@ else
 
     private Task CargarDocumentos()
     {
-        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation,IdDocumentoPadreNavigation");
+        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation,IdDocumentoPadreNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
 
         if (!verTodo && idOficinaUsuario > 0)
         {
@@ -273,16 +270,22 @@ else
             doc.NumeroInterno,
             doc.FechaCreacion?.ToString("dd/MM/yyyy"));
 
-    private static string ObtenerEtiquetaDocumentoPadre(MaeDocumento doc)
+    private static string ObtenerEtiquetaVinculacion(MaeDocumento doc)
     {
         if (doc.IdDocumentoPadreNavigation is null)
         {
-            return $"Padre #{doc.IdDocumentoPadre}";
+            return $"Vinculado DOC {doc.IdDocumentoPadre}";
         }
 
-        return string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.NumeroOficial)
+        var tipo = string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.IdTipoNavigation?.Nombre)
+            ? "DOC"
+            : doc.IdDocumentoPadreNavigation.IdTipoNavigation?.Nombre;
+
+        var numero = string.IsNullOrWhiteSpace(doc.IdDocumentoPadreNavigation.NumeroOficial)
             ? doc.IdDocumentoPadreNavigation.NumeroInterno
             : doc.IdDocumentoPadreNavigation.NumeroOficial;
+
+        return $"Vinculado {tipo} {numero}";
     }
 
     private void PaginaAnterior()
