@@ -11,15 +11,11 @@ public partial class MaeDocumento
 
     public string? NumeroOficial { get; set; }
 
-    public string NumeroInterno { get; set; } = null!;
-
     public string Asunto { get; set; } = null!;
 
     public string? Descripcion { get; set; }
 
     public DateTime? FechaCreacion { get; set; }
-
-    public int? AnioDocumento { get; set; }
 
     public DateTime? FechaRecepcion { get; set; }
 
@@ -38,6 +34,10 @@ public partial class MaeDocumento
     public DateTime? FechaVencimiento { get; set; }
 
     public string EstadoSemaforo { get; set; } = null!;
+
+    public int? AnioDocumento { get; set; }
+
+    public string NumeroInterno { get; set; } = null!;
 
     public virtual MaeDocumento? IdDocumentoPadreNavigation { get; set; }
 

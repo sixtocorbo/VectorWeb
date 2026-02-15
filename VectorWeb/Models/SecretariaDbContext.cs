@@ -56,18 +56,7 @@ public partial class SecretariaDbContext : DbContext
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (optionsBuilder.IsConfigured)
-        {
-            return;
-        }
-
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
-        if (!string.IsNullOrWhiteSpace(connectionString))
-        {
-            optionsBuilder.UseSqlServer(connectionString);
-        }
-    }
+        => optionsBuilder.UseSqlServer("Name=ConnectionStrings:DefaultConnection");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -326,7 +315,6 @@ public partial class SecretariaDbContext : DbContext
             entity.Property(e => e.FechaCreacion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
-            entity.Property(e => e.AnioDocumento);
             entity.Property(e => e.FechaRecepcion)
                 .HasDefaultValueSql("(getdate())")
                 .HasColumnType("datetime");
