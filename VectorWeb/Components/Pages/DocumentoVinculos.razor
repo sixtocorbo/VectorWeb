@@ -55,7 +55,11 @@ else
                 {
                     <tr>
                         <td>
-                            @if (relacion.EsPadre)
+                            @if (relacion.Tipo == TipoRelacionVinculo.Seleccionado)
+                            {
+                                <span class="badge bg-secondary">Seleccionado</span>
+                            }
+                            else if (relacion.Tipo == TipoRelacionVinculo.Padre)
                             {
                                 <span class="badge bg-primary">Padre</span>
                             }
@@ -100,14 +104,14 @@ else
             .OrderByDescending(d => d.FechaCreacion)
             .ToListAsync();
 
-        relaciones = [];
+        relaciones = [new RelacionVinculo(documentoActual, TipoRelacionVinculo.Seleccionado)];
 
         if (documentoActual.IdDocumentoPadreNavigation is not null)
         {
-            relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, true));
+            relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, TipoRelacionVinculo.Padre));
         }
 
-        relaciones.AddRange(hijos.Select(h => new RelacionVinculo(h, false)));
+        relaciones.AddRange(hijos.Select(h => new RelacionVinculo(h, TipoRelacionVinculo.Hijo)));
 
         cargando = false;
     }
@@ -122,5 +126,12 @@ else
     private void VolverABandeja()
         => Navegador.NavigateTo("/documentos");
 
-    private sealed record RelacionVinculo(MaeDocumento Documento, bool EsPadre);
+    private sealed record RelacionVinculo(MaeDocumento Documento, TipoRelacionVinculo Tipo);
+
+    private enum TipoRelacionVinculo
+    {
+        Seleccionado,
+        Padre,
+        Hijo
+    }
 }
