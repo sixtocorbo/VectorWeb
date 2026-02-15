@@ -109,6 +109,39 @@
     display: block;
 }
 
+
+.nav-item-submenu details {
+    padding: 0.25rem 0.75rem;
+}
+
+.nav-item-submenu summary {
+    color: #d7d7d7;
+    cursor: pointer;
+    font-size: 0.85rem;
+    list-style: none;
+    margin-bottom: 0.25rem;
+}
+
+.nav-item-submenu summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-item-submenu summary::before {
+    content: "▾";
+    margin-right: 0.35rem;
+}
+
+.nav-item-submenu details:not([open]) summary::before {
+    content: "▸";
+}
+
+.nav-item-submenu ::deep .nav-link-child {
+    margin-left: 1rem;
+    height: 2.5rem;
+    line-height: 2.5rem;
+    font-size: 0.85rem;
+}
+
 @media (min-width: 641px) {
     .navbar-toggler {
         display: none;
