@@ -38,7 +38,8 @@ public sealed class DocumentoVinculacionService
         }
 
         var relacionesHijos = documentos
-            .GroupBy(d => d.IdDocumentoPadre)
+            .Where(d => d.IdDocumentoPadre.HasValue)
+            .GroupBy(d => d.IdDocumentoPadre!.Value)
             .ToDictionary(g => g.Key, g => g.Select(x => x.IdDocumento).ToList());
 
         var detalles = new List<VinculacionDetalle>();
@@ -110,7 +111,7 @@ public sealed class DocumentoVinculacionService
         return false;
     }
 
-    private static List<long> ObtenerSubarbol(long idRaiz, IReadOnlyDictionary<long?, List<long>> relacionesHijos)
+    private static List<long> ObtenerSubarbol(long idRaiz, IReadOnlyDictionary<long, List<long>> relacionesHijos)
     {
         var visitados = new HashSet<long>();
         var pila = new Stack<long>();
