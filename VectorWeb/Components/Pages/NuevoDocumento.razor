@@ -41,42 +41,7 @@
         <div class="alert alert-info" role="alert">@mensajeNumeracion</div>
     }
 
-    @if (!esActuacion)
-    {
-        <div class="card mb-3 border-primary">
-            <div class="card-header bg-light">
-                <i class="bi bi-link-45deg"></i> Vinculación
-            </div>
-            <div class="card-body">
-                @if (docPadreSeleccionado == null)
-                {
-                    <p class="mb-2 text-muted">
-                        Si corresponde podés adjuntar este documento a un expediente padre existente.
-                    </p>
-                    <button type="button" class="btn btn-outline-primary" @onclick="AbrirModalPadres">
-                        <i class="bi bi-search"></i> Buscar documento padre
-                    </button>
-                }
-                else
-                {
-                    <div class="alert alert-info d-flex justify-content-between align-items-center">
-                        <span class="me-2">
-                            <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
-                        </span>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AbrirModalPadres">
-                                <i class="bi bi-search"></i> Cambiar
-                            </button>
-                            <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
-                                <i class="bi bi-x-circle"></i> Quitar
-                            </button>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
-    }
-    else
+    @if (esActuacion)
     {
         <div class="alert alert-warning shadow-sm">
             <h5 class="alert-heading"><i class="bi bi-folder-fill"></i> Trabajando sobre el Expediente: @docPadreSeleccionado?.NumeroOficial</h5>
@@ -230,6 +195,42 @@
             </div>
         </div>
     </div>
+
+    @if (!esActuacion)
+    {
+        <div class="card mb-3 border-primary">
+            <div class="card-header bg-light">
+                <i class="bi bi-link-45deg"></i> Vinculación
+            </div>
+            <div class="card-body">
+                @if (docPadreSeleccionado == null)
+                {
+                    <p class="mb-2 text-muted">
+                        Si corresponde podés adjuntar este documento a un expediente padre existente.
+                    </p>
+                    <button type="button" class="btn btn-outline-primary" @onclick="AbrirModalPadres">
+                        <i class="bi bi-search"></i> Buscar documento padre
+                    </button>
+                }
+                else
+                {
+                    <div class="alert alert-info d-flex justify-content-between align-items-center">
+                        <span class="me-2">
+                            <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
+                        </span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AbrirModalPadres">
+                                <i class="bi bi-search"></i> Cambiar
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
+                                <i class="bi bi-x-circle"></i> Quitar
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 
     <div class="d-grid gap-2 d-md-block">
         <button type="submit" class="btn btn-success btn-lg" disabled="@bloqueoPorRangoAgotado">
