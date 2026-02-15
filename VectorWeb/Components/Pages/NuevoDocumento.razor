@@ -48,40 +48,44 @@
             <div class="card-body">
                 @if (docPadreSeleccionado == null)
                 {
-                    <div class="input-group">
-                        <input type="text" class="form-control" placeholder="Buscar documento padre por Asunto o Nro..."
-                               @bind="busquedaPadre" />
-                        <button type="button" class="btn btn-outline-primary" @onclick="BuscarPadre">
-                            <i class="bi bi-search"></i> Buscar
-                        </button>
+                    <div class="position-relative">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Buscar documento padre por número o asunto..."
+                               value="@busquedaPadre"
+                               autocomplete="off"
+                               @oninput="FiltrarPadres"
+                               @onfocus="MostrarSugerenciasPadre"
+                               @onkeydown="ManejarTecladoPadres" />
+
+                        @if (resultadosBusqueda.Any())
+                        {
+                            <div class="list-group position-absolute start-0 end-0 shadow-sm"
+                                 style="z-index: 20; top: calc(100% + .25rem); max-height: 16rem; overflow-y: auto;">
+                                @for (var i = 0; i < resultadosBusqueda.Count; i++)
+                                {
+                                    var d = resultadosBusqueda[i];
+                                    var cssItem = i == indicePadreSeleccionado
+                                    ? "list-group-item list-group-item-action active"
+                                    : "list-group-item list-group-item-action";
+
+                                    <button type="button"
+                                            class="@cssItem"
+                                            @onclick="() => SeleccionarPadre(d)">
+                                        <div class="d-flex justify-content-between gap-3">
+                                            <span class="fw-semibold">@(string.IsNullOrWhiteSpace(d.NumeroOficial) ? "S/N" : d.NumeroOficial)</span>
+                                            <small>@((d.FechaCreacion ?? DateTime.MinValue).ToString("dd/MM/yyyy"))</small>
+                                        </div>
+                                        <div class="small text-truncate">@d.Asunto</div>
+                                    </button>
+                                }
+                            </div>
+                        }
                     </div>
 
-                    @if (resultadosBusqueda != null && resultadosBusqueda.Any())
-                    {
-                        <table class="table table-sm mt-2 table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Nro</th>
-                                    <th>Asunto</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var d in resultadosBusqueda)
-                                {
-                                    <tr>
-                                        <td>@d.NumeroOficial</td>
-                                        <td>@d.Asunto</td>
-                                        <td>
-                                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadre(d)">
-                                                Vincular
-                                            </button>
-                                        </td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    }
+                    <small class="text-muted">
+                        Escriba al menos 2 caracteres. Use ↑ ↓ y Enter para seleccionar rápidamente.
+                    </small>
                 }
                 else
                 {
@@ -300,7 +304,9 @@
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
 
     private string busquedaPadre = string.Empty;
-    private List<MaeDocumento>? resultadosBusqueda;
+    private List<MaeDocumento> resultadosBusqueda = new();
+    private List<MaeDocumento> documentosDisponibles = new();
+    private int indicePadreSeleccionado = -1;
     private MaeDocumento? docPadreSeleccionado;
     private int? idOficinaBandejaEntrada;
     private int idOficinaUsuarioActual;
@@ -333,6 +339,9 @@
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+        documentosDisponibles = (await RepoDocs.GetAllAsync())
+            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
+            .ToList();
 
         var estadoInicial = estados.FirstOrDefault();
         if (estadoInicial != null)
@@ -409,17 +418,61 @@
         }
     }
 
-    private async Task BuscarPadre()
+    private void FiltrarPadres(ChangeEventArgs e)
     {
-        if (!string.IsNullOrWhiteSpace(busquedaPadre))
+        busquedaPadre = e.Value?.ToString() ?? string.Empty;
+        indicePadreSeleccionado = -1;
+
+        if (busquedaPadre.Trim().Length < 2)
         {
-            var todos = await RepoDocs.GetAllAsync();
-            resultadosBusqueda = todos
-                .Where(d =>
-                    (d.Asunto?.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                    (!string.IsNullOrWhiteSpace(d.NumeroOficial) && d.NumeroOficial.Contains(busquedaPadre, StringComparison.OrdinalIgnoreCase)))
-                .Take(5)
-                .ToList();
+            resultadosBusqueda.Clear();
+            return;
+        }
+
+        var termino = busquedaPadre.Trim();
+        resultadosBusqueda = documentosDisponibles
+            .Where(d =>
+                (d.Asunto?.Contains(termino, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (!string.IsNullOrWhiteSpace(d.NumeroOficial) && d.NumeroOficial.Contains(termino, StringComparison.OrdinalIgnoreCase)))
+            .Take(8)
+            .ToList();
+    }
+
+    private void MostrarSugerenciasPadre()
+    {
+        if (busquedaPadre.Trim().Length >= 2)
+        {
+            FiltrarPadres(new ChangeEventArgs { Value = busquedaPadre });
+        }
+    }
+
+    private void ManejarTecladoPadres(KeyboardEventArgs e)
+    {
+        if (!resultadosBusqueda.Any())
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                indicePadreSeleccionado = (indicePadreSeleccionado + 1) % resultadosBusqueda.Count;
+                break;
+            case "ArrowUp":
+                indicePadreSeleccionado = indicePadreSeleccionado <= 0
+                    ? resultadosBusqueda.Count - 1
+                    : indicePadreSeleccionado - 1;
+                break;
+            case "Enter":
+                if (indicePadreSeleccionado >= 0 && indicePadreSeleccionado < resultadosBusqueda.Count)
+                {
+                    SeleccionarPadre(resultadosBusqueda[indicePadreSeleccionado]);
+                }
+                break;
+            case "Escape":
+                resultadosBusqueda.Clear();
+                indicePadreSeleccionado = -1;
+                break;
         }
     }
 
@@ -428,7 +481,8 @@
         docPadreSeleccionado = padre;
         nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
         nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
-        resultadosBusqueda = null;
+        resultadosBusqueda.Clear();
+        indicePadreSeleccionado = -1;
         busquedaPadre = string.Empty;
     }
 
