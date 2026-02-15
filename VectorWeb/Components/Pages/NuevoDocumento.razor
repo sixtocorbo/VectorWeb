@@ -5,6 +5,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
+@using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
@@ -14,6 +15,7 @@
 @inject NumeracionRangoService RangoService
 @inject NavigationManager Navegador
 @inject IJSRuntime JS
+@inject SecretariaDbContext DbContext
 @rendermode InteractiveServer
 
 <h3>
@@ -615,13 +617,24 @@
                 return;
             }
 
-            await MoverFamiliaADestino(
-                docPadreSeleccionado.IdHiloConversacion,
-                idOficinaBandejaEntrada.Value,
-                "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
+            await using var transactionSinActuacion = await DbContext.Database.BeginTransactionAsync();
+            try
+            {
+                await MoverFamiliaADestino(
+                    docPadreSeleccionado.IdHiloConversacion,
+                    idOficinaBandejaEntrada.Value,
+                    "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
 
-            Navegador.NavigateTo("documentos");
-            return;
+                await transactionSinActuacion.CommitAsync();
+                Navegador.NavigateTo("documentos");
+                return;
+            }
+            catch (Exception ex)
+            {
+                await transactionSinActuacion.RollbackAsync();
+                errorGuardar = "Error al trasladar el expediente sin actuación: " + ex.Message;
+                return;
+            }
         }
 
         nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
@@ -739,60 +752,70 @@
             return;
         }
 
-        await RepoDocs.AddAsync(nuevoDoc);
-
-        var obsCreacion = esActuacion
-            ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
-            : "Se crea el documento";
-
-        var movCreacion = new TraMovimiento
+        await using var transaction = await DbContext.Database.BeginTransactionAsync();
+        try
         {
-            IdDocumento = nuevoDoc.IdDocumento,
-            IdOficinaOrigen = nuevoDoc.IdOficinaActual,
-            IdOficinaDestino = nuevoDoc.IdOficinaActual,
-            FechaMovimiento = DateTime.Now,
-            IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-            ObservacionPase = obsCreacion
-        };
-        await RepoMovimientos.AddAsync(movCreacion);
+            await RepoDocs.AddAsync(nuevoDoc);
 
-        if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
-        {
-            await MoverFamiliaADestino(
-                docPadreSeleccionado.IdHiloConversacion,
-                idOficinaUsuarioActual,
-                $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-        }
-        else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
-        {
-            await MoverFamiliaADestino(
-                docPadreSeleccionado.IdHiloConversacion,
-                AutoPaseDestino.Value,
-                $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-        }
-        else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
-        {
-            var oficinaOrigen = nuevoDoc.IdOficinaActual;
-            var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
-            var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
+            var obsCreacion = esActuacion
+                ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
+                : "Se crea el documento";
 
-            var movPase = new TraMovimiento
+            var movCreacion = new TraMovimiento
             {
                 IdDocumento = nuevoDoc.IdDocumento,
-                IdOficinaOrigen = oficinaOrigen,
-                IdOficinaDestino = oficinaDestino,
-                FechaMovimiento = DateTime.Now.AddSeconds(1),
+                IdOficinaOrigen = nuevoDoc.IdOficinaActual,
+                IdOficinaDestino = nuevoDoc.IdOficinaActual,
+                FechaMovimiento = DateTime.Now,
                 IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
+                ObservacionPase = obsCreacion
             };
+            await RepoMovimientos.AddAsync(movCreacion);
 
-            await RepoMovimientos.AddAsync(movPase);
+            if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
+            {
+                await MoverFamiliaADestino(
+                    docPadreSeleccionado.IdHiloConversacion,
+                    idOficinaUsuarioActual,
+                    $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
+            }
+            else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
+            {
+                await MoverFamiliaADestino(
+                    docPadreSeleccionado.IdHiloConversacion,
+                    AutoPaseDestino.Value,
+                    $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
+            }
+            else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
+            {
+                var oficinaOrigen = nuevoDoc.IdOficinaActual;
+                var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
+                var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
 
-            nuevoDoc.IdOficinaActual = oficinaDestino;
-            await RepoDocs.UpdateAsync(nuevoDoc);
+                var movPase = new TraMovimiento
+                {
+                    IdDocumento = nuevoDoc.IdDocumento,
+                    IdOficinaOrigen = oficinaOrigen,
+                    IdOficinaDestino = oficinaDestino,
+                    FechaMovimiento = DateTime.Now.AddSeconds(1),
+                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                    ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
+                };
+
+                await RepoMovimientos.AddAsync(movPase);
+
+                nuevoDoc.IdOficinaActual = oficinaDestino;
+                await RepoDocs.UpdateAsync(nuevoDoc);
+            }
+
+            await transaction.CommitAsync();
+            Navegador.NavigateTo("documentos");
         }
-
-        Navegador.NavigateTo("documentos");
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            errorGuardar = "Error al procesar la actuación y el pase: " + ex.Message;
+        }
     }
 
     private async Task MoverFamiliaADestino(Guid hiloConversacion, int oficinaDestino, string observacion)
