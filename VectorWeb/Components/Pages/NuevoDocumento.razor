@@ -603,218 +603,226 @@
     private async Task Guardar()
     {
         errorGuardar = null;
-
-        if (paseConActuacionForzado)
+        try
         {
-            soloTraerSinActuacion = false;
-        }
-
-        if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
-        {
-            if (!idOficinaBandejaEntrada.HasValue)
+            if (paseConActuacionForzado)
             {
-                errorGuardar = "No se encontró la oficina BANDEJA DE ENTRADA para realizar el traslado.";
+                soloTraerSinActuacion = false;
+            }
+
+            if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
+            {
+                if (!idOficinaBandejaEntrada.HasValue)
+                {
+                    errorGuardar = "No se encontró la oficina BANDEJA DE ENTRADA para realizar el traslado.";
+                    return;
+                }
+
+                await using var transactionSinActuacion = await DbContext.Database.BeginTransactionAsync();
+                try
+                {
+                    await MoverFamiliaADestino(
+                        docPadreSeleccionado.IdHiloConversacion,
+                        idOficinaBandejaEntrada.Value,
+                        "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
+
+                    await transactionSinActuacion.CommitAsync();
+                    Navegador.NavigateTo("documentos");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    await transactionSinActuacion.RollbackAsync();
+                    errorGuardar = "Error al trasladar el expediente sin actuación: " + ex.Message;
+                    return;
+                }
+            }
+
+            nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
+            {
+                errorGuardar = "Debe ingresar el contenido/asunto del documento.";
                 return;
             }
 
-            await using var transactionSinActuacion = await DbContext.Database.BeginTransactionAsync();
+            if (nuevoDoc.Asunto.Length > 200)
+            {
+                errorGuardar = "El contenido/asunto no puede superar los 200 caracteres.";
+                return;
+            }
+
+            if (!tipos.Any(t => t.IdTipo == nuevoDoc.IdTipo))
+            {
+                errorGuardar = "Tipo de documento inválido.";
+                return;
+            }
+
+            if (!estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual))
+            {
+                errorGuardar = "Estado inválido.";
+                return;
+            }
+
+            if (!oficinas.Any(o => o.IdOficina == nuevoDoc.IdOficinaActual))
+            {
+                errorGuardar = "Debe seleccionar una oficina válida.";
+                return;
+            }
+
+            if (bloqueoPorRangoAgotado)
+            {
+                errorGuardar = $"No puede continuar: {mensajeNumeracion}";
+                return;
+            }
+
+            nuevoDoc.AnioDocumento = anioNumeracionSeleccionado;
+
+            if (esNumeracionAutomatica)
+            {
+                var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+                if (!resultadoNumeracion.Exitoso || resultadoNumeracion.Data is null)
+                {
+                    errorGuardar = resultadoNumeracion.Mensaje;
+                    return;
+                }
+
+                var rangoConsumido = resultadoNumeracion.Data;
+                nuevoDoc.NumeroOficial = rangoConsumido.UltimoUtilizado.ToString();
+            }
+            else if (esNumeracionManualInterna)
+            {
+                if (!numeroManualInterno.HasValue)
+                {
+                    errorGuardar = "Debe ingresar el número oficial para la oficina interna.";
+                    return;
+                }
+
+                if (numeroManualInterno <= 0)
+                {
+                    errorGuardar = "El número oficial debe ser mayor que cero.";
+                    return;
+                }
+
+                var rango = rangoManualInternoActivo
+                    ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+
+                if (rango is null)
+                {
+                    errorGuardar = "No hay un rango activo configurado para validar el número ingresado.";
+                    return;
+                }
+
+                if (numeroManualInterno < rango.NumeroInicio || numeroManualInterno > rango.NumeroFin)
+                {
+                    errorGuardar = $"El número ingresado está fuera del rango permitido ({rango.NumeroInicio}-{rango.NumeroFin}).";
+                    return;
+                }
+
+                nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
+            }
+            else
+            {
+                nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial?.Trim();
+
+                if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
+                {
+                    errorGuardar = "Debe ingresar el número oficial para numeración manual.";
+                    return;
+                }
+
+                if (nuevoDoc.NumeroOficial.Length > 50)
+                {
+                    errorGuardar = "El número oficial no puede superar los 50 caracteres.";
+                    return;
+                }
+            }
+
+            var documentosExistentes = await RepoDocs.GetAllAsync();
+            var existeDuplicado = documentosExistentes.Any(d =>
+                d.IdTipo == nuevoDoc.IdTipo &&
+                d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
+                d.FechaCreacion.HasValue &&
+                (d.AnioDocumento ?? d.FechaCreacion.Value.Year) == anioNumeracionSeleccionado &&
+                string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
+
+            if (existeDuplicado)
+            {
+                errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
+                return;
+            }
+
+            await using var transaction = await DbContext.Database.BeginTransactionAsync();
             try
             {
-                await MoverFamiliaADestino(
-                    docPadreSeleccionado.IdHiloConversacion,
-                    idOficinaBandejaEntrada.Value,
-                    "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
+                await RepoDocs.AddAsync(nuevoDoc);
 
-                await transactionSinActuacion.CommitAsync();
+                var obsCreacion = esActuacion
+                    ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
+                    : "Se crea el documento";
+
+                var movCreacion = new TraMovimiento
+                {
+                    IdDocumento = nuevoDoc.IdDocumento,
+                    IdOficinaOrigen = nuevoDoc.IdOficinaActual,
+                    IdOficinaDestino = nuevoDoc.IdOficinaActual,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                    ObservacionPase = obsCreacion
+                };
+                await RepoMovimientos.AddAsync(movCreacion);
+
+                if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
+                {
+                    await MoverFamiliaADestino(
+                        docPadreSeleccionado.IdHiloConversacion,
+                        idOficinaUsuarioActual,
+                        $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
+                }
+                else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
+                {
+                    await MoverFamiliaADestino(
+                        docPadreSeleccionado.IdHiloConversacion,
+                        AutoPaseDestino.Value,
+                        $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
+                }
+                else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
+                {
+                    var oficinaOrigen = nuevoDoc.IdOficinaActual;
+                    var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
+                    var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
+
+                    var movPase = new TraMovimiento
+                    {
+                        IdDocumento = nuevoDoc.IdDocumento,
+                        IdOficinaOrigen = oficinaOrigen,
+                        IdOficinaDestino = oficinaDestino,
+                        FechaMovimiento = DateTime.Now.AddSeconds(1),
+                        IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                        ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
+                    };
+
+                    await RepoMovimientos.AddAsync(movPase);
+
+                    nuevoDoc.IdOficinaActual = oficinaDestino;
+                    await RepoDocs.UpdateAsync(nuevoDoc);
+                }
+
+                await transaction.CommitAsync();
                 Navegador.NavigateTo("documentos");
-                return;
             }
             catch (Exception ex)
             {
-                await transactionSinActuacion.RollbackAsync();
-                errorGuardar = "Error al trasladar el expediente sin actuación: " + ex.Message;
-                return;
+                await transaction.RollbackAsync();
+                errorGuardar = "Error al procesar la actuación y el pase: " + ex.Message;
             }
         }
-
-        nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
+        finally
         {
-            errorGuardar = "Debe ingresar el contenido/asunto del documento.";
-            return;
-        }
-
-        if (nuevoDoc.Asunto.Length > 200)
-        {
-            errorGuardar = "El contenido/asunto no puede superar los 200 caracteres.";
-            return;
-        }
-
-        if (!tipos.Any(t => t.IdTipo == nuevoDoc.IdTipo))
-        {
-            errorGuardar = "Tipo de documento inválido.";
-            return;
-        }
-
-        if (!estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual))
-        {
-            errorGuardar = "Estado inválido.";
-            return;
-        }
-
-        if (!oficinas.Any(o => o.IdOficina == nuevoDoc.IdOficinaActual))
-        {
-            errorGuardar = "Debe seleccionar una oficina válida.";
-            return;
-        }
-
-        if (bloqueoPorRangoAgotado)
-        {
-            errorGuardar = $"No puede continuar: {mensajeNumeracion}";
-            return;
-        }
-
-        nuevoDoc.AnioDocumento = anioNumeracionSeleccionado;
-
-        if (esNumeracionAutomatica)
-        {
-            var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-            if (!resultadoNumeracion.Exitoso || resultadoNumeracion.Data is null)
+            if (!string.IsNullOrWhiteSpace(errorGuardar))
             {
-                errorGuardar = resultadoNumeracion.Mensaje;
-                return;
+                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             }
-
-            var rangoConsumido = resultadoNumeracion.Data;
-            nuevoDoc.NumeroOficial = rangoConsumido.UltimoUtilizado.ToString();
-        }
-        else if (esNumeracionManualInterna)
-        {
-            if (!numeroManualInterno.HasValue)
-            {
-                errorGuardar = "Debe ingresar el número oficial para la oficina interna.";
-                return;
-            }
-
-            if (numeroManualInterno <= 0)
-            {
-                errorGuardar = "El número oficial debe ser mayor que cero.";
-                return;
-            }
-
-            var rango = rangoManualInternoActivo
-                ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-
-            if (rango is null)
-            {
-                errorGuardar = "No hay un rango activo configurado para validar el número ingresado.";
-                return;
-            }
-
-            if (numeroManualInterno < rango.NumeroInicio || numeroManualInterno > rango.NumeroFin)
-            {
-                errorGuardar = $"El número ingresado está fuera del rango permitido ({rango.NumeroInicio}-{rango.NumeroFin}).";
-                return;
-            }
-
-            nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
-        }
-        else
-        {
-            nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial?.Trim();
-
-            if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
-            {
-                errorGuardar = "Debe ingresar el número oficial para numeración manual.";
-                return;
-            }
-
-            if (nuevoDoc.NumeroOficial.Length > 50)
-            {
-                errorGuardar = "El número oficial no puede superar los 50 caracteres.";
-                return;
-            }
-
-        }
-
-        var documentosExistentes = await RepoDocs.GetAllAsync();
-        var existeDuplicado = documentosExistentes.Any(d =>
-            d.IdTipo == nuevoDoc.IdTipo &&
-            d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
-            d.FechaCreacion.HasValue &&
-            (d.AnioDocumento ?? d.FechaCreacion.Value.Year) == anioNumeracionSeleccionado &&
-            string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
-
-        if (existeDuplicado)
-        {
-            errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
-            return;
-        }
-
-        await using var transaction = await DbContext.Database.BeginTransactionAsync();
-        try
-        {
-            await RepoDocs.AddAsync(nuevoDoc);
-
-            var obsCreacion = esActuacion
-                ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
-                : "Se crea el documento";
-
-            var movCreacion = new TraMovimiento
-            {
-                IdDocumento = nuevoDoc.IdDocumento,
-                IdOficinaOrigen = nuevoDoc.IdOficinaActual,
-                IdOficinaDestino = nuevoDoc.IdOficinaActual,
-                FechaMovimiento = DateTime.Now,
-                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = obsCreacion
-            };
-            await RepoMovimientos.AddAsync(movCreacion);
-
-            if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
-            {
-                await MoverFamiliaADestino(
-                    docPadreSeleccionado.IdHiloConversacion,
-                    idOficinaUsuarioActual,
-                    $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-            }
-            else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
-            {
-                await MoverFamiliaADestino(
-                    docPadreSeleccionado.IdHiloConversacion,
-                    AutoPaseDestino.Value,
-                    $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-            }
-            else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
-            {
-                var oficinaOrigen = nuevoDoc.IdOficinaActual;
-                var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
-                var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
-
-                var movPase = new TraMovimiento
-                {
-                    IdDocumento = nuevoDoc.IdDocumento,
-                    IdOficinaOrigen = oficinaOrigen,
-                    IdOficinaDestino = oficinaDestino,
-                    FechaMovimiento = DateTime.Now.AddSeconds(1),
-                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                    ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
-                };
-
-                await RepoMovimientos.AddAsync(movPase);
-
-                nuevoDoc.IdOficinaActual = oficinaDestino;
-                await RepoDocs.UpdateAsync(nuevoDoc);
-            }
-
-            await transaction.CommitAsync();
-            Navegador.NavigateTo("documentos");
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            errorGuardar = "Error al procesar la actuación y el pase: " + ex.Message;
         }
     }
 
