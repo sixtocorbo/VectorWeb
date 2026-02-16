@@ -22,23 +22,3 @@ window.scrollSugerenciaVisible = (contenedor, indice) => {
         contenedor.scrollTop = bottomItem - contenedor.clientHeight;
     }
 };
-
-window.scrollToAnchorCentered = (anchorId) => {
-    if (!anchorId) {
-        return;
-    }
-
-    const section = document.getElementById(anchorId);
-    if (!section) {
-        return;
-    }
-
-    section.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-    });
-
-    if (window.history?.replaceState) {
-        window.history.replaceState(null, '', `#${anchorId}`);
-    }
-};

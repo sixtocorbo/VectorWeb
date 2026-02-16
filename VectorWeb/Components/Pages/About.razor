@@ -1,5 +1,4 @@
 @page "/about"
-@inject IJSRuntime JS
 
 <PageTitle>Manual de uso de Vector</PageTitle>
 
@@ -18,16 +17,16 @@
                 <div class="card-body">
                     <h2 class="h4">Índice</h2>
                     <ol class="mb-0">
-                        <li><a href="#objetivo-general" @onclick:preventDefault="true" @onclick='() => IrASeccion("objetivo-general")'>Objetivo general del sistema</a></li>
-                        <li><a href="#flujo-recomendado" @onclick:preventDefault="true" @onclick='() => IrASeccion("flujo-recomendado")'>Flujo recomendado de operación</a></li>
-                        <li><a href="#modulo-documentos" @onclick:preventDefault="true" @onclick='() => IrASeccion("modulo-documentos")'>Módulo de Documentos</a></li>
-                        <li><a href="#modulo-vinculacion" @onclick:preventDefault="true" @onclick='() => IrASeccion("modulo-vinculacion")'>Módulo de Vinculación de Documentos</a></li>
-                        <li><a href="#modulo-reclusos" @onclick:preventDefault="true" @onclick='() => IrASeccion("modulo-reclusos")'>Módulo de Reclusos</a></li>
-                        <li><a href="#modulo-renovaciones" @onclick:preventDefault="true" @onclick='() => IrASeccion("modulo-renovaciones")'>Módulo de Renovaciones (Art. 120)</a></li>
-                        <li><a href="#modulo-configuracion" @onclick:preventDefault="true" @onclick='() => IrASeccion("modulo-configuracion")'>Módulo de Configuración</a></li>
-                        <li><a href="#ejemplo-practico" @onclick:preventDefault="true" @onclick='() => IrASeccion("ejemplo-practico")'>Ejemplo práctico completo</a></li>
-                        <li><a href="#buenas-practicas" @onclick:preventDefault="true" @onclick='() => IrASeccion("buenas-practicas")'>Buenas prácticas y errores frecuentes</a></li>
-                        <li><a href="#resultado-esperado" @onclick:preventDefault="true" @onclick='() => IrASeccion("resultado-esperado")'>Resultado esperado del uso del sistema</a></li>
+                        <li><a href="/about#objetivo-general">Objetivo general del sistema</a></li>
+                        <li><a href="/about#flujo-recomendado">Flujo recomendado de operación</a></li>
+                        <li><a href="/about#modulo-documentos">Módulo de Documentos</a></li>
+                        <li><a href="/about#modulo-vinculacion">Módulo de Vinculación de Documentos</a></li>
+                        <li><a href="/about#modulo-reclusos">Módulo de Reclusos</a></li>
+                        <li><a href="/about#modulo-renovaciones">Módulo de Renovaciones (Art. 120)</a></li>
+                        <li><a href="/about#modulo-configuracion">Módulo de Configuración</a></li>
+                        <li><a href="/about#ejemplo-practico">Ejemplo práctico completo</a></li>
+                        <li><a href="/about#buenas-practicas">Buenas prácticas y errores frecuentes</a></li>
+                        <li><a href="/about#resultado-esperado">Resultado esperado del uso del sistema</a></li>
                     </ol>
                 </div>
             </div>
@@ -209,8 +208,3 @@
         </div>
     </div>
 </div>
-
-@code {
-    private Task IrASeccion(string idSeccion)
-        => JS.InvokeVoidAsync("scrollToAnchorCentered", idSeccion).AsTask();
-}
