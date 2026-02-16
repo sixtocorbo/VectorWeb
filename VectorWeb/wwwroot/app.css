@@ -49,3 +49,42 @@ h1:focus {
 .darker-border-checkbox.form-check-input {
     border-color: #929292;
 }
+
+.office-switch {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 0.5rem;
+    background-color: #f8fbff;
+}
+
+.controls-panel {
+    padding: 1rem;
+    border: 1px solid #d8e2ef;
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, #fbfdff 0%, #f6f9fd 100%);
+}
+
+.search-input-wrapper {
+    position: relative;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d;
+    pointer-events: none;
+}
+
+.search-input {
+    padding-left: 2.2rem;
+}
+
+.status-legend {
+    padding: 0.65rem 0.9rem;
+    border: 1px solid #e2e6ea;
+    border-radius: 0.5rem;
+    background-color: #fafbfc;
+    font-size: 0.95rem;
+}

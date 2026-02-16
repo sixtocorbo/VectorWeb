@@ -21,35 +21,40 @@
         </a>
     </div>
     <div class="col-md-6 text-end">
-        <div class="form-check form-switch d-inline-block">
+        <div class="form-check form-switch d-inline-block office-switch">
             <input id="verTodoOficinas" class="form-check-input" type="checkbox" @bind="verTodo" @bind:after="CargarDocumentos">
             <label class="form-check-label" for="verTodoOficinas">Ver documentos de otras oficinas</label>
         </div>
     </div>
 </div>
 
-<div class="row g-2 mb-3 align-items-end">
-    <div class="col-md-6">
-        <label for="buscadorDocumentos" class="form-label">Buscador en bandeja</label>
-        <input id="buscadorDocumentos"
-               class="form-control"
-               placeholder="Buscar por número, asunto, tipo, oficina o estado"
-               @bind="FiltroBusqueda"
-               @bind:event="oninput" />
-        <small class="text-muted">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
-    </div>
-    <div class="col-md-3">
-        <label for="tamanoPagina" class="form-label">Resultados por página</label>
-        <select id="tamanoPagina" class="form-select" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
-            @foreach (var opcion in opcionesTamanoPagina)
-            {
-                <option value="@opcion">@opcion</option>
-            }
-        </select>
+<div class="controls-panel mb-3">
+    <div class="row g-3 align-items-end">
+        <div class="col-lg-8">
+            <label for="buscadorDocumentos" class="form-label fw-semibold">Buscador en bandeja</label>
+            <div class="search-input-wrapper">
+                <i class="bi bi-search search-icon"></i>
+                <input id="buscadorDocumentos"
+                       class="form-control search-input"
+                       placeholder="Buscar por número, asunto, tipo, oficina o estado"
+                       @bind="FiltroBusqueda"
+                       @bind:event="oninput" />
+            </div>
+            <small class="text-muted d-block mt-1">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <label for="tamanoPagina" class="form-label fw-semibold">Resultados por página</label>
+            <select id="tamanoPagina" class="form-select" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
+                @foreach (var opcion in opcionesTamanoPagina)
+                {
+                    <option value="@opcion">@opcion</option>
+                }
+            </select>
+        </div>
     </div>
 </div>
 
-<div class="mb-3">
+<div class="status-legend mb-3">
     <span class="badge bg-danger me-2">Rojo</span>
     <span class="me-3">Trámite vencido o de atención urgente.</span>
     <span class="badge bg-info me-2">Azul</span>
