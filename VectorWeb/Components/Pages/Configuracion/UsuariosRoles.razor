@@ -1,15 +1,17 @@
 @page "/configuracion/usuarios"
-@attribute [Authorize]
+@attribute [Authorize(Policy = "seguridad.usuarios_roles")]
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using VectorWeb.Services.Security
 @inject IRepository<CatUsuario> RepoUsuarios
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CfgSistemaParametro> RepoParametros
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JS
+@inject RolePermissionService RolePermissionService
 @rendermode InteractiveServer
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -45,6 +47,12 @@
         <button class="nav-link @(tabActiva == TabSeguridad.Roles ? "active fw-bold border-dark border-bottom-0 text-dark" : "text-muted")"
                 @onclick="() => tabActiva = TabSeguridad.Roles">
             <i class="bi bi-person-badge me-2"></i>Roles
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link @(tabActiva == TabSeguridad.Permisos ? "active fw-bold border-success border-bottom-0 text-success" : "text-muted")"
+                @onclick="() => tabActiva = TabSeguridad.Permisos">
+            <i class="bi bi-shield-check me-2"></i>Permisos
         </button>
     </li>
 </ul>
@@ -201,6 +209,43 @@
     </div>
 }
 
+@if (tabActiva == TabSeguridad.Permisos)
+{
+    <div class="card shadow-sm border-0 animate__animated animate__fadeIn">
+        <div class="card-body">
+            <h5 class="card-title mb-3">Matriz de permisos por rol</h5>
+            <p class="text-muted">Define qué acciones puede ejecutar cada rol dentro del sistema.</p>
+
+            @foreach (var rol in rolesDisponibles.OrderBy(r => r))
+            {
+                <div class="border rounded p-3 mb-3">
+                    <h6 class="fw-bold mb-3">@rol</h6>
+                    <div class="row g-2">
+                        @foreach (var permiso in AppPermissions.Todos)
+                        {
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="perm_@rol.Replace(" ", "_")_@permiso.Replace(".", "_")"
+                                           checked="@TienePermiso(rol, permiso)"
+                                           @onchange="e => TogglePermiso(rol, permiso, e.Value is true)" />
+                                    <label class="form-check-label" for="perm_@rol.Replace(" ", "_")_@permiso.Replace(".", "_")">
+                                        @EtiquetaPermiso(permiso)
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            <button class="btn btn-success" @onclick="GuardarPermisosAsync">
+                <i class="bi bi-save me-1"></i> Guardar permisos
+            </button>
+        </div>
+    </div>
+}
+
 @* --- MODAL USUARIO (CREAR / EDITAR) --- *@
 @if (mostrarModalUsuario)
 {
@@ -275,13 +320,14 @@
 }
 
 @code {
-    private enum TabSeguridad { Usuarios, Roles }
+    private enum TabSeguridad { Usuarios, Roles, Permisos }
     private TabSeguridad tabActiva = TabSeguridad.Usuarios;
     private const string ParametroRoles = "SEGURIDAD_ROLES_HABILITADOS";
 
     private List<CatUsuario> usuarios = new();
     private List<CatOficina> oficinas = new();
     private HashSet<string> rolesDisponibles = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, HashSet<string>> permisosPorRol = new(StringComparer.OrdinalIgnoreCase);
 
     private string mensajeError = string.Empty;
     private string mensajeExito = string.Empty;
@@ -310,6 +356,7 @@
         usuarios = (await RepoUsuarios.GetAllAsync()).OrderBy(u => u.NombreCompleto).ToList();
         oficinas = (await RepoOficinas.GetAllAsync()).OrderBy(o => o.Nombre).ToList();
         await CargarRolesAsync();
+        await CargarPermisosAsync();
     }
 
     private async Task CargarRolesAsync()
@@ -414,7 +461,9 @@
         if (!rolesDisponibles.Contains(usuarioEdicion.Rol))
         {
             rolesDisponibles.Add(usuarioEdicion.Rol);
+            permisosPorRol[usuarioEdicion.Rol] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             await GuardarRolesAsync();
+            await GuardarPermisosAsync();
         }
 
         CerrarModal();
@@ -470,7 +519,9 @@
         if (!rolesDisponibles.Contains(rolNormalizado))
         {
             rolesDisponibles.Add(rolNormalizado);
+            permisosPorRol[rolNormalizado] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             await GuardarRolesAsync();
+            await GuardarPermisosAsync();
             mensajeExito = "Rol agregado.";
         }
         nuevoRol = string.Empty;
@@ -487,7 +538,9 @@
         if (await JS.InvokeAsync<bool>("confirm", $"¿Eliminar el rol '{rol}'?"))
         {
             rolesDisponibles.Remove(rol);
+            permisosPorRol.Remove(rol);
             await GuardarRolesAsync();
+            await GuardarPermisosAsync();
             mensajeExito = "Rol eliminado.";
         }
     }
@@ -517,6 +570,71 @@
             await RepoParametros.UpdateAsync(parametro);
         }
     }
+
+    private async Task CargarPermisosAsync()
+    {
+        permisosPorRol = await RolePermissionService.ObtenerMatrizAsync();
+
+        foreach (var rol in rolesDisponibles)
+        {
+            if (!permisosPorRol.ContainsKey(rol))
+            {
+                permisosPorRol[rol] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    private bool TienePermiso(string rol, string permiso)
+        => permisosPorRol.TryGetValue(rol, out var permisos) && permisos.Contains(permiso);
+
+    private void TogglePermiso(string rol, string permiso, bool habilitado)
+    {
+        if (!permisosPorRol.TryGetValue(rol, out var permisos))
+        {
+            permisos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            permisosPorRol[rol] = permisos;
+        }
+
+        if (habilitado)
+        {
+            permisos.Add(permiso);
+        }
+        else
+        {
+            permisos.Remove(permiso);
+        }
+    }
+
+    private async Task GuardarPermisosAsync()
+    {
+        var parametro = (await RepoParametros.FindAsync(p => p.Clave == "SEGURIDAD_PERMISOS_POR_ROL")).FirstOrDefault();
+        var usuarioActual = await ObtenerNombreUsuarioActualAsync();
+        var valor = RolePermissionService.SerializarMatriz(permisosPorRol);
+
+        if (parametro is null)
+        {
+            await RepoParametros.AddAsync(new CfgSistemaParametro
+            {
+                Clave = "SEGURIDAD_PERMISOS_POR_ROL",
+                Valor = valor,
+                Descripcion = "Matriz de permisos por rol",
+                UsuarioActualizacion = usuarioActual,
+                FechaActualizacion = DateTime.Now
+            });
+        }
+        else
+        {
+            parametro.Valor = valor;
+            parametro.UsuarioActualizacion = usuarioActual;
+            parametro.FechaActualizacion = DateTime.Now;
+            await RepoParametros.UpdateAsync(parametro);
+        }
+
+        mensajeExito = "Permisos guardados. Los cambios aplican en el próximo inicio de sesión.";
+    }
+
+    private static string EtiquetaPermiso(string permiso)
+        => AppPermissions.Etiquetas.TryGetValue(permiso, out var etiqueta) ? etiqueta : permiso;
 
     // --- HELPERS ---
 

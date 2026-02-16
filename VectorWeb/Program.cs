@@ -6,6 +6,7 @@ using VectorWeb.Components;
 using VectorWeb.Models;
 using VectorWeb.Repositories;
 using VectorWeb.Services;
+using VectorWeb.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,9 +27,16 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<NumeracionRangoService>();
 builder.Services.AddScoped<DocumentoVinculacionService>();
 builder.Services.AddScoped<RenovacionesService>();
+builder.Services.AddScoped<RolePermissionService>();
 
 // Blazor auth services
-builder.Services.AddAuthorizationCore();
+builder.Services.AddAuthorizationCore(options =>
+{
+    foreach (var permiso in AppPermissions.Todos)
+    {
+        options.AddPolicy(permiso, policy => policy.RequireClaim(AppPermissions.ClaimType, permiso));
+    }
+});
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
 builder.Services.AddScoped<ProtectedSessionStorage>();

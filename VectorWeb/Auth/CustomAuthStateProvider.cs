@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using System.Security.Claims;
+using VectorWeb.Services.Security;
 
 namespace VectorWeb.Auth;
 
@@ -8,12 +9,14 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 {
     private const string SessionKey = "vectorweb.auth.user";
     private readonly ProtectedSessionStorage _sessionStorage;
+    private readonly RolePermissionService _rolePermissionService;
     private bool _initialized;
     private ClaimsPrincipal _currentUser = new(new ClaimsIdentity());
 
-    public CustomAuthStateProvider(ProtectedSessionStorage sessionStorage)
+    public CustomAuthStateProvider(ProtectedSessionStorage sessionStorage, RolePermissionService rolePermissionService)
     {
         _sessionStorage = sessionStorage;
+        _rolePermissionService = rolePermissionService;
     }
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -28,20 +31,12 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
 
     public async Task MarkUserAsAuthenticatedAsync(int idUsuario, string nombre, string? rol, int idOficina)
     {
-        var roleValue = string.IsNullOrWhiteSpace(rol) ? "Usuario" : rol;
+        var roleValue = string.IsNullOrWhiteSpace(rol) ? "OPERADOR" : rol.Trim().ToUpperInvariant();
         var authUser = new AuthSessionUser(idUsuario, nombre, roleValue, idOficina);
 
         await _sessionStorage.SetAsync(SessionKey, authUser);
 
-        var identity = new ClaimsIdentity(new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, idUsuario.ToString()),
-            new Claim(ClaimTypes.Name, nombre),
-            new Claim(ClaimTypes.Role, roleValue),
-            new Claim("IdOficina", idOficina.ToString())
-        }, "CustomAuth");
-
-        var user = new ClaimsPrincipal(identity);
+        var user = await ConstruirPrincipalAsync(idUsuario, nombre, roleValue, idOficina);
         _currentUser = user;
 
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
@@ -61,15 +56,11 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
             var sessionResult = await _sessionStorage.GetAsync<AuthSessionUser>(SessionKey);
             if (sessionResult.Success && sessionResult.Value is not null)
             {
-                var identity = new ClaimsIdentity(new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, sessionResult.Value.IdUsuario.ToString()),
-                    new Claim(ClaimTypes.Name, sessionResult.Value.Nombre),
-                    new Claim(ClaimTypes.Role, sessionResult.Value.Rol),
-                    new Claim("IdOficina", sessionResult.Value.IdOficina.ToString())
-                }, "CustomAuth");
-
-                _currentUser = new ClaimsPrincipal(identity);
+                _currentUser = await ConstruirPrincipalAsync(
+                    sessionResult.Value.IdUsuario,
+                    sessionResult.Value.Nombre,
+                    sessionResult.Value.Rol,
+                    sessionResult.Value.IdOficina);
             }
 
             return true;
@@ -79,6 +70,23 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
             // Browser storage is unavailable during server pre-rendering.
             return false;
         }
+    }
+
+    private async Task<ClaimsPrincipal> ConstruirPrincipalAsync(int idUsuario, string nombre, string rol, int idOficina)
+    {
+        var permisos = await _rolePermissionService.ObtenerPermisosPorRolAsync(rol);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, idUsuario.ToString()),
+            new(ClaimTypes.Name, nombre),
+            new(ClaimTypes.Role, rol),
+            new("IdOficina", idOficina.ToString())
+        };
+
+        claims.AddRange(permisos.Select(permiso => new Claim(AppPermissions.ClaimType, permiso)));
+
+        var identity = new ClaimsIdentity(claims, "CustomAuth");
+        return new ClaimsPrincipal(identity);
     }
 
     private sealed record AuthSessionUser(int IdUsuario, string Nombre, string Rol, int IdOficina);

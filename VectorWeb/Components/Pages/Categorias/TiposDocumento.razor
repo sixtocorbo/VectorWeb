@@ -1,4 +1,6 @@
 @page "/configuracion/tipos-documento"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "configuracion.catalogos")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<CatTipoDocumento> RepoTipo

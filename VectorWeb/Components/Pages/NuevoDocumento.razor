@@ -1,4 +1,6 @@
 @page "/documentos/nuevo"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.editar")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services
