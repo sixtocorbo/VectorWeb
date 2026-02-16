@@ -58,7 +58,7 @@ public partial class SecretariaDbContext : DbContext
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        => optionsBuilder.UseSqlServer("Name=ConnectionStrings:DefaultConnection");
+        => optionsBuilder.UseSqlServer("Name=DefaultConnection");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -279,36 +279,6 @@ public partial class SecretariaDbContext : DbContext
                 .HasConstraintName("FK_MaeCuposSecretaria_Usuario");
         });
 
-        modelBuilder.Entity<SegAuditoriaPermiso>(entity =>
-        {
-            entity.HasKey(e => e.IdAuditoria).HasName("PK_Seg_AuditoriaPermisos");
-
-            entity.ToTable("Seg_AuditoriaPermisos");
-
-            entity.HasIndex(e => e.FechaEvento, "IX_Seg_AuditoriaPermisos_FechaEvento").IsDescending();
-
-            entity.HasIndex(e => new { e.UsuarioId, e.FechaEvento }, "IX_Seg_AuditoriaPermisos_Usuario_Fecha").IsDescending(false, true);
-
-            entity.Property(e => e.FechaEvento)
-                .HasDefaultValueSql("(sysdatetime())")
-                .HasColumnType("datetime2(0)");
-            entity.Property(e => e.Modulo)
-                .HasMaxLength(150)
-                .IsUnicode(false);
-            entity.Property(e => e.PermisoRequerido)
-                .HasMaxLength(150)
-                .IsUnicode(false);
-            entity.Property(e => e.Rol)
-                .HasMaxLength(50)
-                .IsUnicode(false);
-            entity.Property(e => e.Ruta)
-                .HasMaxLength(250)
-                .IsUnicode(false);
-            entity.Property(e => e.UsuarioNombre)
-                .HasMaxLength(100)
-                .IsUnicode(false);
-        });
-
         modelBuilder.Entity<MaeDocumento>(entity =>
         {
             entity.HasKey(e => e.IdDocumento).HasName("PK__Mae_Docu__E52073471EC89580");
@@ -468,6 +438,36 @@ public partial class SecretariaDbContext : DbContext
                 .IsUnicode(false);
             entity.Property(e => e.NombreCompleto)
                 .HasMaxLength(200)
+                .IsUnicode(false);
+        });
+
+        modelBuilder.Entity<SegAuditoriaPermiso>(entity =>
+        {
+            entity.HasKey(e => e.IdAuditoria);
+
+            entity.ToTable("Seg_AuditoriaPermisos");
+
+            entity.HasIndex(e => e.FechaEvento, "IX_Seg_AuditoriaPermisos_FechaEvento").IsDescending();
+
+            entity.HasIndex(e => new { e.UsuarioId, e.FechaEvento }, "IX_Seg_AuditoriaPermisos_Usuario_Fecha").IsDescending(false, true);
+
+            entity.Property(e => e.FechaEvento)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysdatetime())");
+            entity.Property(e => e.Modulo)
+                .HasMaxLength(150)
+                .IsUnicode(false);
+            entity.Property(e => e.PermisoRequerido)
+                .HasMaxLength(150)
+                .IsUnicode(false);
+            entity.Property(e => e.Rol)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Ruta)
+                .HasMaxLength(250)
+                .IsUnicode(false);
+            entity.Property(e => e.UsuarioNombre)
+                .HasMaxLength(100)
                 .IsUnicode(false);
         });
 
