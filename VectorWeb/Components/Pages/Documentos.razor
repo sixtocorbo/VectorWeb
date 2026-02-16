@@ -74,7 +74,6 @@ else
                 <th style="width: 170px;">Nro. / Tipo</th>
                 <th>Asunto</th>
                 <th style="width: 170px;">Ubicación</th>
-                <th style="width: 55px;" class="text-center">Vinc.</th>
                 <th style="width: 95px;" class="text-end">Acciones</th>
             </tr>
         </thead>
@@ -109,24 +108,6 @@ else
                         else
                         {
                             <span class="small text-truncate d-inline-block" style="max-width: 100%;">@doc.IdOficinaActualNavigation?.Nombre</span>
-                        }
-                    </td>
-                    <td class="text-center">
-                        @if (documentoPadrePorHijo.TryGetValue(doc.IdDocumento, out var idDocumentoPadre))
-                        {
-                            <a href="documentos/vinculos/@doc.IdDocumento" class="text-warning" title="Documento hijo del #@idDocumentoPadre. Ver familia.">
-                                <i class="bi bi-diagram-2" aria-hidden="true"></i>
-                            </a>
-                        }
-                        else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var totalHijos))
-                        {
-                            <a href="documentos/vinculos/@doc.IdDocumento" class="text-primary" title="Documento padre con @totalHijos hijo(s). Ver familia.">
-                                <i class="bi bi-diagram-3-fill" aria-hidden="true"></i>
-                            </a>
-                        }
-                        else
-                        {
-                            <i class="bi bi-dash text-muted" aria-hidden="true" title="Sin vínculos"></i>
                         }
                     </td>
                     <td class="text-end text-nowrap">
