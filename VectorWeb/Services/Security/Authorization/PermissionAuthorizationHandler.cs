@@ -70,7 +70,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
             return (endpointName, path);
         }
 
-        if (resource is RouteData routeData)
+        if (resource is Microsoft.AspNetCore.Components.RouteData routeData)
         {
             var route = routeData.RouteValues.TryGetValue("page", out var page)
                 ? page?.ToString()
