@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Text.Json.Serialization; // Necesario para controlar nombres en JSON si se desea
 using VectorWeb.Models;
 
 namespace VectorWeb.Services;
@@ -28,11 +29,15 @@ public enum EstadoRenovacion
     Inactiva
 }
 
+// CORRECCIÓN: Renombradas las propiedades para coincidir con lo que espera EditarRenovacion.razor
 public sealed class ObservacionesRenovacionDto
 {
-    public string CodigoAutorizacion { get; set; } = string.Empty;
-    public string DescripcionAutorizacion { get; set; } = string.Empty;
-    public string ObservacionesUsuario { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string Descripcion { get; set; } = string.Empty;
+
+    // Mapeamos "Observacion" (Razor) a "ObservacionesUsuario" (Lógica interna) si prefieres, 
+    // o simplemente usamos "Observacion" para mantener compatibilidad total.
+    public string Observacion { get; set; } = string.Empty;
 }
 
 public sealed class DocumentoRespaldoDto
@@ -47,7 +52,6 @@ public sealed class RenovacionesService
     private readonly SecretariaDbContext context;
     private const int DiasAlertaDefecto = 30;
 
-    // Cacheamos las opciones de serialización para no instanciarlas en cada llamada
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -99,13 +103,14 @@ public sealed class RenovacionesService
             })
             .ToListAsync();
 
-        // Procesamiento en memoria optimizado
         return datos.Select(x =>
         {
             var dias = (x.Salida.FechaVencimiento.Date - hoy).Days;
             var activa = x.Salida.Activo ?? true;
             var estado = CalcularEstado(activa, dias);
-            var autorizacion = ParsearObservaciones(x.Salida.Observaciones);
+
+            // Ahora devuelve el objeto DTO con las propiedades correctas
+            var autorizacionDto = ParsearObservaciones(x.Salida.Observaciones);
 
             return new SalidaGridDto
             {
@@ -120,7 +125,7 @@ public sealed class RenovacionesService
                 Activo = activa,
                 CantidadDocumentos = x.CantDocs,
                 DetalleCustodia = x.Salida.DetalleCustodia,
-                Autorizacion = autorizacion.CodigoAutorizacion // Corregido para usar la propiedad correcta del DTO
+                Autorizacion = autorizacionDto.Codigo // Acceso corregido
             };
         }).ToList();
     }
@@ -153,8 +158,7 @@ public sealed class RenovacionesService
 
         await context.SaveChangesAsync();
 
-        // Manejo seguro de la lista de documentos
-        if (idsDocumentos != null && idsDocumentos.Count > 0)
+        if (idsDocumentos != null) // Permitir lista vacía para limpiar, pero no null
         {
             var idsNormalizados = idsDocumentos
                 .Where(x => x > 0)
@@ -162,16 +166,6 @@ public sealed class RenovacionesService
                 .ToList();
 
             await ActualizarVinculosDocumentos(entidad.IdSalida, idsNormalizados);
-        }
-        else
-        {
-            // Si la lista viene vacía, asegurarse de limpiar vínculos existentes si es necesario
-            // Opcional: depende de la regla de negocio. Aquí asumo que si viene vacía o nula no tocamos nada o borramos todo.
-            // Para seguridad, si es explícitamente una lista vacía, borramos los vínculos.
-            if (idsDocumentos != null && idsDocumentos.Count == 0)
-            {
-                await ActualizarVinculosDocumentos(entidad.IdSalida, new List<long>());
-            }
         }
     }
 
@@ -217,18 +211,17 @@ public sealed class RenovacionesService
 
         if (!activo && !string.IsNullOrWhiteSpace(motivo))
         {
-            // Nota: Aquí simplemente concatenamos texto al final, el JSON previo (si existe) se rompe.
-            // MEJORA: Deberíamos deserializar, agregar el motivo al campo ObservacionesUsuario y volver a serializar.
-            // Por simplicidad mantenemos tu lógica, pero ten en cuenta que esto invalidará el JSON para futuras lecturas.
+            // Deserializamos para mantener la estructura JSON válida
             var dto = ParsearObservaciones(entidad.Observaciones);
-            dto.ObservacionesUsuario += $"{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
+            dto.Observacion += $"{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
+
+            // Volvemos a serializar
             entidad.Observaciones = JsonSerializer.Serialize(dto, _jsonOptions);
         }
 
         await context.SaveChangesAsync();
     }
 
-    // Método estático puro para calcular estado
     private static EstadoRenovacion CalcularEstado(bool activa, int diasRestantes)
     {
         if (!activa) return EstadoRenovacion.Inactiva;
@@ -244,7 +237,7 @@ public sealed class RenovacionesService
 
         var obsTrimmed = obs.Trim();
 
-        // 1. Intento Rápido: Verificar si parece JSON
+        // 1. Intento JSON
         if (obsTrimmed.StartsWith("{") && obsTrimmed.EndsWith("}"))
         {
             try
@@ -254,11 +247,11 @@ public sealed class RenovacionesService
             }
             catch
             {
-                // Si falla el JSON (formato corrupto), caemos al legacy por seguridad
+                // Fallback silencioso
             }
         }
 
-        // 2. Fallback: Formato Legacy
+        // 2. Fallback Legacy
         return ParsearFormatoLegacy(obs);
     }
 
@@ -270,19 +263,19 @@ public sealed class RenovacionesService
 
         if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION#:"))
         {
-            dto.CodigoAutorizacion = lineas[index].Replace("#AUTORIZACION#:", string.Empty).Trim();
+            dto.Codigo = lineas[index].Replace("#AUTORIZACION#:", string.Empty).Trim();
             index++;
         }
 
         if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION_DESC#:"))
         {
-            dto.DescripcionAutorizacion = lineas[index].Replace("#AUTORIZACION_DESC#:", string.Empty).Trim();
+            dto.Descripcion = lineas[index].Replace("#AUTORIZACION_DESC#:", string.Empty).Trim();
             index++;
         }
 
         if (index < lineas.Count)
         {
-            dto.ObservacionesUsuario = string.Join(Environment.NewLine, lineas.Skip(index));
+            dto.Observacion = string.Join(Environment.NewLine, lineas.Skip(index));
         }
 
         return dto;
@@ -292,9 +285,9 @@ public sealed class RenovacionesService
     {
         var payload = new ObservacionesRenovacionDto
         {
-            CodigoAutorizacion = codigo,
-            DescripcionAutorizacion = descripcion,
-            ObservacionesUsuario = observaciones
+            Codigo = codigo,
+            Descripcion = descripcion,
+            Observacion = observaciones
         };
 
         return JsonSerializer.Serialize(payload, _jsonOptions);
@@ -302,14 +295,12 @@ public sealed class RenovacionesService
 
     public async Task<List<DocumentoRespaldoDto>> BuscarDocumentosCandidatos(int idRecluso, string nombreRecluso)
     {
-        // MEJORA: Usar una sola consulta con OR en lugar de UNION en memoria
-        // Esto permite que SQL Server optimice el plan de ejecución
         var query = context.MaeDocumentos
             .AsNoTracking()
             .Where(d =>
-                d.TraSalidasLaborales.Any(s => s.IdRecluso == idRecluso) || // Relacionados
-                d.Asunto.Contains(nombreRecluso) ||                        // Por asunto
-                (d.Descripcion != null && d.Descripcion.Contains(nombreRecluso)) // Por descripción
+                d.TraSalidasLaborales.Any(s => s.IdRecluso == idRecluso) ||
+                d.Asunto.Contains(nombreRecluso) ||
+                (d.Descripcion != null && d.Descripcion.Contains(nombreRecluso))
             )
             .OrderByDescending(d => d.FechaCreacion)
             .Take(20)
