@@ -1,0 +1,141 @@
+@page "/renovaciones"
+@using VectorWeb.Services
+@inject RenovacionesService Service
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<h3>Renovaciones Art. 120</h3>
+
+<div class="row mb-3 align-items-center">
+    <div class="col-md-4">
+        <input type="text"
+               class="form-control"
+               placeholder="Buscar..."
+               @bind="textoBuscar"
+               @bind:event="oninput"
+               @oninput="async _ => await CargarDatos()" />
+    </div>
+    <div class="col-md-3">
+        <div class="form-check form-switch">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="chkActivas"
+                   @bind="soloActivas"
+                   @bind:after="CargarDatos">
+            <label class="form-check-label" for="chkActivas">Solo Activas</label>
+        </div>
+    </div>
+    <div class="col-md-5 text-end">
+        <a href="renovaciones/editar/0" class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> Nueva Salida
+        </a>
+    </div>
+</div>
+
+@if (lista is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Recluso</th>
+                <th>Lugar</th>
+                <th>Vencimiento</th>
+                <th>Días</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in lista)
+            {
+                <tr class="@ObtenerClaseFila(item.Estado)">
+                    <td>
+                        <strong>@item.Recluso</strong>
+                        <br />
+                        <small class="text-muted">@item.Autorizacion</small>
+                    </td>
+                    <td>@item.LugarTrabajo</td>
+                    <td>@item.FechaVencimiento.ToShortDateString()</td>
+                    <td><strong>@item.DiasRestantes</strong></td>
+                    <td>
+                        <span class="badge @ObtenerBadge(item.Estado)">@item.Estado</span>
+                    </td>
+                    <td>
+                        <a href="renovaciones/editar/@item.IdSalida" class="btn btn-sm btn-primary me-1">Editar</a>
+                        @if (item.Activo)
+                        {
+                            <button class="btn btn-sm btn-danger" @onclick="() => Desactivar(item)">Desactivar</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-success" @onclick="() => Reactivar(item)">Reactivar</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<SalidaGridDto>? lista;
+    private string textoBuscar = string.Empty;
+    private bool soloActivas = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarDatos();
+    }
+
+    private async Task CargarDatos()
+    {
+        lista = await Service.ObtenerSalidasAsync(soloActivas, textoBuscar);
+    }
+
+    private static string ObtenerClaseFila(string estado)
+        => estado switch
+        {
+            "VENCIDA" => "table-danger",
+            "ALERTA" => "table-warning",
+            "INACTIVA" => "table-secondary",
+            _ => string.Empty
+        };
+
+    private static string ObtenerBadge(string estado)
+        => estado switch
+        {
+            "VENCIDA" => "bg-danger",
+            "ALERTA" => "bg-warning text-dark",
+            "INACTIVA" => "bg-secondary",
+            "OK" => "bg-success",
+            _ => "bg-primary"
+        };
+
+    private async Task Desactivar(SalidaGridDto item)
+    {
+        var motivo = await JS.InvokeAsync<string>("prompt", "Motivo del cese:");
+        if (string.IsNullOrWhiteSpace(motivo))
+        {
+            return;
+        }
+
+        await Service.CambiarEstadoAsync(item.IdSalida, false, motivo);
+        await CargarDatos();
+    }
+
+    private async Task Reactivar(SalidaGridDto item)
+    {
+        var confirmar = await JS.InvokeAsync<bool>("confirm", "¿Reactivar esta salida?");
+        if (!confirmar)
+        {
+            return;
+        }
+
+        await Service.CambiarEstadoAsync(item.IdSalida, true, string.Empty);
+        await CargarDatos();
+    }
+}
