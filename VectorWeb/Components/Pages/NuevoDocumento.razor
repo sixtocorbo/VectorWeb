@@ -100,7 +100,10 @@
                         @if (esNumeracionAutomatica)
                         {
                             <input type="text" class="form-control" value="Automático (se asigna al guardar)" disabled />
-                            <small class="text-muted">Serie: <strong>@serieNumeracionAutomatica</strong> | Próximo estimado: @proximoNumeroAutomatico</small>
+                            <small class="text-muted d-flex align-items-center gap-1 flex-wrap">
+                                <span>Serie: <strong>@serieNumeracionAutomatica</strong> | Próximo estimado:</span>
+                                <span class="badge rounded-pill text-bg-warning text-dark fw-semibold px-2">@proximoNumeroAutomatico</span>
+                            </small>
                         }
                         else if (esNumeracionManualInterna)
                         {
