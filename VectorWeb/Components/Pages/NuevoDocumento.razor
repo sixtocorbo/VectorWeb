@@ -13,6 +13,7 @@
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
+@inject IRepository<MaeRecluso> RepoReclusos
 @inject NumeracionRangoService RangoService
 @inject NavigationManager Navegador
 @inject IJSRuntime JS
@@ -137,6 +138,69 @@
                     <label>Contenido / Asunto del Memorando:</label>
                     <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="4" />
                 </div>
+
+                @if (!esActuacion)
+                {
+                    <div class="mb-3 border rounded p-3 bg-light-subtle">
+                        <label class="form-label mb-1">Insertar reclusos en asunto</label>
+                        <small class="d-block text-muted mb-2">
+                            Busque y seleccione uno o varios reclusos. Luego inserte sus nombres en el asunto con un clic.
+                        </small>
+
+                        <div class="row g-2 align-items-start">
+                            <div class="col-md-7 position-relative">
+                                <input type="text"
+                                       class="form-control"
+                                       placeholder="Buscar por nombre o documento..."
+                                       value="@busquedaReclusoAsunto"
+                                       autocomplete="off"
+                                       @oninput="FiltrarReclusosAsunto" />
+
+                                @if (reclusosFiltradosAsunto.Any())
+                                {
+                                    <div class="list-group position-absolute start-0 end-0 shadow-sm" style="z-index: 30; top: calc(100% + .25rem);">
+                                        @foreach (var recluso in reclusosFiltradosAsunto)
+                                        {
+                                            <button type="button"
+                                                    class="list-group-item list-group-item-action"
+                                                    @onclick="() => AgregarReclusoAsunto(recluso)">
+                                                <strong>@recluso.NombreCompleto</strong>
+                                                @if (!string.IsNullOrWhiteSpace(recluso.Documento))
+                                                {
+                                                    <span class="text-muted"> · DNI @recluso.Documento</span>
+                                                }
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="col-md-5 d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-primary" @onclick="InsertarReclusosEnAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                    <i class="bi bi-input-cursor-text"></i> Insertar en asunto
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" @onclick="LimpiarReclusosAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                    Limpiar selección
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (reclusosSeleccionadosAsunto.Any())
+                        {
+                            <div class="mt-3 d-flex flex-wrap gap-2">
+                                @foreach (var recluso in reclusosSeleccionadosAsunto)
+                                {
+                                    <span class="badge bg-primary d-inline-flex align-items-center gap-1 fs-6">
+                                        @recluso.NombreCompleto
+                                        <button type="button" class="btn btn-sm btn-link text-white text-decoration-none p-0" @onclick="() => QuitarReclusoAsunto(recluso.IdRecluso)">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
             }
 
             <div class="row">
@@ -367,6 +431,10 @@
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
     private IEnumerable<CatTipoDocumento> tipos = new List<CatTipoDocumento>();
     private IEnumerable<CatEstado> estados = new List<CatEstado>();
+    private List<MaeRecluso> reclusosActivos = new();
+    private string busquedaReclusoAsunto = string.Empty;
+    private List<MaeRecluso> reclusosFiltradosAsunto = new();
+    private List<MaeRecluso> reclusosSeleccionadosAsunto = new();
 
     private string filtroModalPadre = string.Empty;
     private List<MaeDocumento> documentosPadreFiltrados = new();
@@ -413,6 +481,10 @@
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
+        reclusosActivos = (await RepoReclusos.GetAllAsync())
+            .Where(r => r.Activo == true)
+            .OrderBy(r => r.NombreCompleto)
+            .ToList();
 
         nombresOficinas.Clear();
         foreach (var oficina in oficinas)
@@ -1091,5 +1163,75 @@
         }
 
         await JS.InvokeVoidAsync("scrollSugerenciaVisible", panelRef, indiceSugerencia);
+    }
+
+    private void FiltrarReclusosAsunto(ChangeEventArgs e)
+    {
+        busquedaReclusoAsunto = e.Value?.ToString() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(busquedaReclusoAsunto))
+        {
+            reclusosFiltradosAsunto.Clear();
+            return;
+        }
+
+        var terminos = busquedaReclusoAsunto
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        reclusosFiltradosAsunto = reclusosActivos
+            .Where(r => !reclusosSeleccionadosAsunto.Any(sel => sel.IdRecluso == r.IdRecluso))
+            .Where(r =>
+            {
+                var indice = $"{r.NombreCompleto} {r.Documento}";
+                return terminos.All(t => indice.Contains(t, StringComparison.OrdinalIgnoreCase));
+            })
+            .Take(8)
+            .ToList();
+    }
+
+    private void AgregarReclusoAsunto(MaeRecluso recluso)
+    {
+        if (reclusosSeleccionadosAsunto.Any(r => r.IdRecluso == recluso.IdRecluso))
+        {
+            return;
+        }
+
+        reclusosSeleccionadosAsunto.Add(recluso);
+        busquedaReclusoAsunto = string.Empty;
+        reclusosFiltradosAsunto.Clear();
+    }
+
+    private void QuitarReclusoAsunto(int idRecluso)
+    {
+        reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == idRecluso);
+    }
+
+    private void LimpiarReclusosAsunto()
+    {
+        reclusosSeleccionadosAsunto.Clear();
+        reclusosFiltradosAsunto.Clear();
+        busquedaReclusoAsunto = string.Empty;
+    }
+
+    private void InsertarReclusosEnAsunto()
+    {
+        if (!reclusosSeleccionadosAsunto.Any())
+        {
+            return;
+        }
+
+        var nombres = string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto));
+        var bloqueReclusos = $"Recluso(s): {nombres}";
+
+        if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
+        {
+            nuevoDoc.Asunto = bloqueReclusos;
+            return;
+        }
+
+        if (!nuevoDoc.Asunto.Contains(bloqueReclusos, StringComparison.OrdinalIgnoreCase))
+        {
+            nuevoDoc.Asunto = $"{nuevoDoc.Asunto.Trim()} | {bloqueReclusos}";
+        }
     }
 }
