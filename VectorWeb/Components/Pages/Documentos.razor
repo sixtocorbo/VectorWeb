@@ -243,8 +243,6 @@ else
             .Include(d => d.IdTipoNavigation)
             .Include(d => d.IdOficinaActualNavigation)
             .Include(d => d.IdEstadoActualNavigation)
-            .Include(d => d.IdDocumentoPadreNavigation)
-                .ThenInclude(d => d!.IdTipoNavigation)
             .AsQueryable();
 
         if (!verTodo && idOficinaUsuario > 0)
@@ -303,19 +301,32 @@ else
         timerBusqueda?.Stop();
         timerBusqueda?.Dispose();
 
-        timerBusqueda = new Timer(500)
+        var nuevoTimer = new Timer(500)
         {
             AutoReset = false,
         };
 
-        timerBusqueda.Elapsed += async (_, _) =>
+        nuevoTimer.Elapsed += (_, _) =>
         {
-            await InvokeAsync(CargarDocumentos);
-            timerBusqueda?.Dispose();
-            timerBusqueda = null;
+            _ = InvokeAsync(async () =>
+            {
+                if (!ReferenceEquals(timerBusqueda, nuevoTimer))
+                {
+                    return;
+                }
+
+                await CargarDocumentos();
+
+                if (ReferenceEquals(timerBusqueda, nuevoTimer))
+                {
+                    timerBusqueda?.Dispose();
+                    timerBusqueda = null;
+                }
+            });
         };
 
-        timerBusqueda.Start();
+        timerBusqueda = nuevoTimer;
+        nuevoTimer.Start();
     }
 
     public void Dispose()
