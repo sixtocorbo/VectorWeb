@@ -328,9 +328,15 @@ public sealed class RenovacionesService
             return false;
         }
 
+        var valorNormalizado = obs.Trim();
+        if (!valorNormalizado.StartsWith('{') || !valorNormalizado.EndsWith('}'))
+        {
+            return false;
+        }
+
         try
         {
-            using var document = JsonDocument.Parse(obs);
+            using var document = JsonDocument.Parse(valorNormalizado);
             if (document.RootElement.ValueKind != JsonValueKind.Object)
             {
                 return false;
@@ -344,6 +350,10 @@ public sealed class RenovacionesService
             return false;
         }
         catch (NotSupportedException)
+        {
+            return false;
+        }
+        catch (Exception)
         {
             return false;
         }
