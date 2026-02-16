@@ -1,0 +1,175 @@
+@page "/renovaciones/editar/{Id:int}"
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@using VectorWeb.Services
+@inject RenovacionesService Service
+@inject IRepository<MaeRecluso> RepoReclusos
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<div class="container p-4">
+    <h3>@(Id == 0 ? "Nueva Salida" : "Editar Salida")</h3>
+
+    <EditForm Model="modelo" OnValidSubmit="Guardar">
+        <DataAnnotationsValidator />
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label>Recluso</label>
+                <select class="form-select" @bind="modelo.IdRecluso" disabled="@(Id > 0)">
+                    <option value="0">-- Seleccione --</option>
+                    @foreach (var r in reclusos)
+                    {
+                        <option value="@r.IdRecluso">@r.NombreCompleto</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label>Lugar de Trabajo</label>
+                <InputText class="form-control" @bind-Value="modelo.LugarTrabajo" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label>Inicio</label>
+                <InputDate class="form-control" @bind-Value="modelo.FechaInicio" />
+            </div>
+            <div class="col-md-4">
+                <label>Vencimiento</label>
+                <InputDate class="form-control" @bind-Value="modelo.FechaVencimiento" />
+            </div>
+            <div class="col-md-4">
+                <label>Notificación Juez</label>
+                <InputDate class="form-control" @bind-Value="modelo.FechaNotificacionJuez" />
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label>Horario</label>
+                <InputText class="form-control" @bind-Value="modelo.Horario" />
+            </div>
+            <div class="col-md-6">
+                <label>Custodia</label>
+                <InputText class="form-control" @bind-Value="modelo.DetalleCustodia" />
+            </div>
+        </div>
+
+        <div class="card mb-3 bg-light">
+            <div class="card-body">
+                <h6>Autorización</h6>
+                <div class="row">
+                    <div class="col-md-4">
+                        <select class="form-select" @bind="codigoAutorizacion">
+                            <option value="">(Seleccione)</option>
+                            <option value="RESOLUCION_JUEZ">Resolución Juez</option>
+                            <option value="ACTA">Acta</option>
+                        </select>
+                    </div>
+                    <div class="col-md-8">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Descripción de la autorización"
+                               @bind="descAutorizacion" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label>Observaciones Adicionales</label>
+            <InputTextArea class="form-control" rows="3" @bind-Value="observacionesUsuario" />
+        </div>
+
+        <div class="mb-3">
+            <label>Documentos Vinculados (IDs)</label>
+            <div class="input-group">
+                <input type="number" class="form-control" placeholder="ID Documento" @bind="idDocAgregar" />
+                <button type="button" class="btn btn-outline-secondary" @onclick="AgregarDoc">Agregar ID</button>
+            </div>
+            <ul class="list-group mt-2">
+                @foreach (var docId in idsDocumentos)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        Documento ID: @docId
+                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoverDoc(docId)">X</button>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Guardar</button>
+        <a href="renovaciones" class="btn btn-secondary">Cancelar</a>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private TraSalidasLaborale modelo = new()
+    {
+        FechaInicio = DateTime.Today,
+        FechaVencimiento = DateTime.Today.AddMonths(1),
+        Activo = true,
+        LugarTrabajo = string.Empty
+    };
+
+    private IEnumerable<MaeRecluso> reclusos = [];
+
+    private string codigoAutorizacion = string.Empty;
+    private string descAutorizacion = string.Empty;
+    private string observacionesUsuario = string.Empty;
+
+    private List<long> idsDocumentos = [];
+    private long idDocAgregar;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reclusos = await RepoReclusos.GetAllAsync();
+
+        if (Id <= 0)
+        {
+            return;
+        }
+
+        var existente = await Service.ObtenerPorIdAsync(Id);
+        if (existente is null)
+        {
+            return;
+        }
+
+        modelo = existente;
+        var parsed = Service.ParsearObservaciones(modelo.Observaciones);
+        codigoAutorizacion = parsed.Codigo;
+        descAutorizacion = parsed.Descripcion;
+        observacionesUsuario = parsed.Observacion;
+
+        idsDocumentos = existente.TraSalidasLaboralesDocumentoRespaldos
+            .Select(x => x.IdDocumento)
+            .ToList();
+    }
+
+    private void AgregarDoc()
+    {
+        if (idDocAgregar <= 0 || idsDocumentos.Contains(idDocAgregar))
+        {
+            return;
+        }
+
+        idsDocumentos.Add(idDocAgregar);
+        idDocAgregar = 0;
+    }
+
+    private void RemoverDoc(long idDocumento)
+    {
+        idsDocumentos.Remove(idDocumento);
+    }
+
+    private async Task Guardar()
+    {
+        await Service.GuardarAsync(modelo, idsDocumentos, codigoAutorizacion, descAutorizacion, observacionesUsuario);
+        Nav.NavigateTo("renovaciones");
+    }
+}
