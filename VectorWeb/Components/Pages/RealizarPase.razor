@@ -1,5 +1,6 @@
 @page "/documentos/pase/{Id:long}"
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
@@ -37,7 +38,7 @@
         }
         else
         {
-            <EditForm Model="nuevoMovimiento" OnValidSubmit="GuardarPase">
+            <EditForm EditContext="editContextRealizarPase" OnSubmit="IgnorarSubmitRealizarPase">
                 <DataAnnotationsValidator />
 
                 <div class="row">
@@ -181,7 +182,7 @@
 
                         <div class="d-flex justify-content-end gap-2 mt-4">
                             <a href="documentos" class="btn btn-secondary">Cancelar</a>
-                            <button type="submit" class="btn btn-success px-4 fw-bold">
+                            <button type="button" class="btn btn-success px-4 fw-bold" @onclick="GuardarPaseDesdeBotonAsync">
                                 <i class="bi bi-send-check"></i> CONFIRMAR PASE
                             </button>
                         </div>
@@ -209,6 +210,7 @@
 
     // Modelo del formulario
     private TraMovimiento nuevoMovimiento = new();
+    private EditContext editContextRealizarPase = default!;
     private int nuevoEstadoId = 2; // Por defecto: 2 = En Trámite / Enviado (Según frmPase.vb)
     private int fojasAgregadas = 0;
     private int usuarioLogueadoId = 1;
@@ -225,6 +227,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        editContextRealizarPase = new EditContext(nuevoMovimiento);
+
         try
         {
             cargando = true;
@@ -467,6 +471,19 @@
             await transaction.RollbackAsync();
             mensajeError = "Error crítico al realizar el pase: " + ex.Message;
         }
+    }
+
+    private Task IgnorarSubmitRealizarPase(EditContext _)
+        => Task.CompletedTask;
+
+    private async Task GuardarPaseDesdeBotonAsync()
+    {
+        if (!editContextRealizarPase.Validate())
+        {
+            return;
+        }
+
+        await GuardarPase();
     }
 
     private Task FiltrarOficinasDestino(ChangeEventArgs e)
