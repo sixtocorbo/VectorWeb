@@ -8,24 +8,40 @@
 <h3>Renovaciones Art. 120</h3>
 
 <div class="row mb-3 align-items-center">
-    <div class="col-md-4">
-        <input type="text"
-               class="form-control"
-               placeholder="Buscar..."
-               value="@textoBuscar"
-               @oninput="OnBuscarInput" />
+    <div class="col-md-5">
+        <div class="input-group">
+            <span class="input-group-text bg-white">
+                @if (isBuscando)
+                {
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                }
+                else
+                {
+                    <i class="bi bi-search"></i>
+                }
+            </span>
+            <input type="text" @ref="searchInput" class="form-control border-start-0"
+                   placeholder="Buscar por nombre, lugar..."
+                   @bind="textoBuscar" @bind:event="oninput" @onkeyup="OnBuscarKeyUp" />
+
+            @if (!string.IsNullOrEmpty(textoBuscar))
+            {
+                <button class="btn btn-outline-secondary" type="button" @onclick="LimpiarBusqueda" title="Limpiar">
+                    <i class="bi bi-x-lg"></i> Limpiar
+                </button>
+            }
+        </div>
     </div>
+
     <div class="col-md-3">
-        <div class="form-check form-switch">
-            <input class="form-check-input"
-                   type="checkbox"
-                   id="chkActivas"
-                   @bind="soloActivas"
-                   @bind:after="CargarDatos">
+        <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="chkActivas"
+                   @bind="soloActivas" @bind:after="CargarDatos">
             <label class="form-check-label" for="chkActivas">Solo Activas</label>
         </div>
     </div>
-    <div class="col-md-5 text-end">
+
+    <div class="col-md-4 text-end">
         <a href="renovaciones/editar/0" class="btn btn-success">
             <i class="bi bi-plus-lg"></i> Nueva Salida
         </a>
@@ -34,59 +50,153 @@
 
 @if (lista is null)
 {
-    <p>Cargando...</p>
+    <div class="text-center p-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
 }
 else
 {
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <th>Recluso</th>
-                <th>Lugar</th>
-                <th>Vencimiento</th>
-                <th>Días</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in lista)
-            {
-                <tr class="@ObtenerClaseFila(item.Estado)">
-                    <td>
-                        <strong>@item.Recluso</strong>
-                        <br />
-                        <small class="text-muted">@item.Autorizacion</small>
-                    </td>
-                    <td>@item.LugarTrabajo</td>
-                    <td>@item.FechaVencimiento.ToShortDateString()</td>
-                    <td><strong>@item.DiasRestantes</strong></td>
-                    <td>
-                        <span class="badge @ObtenerBadge(item.Estado)">@item.Estado</span>
-                    </td>
-                    <td>
-                        <a href="renovaciones/editar/@item.IdSalida" class="btn btn-sm btn-primary me-1">Editar</a>
-                        @if (item.Activo)
-                        {
-                            <button class="btn btn-sm btn-danger" @onclick="() => Desactivar(item)">Desactivar</button>
-                        }
-                        else
-                        {
-                            <button class="btn btn-sm btn-success" @onclick="() => Reactivar(item)">Reactivar</button>
-                        }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(tabActiva == FiltroTab.Todas ? "active fw-bold" : "")"
+                    @onclick="() => CambiarTab(FiltroTab.Todas)">
+                Todas <span class="badge bg-secondary rounded-pill ms-1">@lista.Count</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(tabActiva == FiltroTab.Vencidas ? "active fw-bold text-danger border-danger-top" : "text-danger")"
+                    @onclick="() => CambiarTab(FiltroTab.Vencidas)">
+                Vencidas
+                @if (Contar(EstadoRenovacion.Vencida) > 0)
+                {
+                    <span class="badge bg-danger rounded-pill ms-1">@Contar(EstadoRenovacion.Vencida)</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(tabActiva == FiltroTab.Alertas ? "active fw-bold text-warning border-warning-top" : "text-warning")"
+                    @onclick="() => CambiarTab(FiltroTab.Alertas)">
+                Alertas
+                @if (Contar(EstadoRenovacion.Alerta) > 0)
+                {
+                    <span class="badge bg-warning text-dark rounded-pill ms-1">@Contar(EstadoRenovacion.Alerta)</span>
+                }
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(tabActiva == FiltroTab.Vigentes ? "active fw-bold text-success border-success-top" : "text-success")"
+                    @onclick="() => CambiarTab(FiltroTab.Vigentes)">
+                Vigentes
+                <span class="badge bg-light text-dark border ms-1">@Contar(EstadoRenovacion.Ok)</span>
+            </button>
+        </li>
+    </ul>
+
+    @if (!ListaFiltrada.Any())
+    {
+        <div class="alert alert-light border text-center p-4">
+            <i class="bi bi-inbox fs-1 text-muted"></i>
+            <p class="mt-2 text-muted">No hay registros en esta categoría.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive shadow-sm border rounded">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Recluso / Autorización</th>
+                        <th>Lugar de Trabajo</th>
+                        <th class="text-center">Vencimiento</th>
+                        <th class="text-center">Estado</th>
+                        <th class="text-end" style="min-width: 280px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in ListaFiltrada)
+                    {
+                        <tr class="@ObtenerClaseFila(item.Estado)">
+                            <td>
+                                <div class="fw-bold">@item.Recluso</div>
+                                @if (!string.IsNullOrEmpty(item.Autorizacion))
+                                {
+                                    <small class="text-muted"><i class="bi bi-file-earmark-text"></i> @item.Autorizacion</small>
+                                }
+                                else
+                                {
+                                    <small class="text-muted fst-italic">Sin código aut.</small>
+                                }
+                            </td>
+                            <td>@item.LugarTrabajo</td>
+                            <td class="text-center">
+                                <div>@item.FechaVencimiento.ToShortDateString()</div>
+                                <small class="@ObtenerClaseDias(item.DiasRestantes)">
+                                    (@item.DiasRestantes días)
+                                </small>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge @ObtenerBadge(item.Estado)">
+                                    @TraducirEstado(item.Estado)
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a href="renovaciones/editar/@item.IdSalida" class="btn btn-sm btn-outline-primary me-1">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </a>
+
+                                @if (item.Activo)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Desactivar(item)">
+                                        <i class="bi bi-slash-circle"></i> Baja
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => Reactivar(item)">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Activar
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 }
 
 @code {
     private List<SalidaGridDto>? lista;
     private string textoBuscar = string.Empty;
     private bool soloActivas = true;
+
+    // CONTROL DE PESTAÑAS
+    private enum FiltroTab { Todas, Vencidas, Alertas, Vigentes }
+    private FiltroTab tabActiva = FiltroTab.Todas;
+
+    // Elementos y Timers
+    private ElementReference searchInput;
     private System.Threading.Timer? debounceTimer;
-    private const int DebounceMs = 400;
+    private const int DebounceMs = 500;
+    private bool isBuscando = false;
+    private bool _disposed = false;
+
+    // PROPIEDAD COMPUTADA: Filtra la lista en memoria según la pestaña seleccionada
+    private IEnumerable<SalidaGridDto> ListaFiltrada
+    {
+        get
+        {
+            if (lista is null) return Enumerable.Empty<SalidaGridDto>();
+
+            return tabActiva switch
+            {
+                FiltroTab.Vencidas => lista.Where(x => x.Estado == EstadoRenovacion.Vencida),
+                FiltroTab.Alertas => lista.Where(x => x.Estado == EstadoRenovacion.Alerta),
+                FiltroTab.Vigentes => lista.Where(x => x.Estado == EstadoRenovacion.Ok),
+                _ => lista
+            };
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -95,68 +205,93 @@ else
 
     private async Task CargarDatos()
     {
-        lista = await Service.ObtenerSalidasAsync(soloActivas, textoBuscar);
+        isBuscando = true;
+        try
+        {
+            lista = await Service.ObtenerSalidasAsync(soloActivas, textoBuscar);
+
+            // Opcional: Si el usuario busca y no hay resultados en la pestaña actual,
+            // podríamos volver a "Todas", pero mejor mantener su selección.
+        }
+        finally
+        {
+            isBuscando = false;
+        }
     }
 
-    private static string ObtenerClaseFila(EstadoRenovacion estado)
-        => estado switch
-        {
-            EstadoRenovacion.Vencida => "table-danger",
-            EstadoRenovacion.Alerta => "table-warning",
-            EstadoRenovacion.Inactiva => "table-secondary",
-            _ => string.Empty
-        };
-
-    private static string ObtenerBadge(EstadoRenovacion estado)
-        => estado switch
-        {
-            EstadoRenovacion.Vencida => "bg-danger",
-            EstadoRenovacion.Alerta => "bg-warning text-dark",
-            EstadoRenovacion.Inactiva => "bg-secondary",
-            EstadoRenovacion.Ok => "bg-success",
-            _ => "bg-primary"
-        };
-
-    private void OnBuscarInput(ChangeEventArgs e)
+    // Método para cambiar pestaña
+    private void CambiarTab(FiltroTab tab)
     {
-        textoBuscar = e.Value?.ToString() ?? string.Empty;
+        tabActiva = tab;
+    }
 
+    // Helper para los contadores de las pestañas
+    private int Contar(EstadoRenovacion estado)
+    {
+        return lista?.Count(x => x.Estado == estado) ?? 0;
+    }
+
+    // --- MÉTODOS DE BUSQUEDA, DISPOSE Y ACCIONES (Iguales al anterior) ---
+    private void OnBuscarKeyUp(KeyboardEventArgs e)
+    {
         debounceTimer?.Dispose();
+        isBuscando = true;
         debounceTimer = new System.Threading.Timer(async _ =>
         {
-            await InvokeAsync(async () =>
-            {
-                await CargarDatos();
-                StateHasChanged();
-            });
+            if (_disposed) return;
+            await InvokeAsync(async () => { await CargarDatos(); StateHasChanged(); });
         }, null, DebounceMs, System.Threading.Timeout.Infinite);
+    }
+
+    private async Task LimpiarBusqueda()
+    {
+        textoBuscar = string.Empty;
+        await CargarDatos();
+        await searchInput.FocusAsync();
     }
 
     public void Dispose()
     {
+        _disposed = true;
         debounceTimer?.Dispose();
+    }
+
+    private static string ObtenerClaseFila(EstadoRenovacion estado) => string.Empty; // Ya no coloreamos toda la fila para que se vea más limpio
+
+    private static string ObtenerBadge(EstadoRenovacion estado) => estado switch
+    {
+        EstadoRenovacion.Vencida => "bg-danger",
+        EstadoRenovacion.Alerta => "bg-warning text-dark",
+        EstadoRenovacion.Inactiva => "bg-secondary",
+        EstadoRenovacion.Ok => "bg-success",
+        _ => "bg-primary"
+    };
+
+    private static string TraducirEstado(EstadoRenovacion estado) => estado switch
+    {
+        EstadoRenovacion.Ok => "Vigente",
+        _ => estado.ToString()
+    };
+
+    private static string ObtenerClaseDias(int dias)
+    {
+        if (dias < 0) return "text-danger fw-bold";
+        if (dias <= 30) return "text-warning fw-bold";
+        return "text-muted";
     }
 
     private async Task Desactivar(SalidaGridDto item)
     {
         var motivo = await JS.InvokeAsync<string>("prompt", "Motivo del cese:");
-        if (string.IsNullOrWhiteSpace(motivo))
-        {
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(motivo)) return;
         await Service.CambiarEstadoAsync(item.IdSalida, false, motivo);
         await CargarDatos();
     }
 
     private async Task Reactivar(SalidaGridDto item)
     {
-        var confirmar = await JS.InvokeAsync<bool>("confirm", "¿Reactivar esta salida?");
-        if (!confirmar)
-        {
-            return;
-        }
-
+        var confirmar = await JS.InvokeAsync<bool>("confirm", $"¿Desea reactivar la salida de {item.Recluso}?");
+        if (!confirmar) return;
         await Service.CambiarEstadoAsync(item.IdSalida, true, string.Empty);
         await CargarDatos();
     }
