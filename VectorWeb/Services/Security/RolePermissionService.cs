@@ -7,6 +7,7 @@ namespace VectorWeb.Services.Security;
 public class RolePermissionService
 {
     private const string ParametroPermisos = "SEGURIDAD_PERMISOS_POR_ROL";
+    private static readonly string[] RolesAdministrativos = ["ADMIN", "ADMINISTRADOR", "SUPERADMIN"];
     private readonly IRepository<CfgSistemaParametro> _repoParametros;
 
     public RolePermissionService(IRepository<CfgSistemaParametro> repoParametros)
@@ -46,14 +47,15 @@ public class RolePermissionService
                     .ToHashSet(StringComparer.OrdinalIgnoreCase)
                     ?? [];
 
-                matriz[rol.Trim().ToUpperInvariant()] = permisosValidos;
+                var rolNormalizado = NormalizarRol(rol);
+                matriz[rolNormalizado] = permisosValidos;
             }
 
             foreach (var (rolDefault, permisosDefault) in defaults)
             {
-                if (!matriz.ContainsKey(rolDefault))
+                if (!matriz.TryGetValue(rolDefault, out var permisosRol) || permisosRol.Count == 0)
                 {
-                    matriz[rolDefault] = permisosDefault;
+                    matriz[rolDefault] = new HashSet<string>(permisosDefault, StringComparer.OrdinalIgnoreCase);
                 }
             }
 
@@ -68,15 +70,37 @@ public class RolePermissionService
     public async Task<HashSet<string>> ObtenerPermisosPorRolAsync(string? rol)
     {
         var matriz = await ObtenerMatrizAsync();
-        var rolNormalizado = string.IsNullOrWhiteSpace(rol) ? "OPERADOR" : rol.Trim().ToUpperInvariant();
+        var rolNormalizado = NormalizarRol(rol);
 
         if (matriz.TryGetValue(rolNormalizado, out var permisos))
         {
             return permisos;
         }
 
-        return matriz["OPERADOR"];
+        return ObtenerPermisosDefaultPorTipoRol(rolNormalizado);
     }
+
+    public HashSet<string> ObtenerPermisosDefaultPorTipoRol(string? rol)
+    {
+        var defaults = ObtenerMatrizDefault();
+        var rolNormalizado = NormalizarRol(rol);
+
+        if (defaults.TryGetValue(rolNormalizado, out var permisosPorDefault) && permisosPorDefault.Count > 0)
+        {
+            return new HashSet<string>(permisosPorDefault, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new HashSet<string>(defaults["OPERADOR"], StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static string NormalizarRol(string? rol)
+    {
+        var rolNormalizado = string.IsNullOrWhiteSpace(rol) ? "OPERADOR" : rol.Trim().ToUpperInvariant();
+        return EsRolAdministrativo(rolNormalizado) ? "ADMIN" : rolNormalizado;
+    }
+
+    private static bool EsRolAdministrativo(string rol)
+        => RolesAdministrativos.Contains(rol, StringComparer.OrdinalIgnoreCase);
 
     public string SerializarMatriz(Dictionary<string, HashSet<string>> matriz)
     {
