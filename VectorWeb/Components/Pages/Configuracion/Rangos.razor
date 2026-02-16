@@ -2,6 +2,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services
+@using System.Text.RegularExpressions
 @inject NumeracionRangoService RangoService
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatOficina> RepoOficinas
@@ -410,8 +411,22 @@
         : listaRangos.Where(r =>
             (r.NombreRango?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (r.IdTipoNavigation?.Nombre?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false) ||
-            (r.IdOficinaNavigation?.Nombre?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false)
+            CoincideOficinaSinImportarOrden(r.IdOficinaNavigation?.Nombre, filtroTexto)
           );
+
+    private static bool CoincideOficinaSinImportarOrden(string? nombreOficina, string? busqueda)
+    {
+        if (string.IsNullOrWhiteSpace(nombreOficina) || string.IsNullOrWhiteSpace(busqueda))
+        {
+            return false;
+        }
+
+        var tokensBusqueda = Regex.Split(busqueda.Trim(), @"\s+")
+            .Where(token => !string.IsNullOrWhiteSpace(token));
+
+        return tokensBusqueda.All(token =>
+            nombreOficina.Contains(token, StringComparison.OrdinalIgnoreCase));
+    }
 
     private string OficinaSeleccionada
     {
