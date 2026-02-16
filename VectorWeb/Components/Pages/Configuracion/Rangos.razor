@@ -5,157 +5,236 @@
 @inject NumeracionRangoService RangoService
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatOficina> RepoOficinas
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<h3>Gestión de Rangos de Documentos</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-sliders"></i> Gestión de Rangos y Cupos</h3>
+</div>
 
 @if (!string.IsNullOrWhiteSpace(mensajeError))
 {
-    <div class="alert alert-danger" role="alert">@mensajeError</div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError
+        <button type="button" class="btn-close" @onclick="() => mensajeError = string.Empty"></button>
+    </div>
 }
 
 @if (!string.IsNullOrWhiteSpace(mensajeOk))
 {
-    <div class="alert alert-success" role="alert">@mensajeOk</div>
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>@mensajeOk
+        <button type="button" class="btn-close" @onclick="() => mensajeOk = string.Empty"></button>
+    </div>
 }
 
-<div class="d-flex gap-2 mb-3">
-    <button class="btn btn-primary" @onclick="AbrirNuevoRango">Nuevo Rango</button>
-    <button class="btn btn-outline-primary" @onclick="AbrirNuevoCupo">Nuevo Cupo</button>
-</div>
-
-<table class="table table-striped table-sm">
-    <thead>
-        <tr>
-            <th>Tipo</th>
-            <th>Oficina</th>
-            <th>Año</th>
-            <th>Serie (auto)</th>
-            <th>Desde</th>
-            <th>Hasta</th>
-            <th>Último</th>
-            <th>Activo</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var rango in listaRangos)
-        {
-            <tr>
-                <td>@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</td>
-                <td>@(rango.IdOficinaNavigation?.Nombre ?? "Global")</td>
-                <td>@rango.Anio</td>
-                <td>@rango.NombreRango</td>
-                <td>@rango.NumeroInicio</td>
-                <td>@rango.NumeroFin</td>
-                <td>@rango.UltimoUtilizado</td>
-                <td>@(rango.Activo ? "Sí" : "No")</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary" @onclick="() => Editar(rango)">Editar</button>
-                    <button class="btn btn-sm btn-outline-danger ms-1" @onclick="() => EliminarRango(rango)">Eliminar</button>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-<div class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="card-title mb-0">Bitácora de cupos y rangos</h5>
-            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="RecargarBitacora">Actualizar</button>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Entidad</th>
-                        <th>Acción</th>
-                        <th>Tipo</th>
-                        <th>Oficina</th>
-                        <th>Año</th>
-                        <th>Detalle</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (bitacora.Count == 0)
-                    {
-                        <tr>
-                            <td colspan="7" class="text-center text-muted">No hay eventos registrados.</td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var evento in bitacora)
-                        {
-                            <tr>
-                                <td>@evento.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                                <td>@evento.Entidad</td>
-                                <td>@evento.Accion</td>
-                                <td>@(evento.IdTipoNavigation?.Nombre ?? $"Tipo {evento.IdTipo}")</td>
-                                <td>@(evento.IdOficinaNavigation?.Nombre ?? "Global")</td>
-                                <td>@evento.Anio</td>
-                                <td>@evento.Detalle</td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
+<div class="card mb-4 shadow-sm">
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-6 d-flex gap-2">
+                <button class="btn btn-primary" @onclick="AbrirNuevoRango" disabled="@procesando">
+                    <i class="bi bi-plus-lg"></i> Nuevo Rango
+                </button>
+                <button class="btn btn-outline-primary" @onclick="AbrirNuevoCupo" disabled="@procesando">
+                    <i class="bi bi-pie-chart"></i> Nuevo Cupo
+                </button>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" placeholder="Buscar por tipo, oficina o serie..."
+                           @bind="filtroTexto" @bind:event="oninput" />
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="card mb-3">
-    <div class="card-body">
-        <h5 class="card-title mb-3">Libro mayor de cupos</h5>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered">
-                <thead>
-                    <tr>
-                        <th>Tipo</th>
-                        <th>Año</th>
-                        <th>Cupo</th>
-                        <th>Consumido</th>
-                        <th>Disponible</th>
-                        <th>Última gestión</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (libroMayorCupos.Count == 0)
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Listado de Rangos Definidos</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover table-striped align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Tipo</th>
+                    <th>Oficina</th>
+                    <th class="text-center">Año</th>
+                    <th>Serie (Nombre)</th>
+                    <th class="text-end">Rango</th>
+                    <th class="text-end">Último Uso</th>
+                    <th class="text-center">Estado</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (cargandoInicial)
+                {
+                    <tr><td colspan="8" class="text-center py-3"><div class="spinner-border text-primary" role="status"></div></td></tr>
+                }
+                else if (!RangosFiltrados.Any())
+                {
+                    <tr><td colspan="8" class="text-center py-3 text-muted">No se encontraron rangos.</td></tr>
+                }
+                else
+                {
+                    @foreach (var rango in RangosFiltrados)
                     {
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No hay cupos registrados.</td>
+                            <td>
+                                <span class="fw-bold text-primary">@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</span>
+                            </td>
+                            <td>
+                                @if (rango.IdOficinaNavigation != null)
+                                {
+                                    <span class="badge bg-info text-dark">@rango.IdOficinaNavigation.Nombre</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Global</span>
+                                }
+                            </td>
+                            <td class="text-center">@rango.Anio</td>
+                            <td><code>@rango.NombreRango</code></td>
+                            <td class="text-end">
+                                <span class="badge bg-light text-dark border">@rango.NumeroInicio</span>
+                                <i class="bi bi-arrow-right-short text-muted"></i>
+                                <span class="badge bg-light text-dark border">@rango.NumeroFin</span>
+                            </td>
+                            <td class="text-end">@rango.UltimoUtilizado</td>
+                            <td class="text-center">
+                                @if (rango.Activo)
+                                {
+                                    <span class="badge bg-success">Activo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-muted border">Inactivo</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Editar(rango)" title="Editar" disabled="@procesando">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarRango(rango)" title="Eliminar" disabled="@procesando">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     }
-                    else
-                    {
-                        @foreach (var item in libroMayorCupos)
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Libro Mayor de Cupos</h5>
+                <button class="btn btn-sm btn-link" @onclick="CargarLibroMayorCuposAsync"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-0" style="font-size: 0.9rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tipo / Año</th>
+                            <th class="text-end">Cupo</th>
+                            <th class="text-end">Consumido</th>
+                            <th class="text-end">Disp.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (libroMayorCupos.Count == 0)
                         {
-                            <tr>
-                                <td>@item.Tipo</td>
-                                <td>@item.Anio</td>
-                                <td>@item.Cantidad</td>
-                                <td>@item.Consumido</td>
-                                <td>@item.Disponible</td>
-                                <td>@item.Fecha.ToString("dd/MM/yyyy HH:mm")</td>
-                            </tr>
+                            <tr><td colspan="4" class="text-center text-muted">Sin registros.</td></tr>
                         }
-                    }
-                </tbody>
-            </table>
+                        else
+                        {
+                            @foreach (var item in libroMayorCupos)
+                            {
+                                var porcentaje = item.Cantidad > 0 ? (double)item.Consumido / item.Cantidad * 100 : 0;
+                                var colorBarra = porcentaje > 90 ? "bg-danger" : (porcentaje > 75 ? "bg-warning" : "bg-success");
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold">@item.Tipo</div>
+                                        <div class="small text-muted">@item.Anio</div>
+                                    </td>
+                                    <td class="text-end align-middle">@item.Cantidad</td>
+                                    <td class="text-end align-middle">@item.Consumido</td>
+                                    <td class="align-middle">
+                                        <div class="d-flex align-items-center justify-content-end">
+                                            <span class="me-2 fw-bold">@item.Disponible</span>
+                                            @if (item.Cantidad > 0)
+                                            {
+                                                <div class="progress" style="width: 50px; height: 6px;" title="@porcentaje.ToString("N0")% consumido">
+                                                    <div class="progress-bar @colorBarra" role="progressbar" style="width: @porcentaje%"></div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Últimos Eventos (Bitácora)</h5>
+                <button type="button" class="btn btn-sm btn-link" @onclick="RecargarBitacora"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0" style="font-size: 0.85rem;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Acción</th>
+                            <th>Detalle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (bitacora.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted">Sin eventos.</td></tr>
+                        }
+                        else
+                        {
+                            @foreach (var evento in bitacora)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@evento.Fecha.ToString("dd/MM HH:mm")</td>
+                                    <td>
+                                        <span class="badge @ObtenerColorAccion(evento.Accion)">@evento.Accion</span>
+                                    </td>
+                                    <td class="text-truncate" style="max-width: 200px;" title="@evento.Detalle">@evento.Detalle</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
+@* --- MODAL RANGO --- *@
 @if (mostrarModal)
 {
-    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Configurar Rango</h5>
-                    <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">@(rangoActual.IdRango == 0 ? "Nuevo Rango" : "Editar Rango")</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModal"></button>
                 </div>
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(mensajeErrorModalRango))
@@ -166,10 +245,10 @@
                     <EditForm Model="rangoActual" OnValidSubmit="Guardar">
                         <DataAnnotationsValidator />
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label>Tipo de Documento</label>
-                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-control">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Tipo de Documento</label>
+                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-select">
                                     <option value="0">-- Seleccione --</option>
                                     @foreach (var tipo in tipos)
                                     {
@@ -177,46 +256,56 @@
                                     }
                                 </InputSelect>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label>Oficina (opcional)</label>
-                                <InputSelect @bind-Value="OficinaSeleccionada" class="form-control">
-                                    <option value="">Global (todas)</option>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Oficina (Opcional)</label>
+                                <InputSelect @bind-Value="OficinaSeleccionada" class="form-select">
+                                    <option value="">Global (Todas las oficinas)</option>
                                     @foreach (var oficina in oficinas)
                                     {
                                         <option value="@oficina.IdOficina.ToString()">@oficina.Nombre</option>
                                     }
                                 </InputSelect>
+                                <div class="form-text">Si selecciona Global, el rango será compartido.</div>
                             </div>
-                        </div>
 
-                        <div class="mb-3">
-                            <label>Año</label>
-                            <InputNumber @bind-Value="rangoActual.Anio" class="form-control" />
-                            <small class="text-muted">El nombre del rango se genera automáticamente.</small>
-                        </div>
-
-                        <div class="row">
                             <div class="col-md-4">
-                                <label>Desde</label>
+                                <label class="form-label fw-bold">Año</label>
+                                <InputNumber @bind-Value="rangoActual.Anio" class="form-control" />
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label text-muted">Nombre de Serie (Auto-generado)</label>
+                                <input type="text" class="form-control bg-light" value="@rangoActual.NombreRango" readonly />
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Desde</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroInicio" class="form-control" />
                             </div>
                             <div class="col-md-4">
-                                <label>Hasta</label>
+                                <label class="form-label fw-bold">Hasta</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroFin" class="form-control" />
                             </div>
                             <div class="col-md-4">
-                                <label>Último utilizado</label>
+                                <label class="form-label fw-bold">Último Utilizado</label>
                                 <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
                             </div>
                         </div>
 
-                        <div class="mb-3 form-check mt-3">
-                            <InputCheckbox @bind-Value="rangoActual.Activo" class="form-check-input" />
-                            <label class="form-check-label">Activo</label>
+                        <div class="mt-4 form-check form-switch">
+                            <InputCheckbox @bind-Value="rangoActual.Activo" class="form-check-input" id="checkActivo" />
+                            <label class="form-check-label" for="checkActivo">Rango Activo para consumo</label>
                         </div>
 
-                        <button type="submit" class="btn btn-primary">Guardar</button>
-                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <div class="modal-footer px-0 pb-0 mt-3">
+                            <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary" disabled="@procesando">
+                                @if (procesando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Guardar
+                            </button>
+                        </div>
                     </EditForm>
                 </div>
             </div>
@@ -224,14 +313,15 @@
     </div>
 }
 
+@* --- MODAL CUPO --- *@
 @if (mostrarModalCupo)
 {
-    <div class="modal d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Configurar Cupo</h5>
-                    <button type="button" class="btn-close" @onclick="CerrarModalCupo"></button>
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Configurar Cupo Anual</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CerrarModalCupo"></button>
                 </div>
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(mensajeErrorModalCupo))
@@ -240,8 +330,8 @@
                     }
 
                     <div class="mb-3">
-                        <label>Tipo de Documento</label>
-                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-control" @onchange="OnCupoFiltroCambio">
+                        <label class="form-label fw-bold">Tipo de Documento</label>
+                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-select" @oninput="OnCupoFiltroCambio">
                             <option value="0">-- Seleccione --</option>
                             @foreach (var tipo in tipos)
                             {
@@ -250,20 +340,37 @@
                         </InputSelect>
                     </div>
                     <div class="mb-3">
-                        <label>Año</label>
+                        <label class="form-label fw-bold">Año</label>
                         <InputNumber @bind-Value="cupoAnio" class="form-control" />
                     </div>
                     <div class="mb-3">
-                        <label>Cantidad de cupo</label>
-                        <InputNumber @bind-Value="cupoCantidad" class="form-control" />
+                        <label class="form-label fw-bold">Cantidad Total (Cupo)</label>
+                        <InputNumber @bind-Value="cupoCantidad" class="form-control form-control-lg" />
                     </div>
+
                     @if (cupoTipoSeleccionado > 0)
                     {
-                        <small class="text-muted d-block mb-3">Consumido en rangos activos: @cupoConsumido de @cupoCantidad (año @cupoAnio).</small>
+                        <div class="alert alert-light border">
+                            <div class="d-flex justify-content-between">
+                                <span>Consumido actualmente:</span>
+                                <strong>@cupoConsumido</strong>
+                            </div>
+                            <div class="d-flex justify-content-between mt-1 text-success">
+                                <span>Disponible si guarda:</span>
+                                <strong>@(Math.Max(0, cupoCantidad - cupoConsumido))</strong>
+                            </div>
+                        </div>
                     }
-                    <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-primary" @onclick="GuardarCupo">Guardar cupo</button>
+
+                    <div class="modal-footer px-0 pb-0">
                         <button type="button" class="btn btn-secondary" @onclick="CerrarModalCupo">Cancelar</button>
+                        <button type="button" class="btn btn-success" @onclick="GuardarCupo" disabled="@procesando">
+                            @if (procesando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Guardar Cupo
+                        </button>
                     </div>
                 </div>
             </div>
@@ -276,48 +383,72 @@
     private List<CatTipoDocumento> tipos = new();
     private List<CatOficina> oficinas = new();
     private MaeNumeracionRango rangoActual = new();
+    private List<MaeNumeracionBitacora> bitacora = new();
+    private List<CupoLibroMayorItem> libroMayorCupos = new();
+
+    // Estado UI
     private bool mostrarModal;
+    private bool mostrarModalCupo;
+    private bool procesando = false;
+    private bool cargandoInicial = true;
     private string mensajeError = string.Empty;
     private string mensajeOk = string.Empty;
     private string mensajeErrorModalRango = string.Empty;
     private string mensajeErrorModalCupo = string.Empty;
+    private string filtroTexto = string.Empty;
+
+    // Estado Cupo
     private int cupoTipoSeleccionado;
     private int cupoAnio = DateTime.Now.Year;
     private int cupoCantidad;
     private int cupoConsumido;
-    private List<MaeNumeracionBitacora> bitacora = new();
-    private bool mostrarModalCupo;
-    private List<CupoLibroMayorItem> libroMayorCupos = new();
+
+    // Propiedad calculada para filtrado
+    private IEnumerable<MaeNumeracionRango> RangosFiltrados =>
+        string.IsNullOrWhiteSpace(filtroTexto)
+        ? listaRangos
+        : listaRangos.Where(r =>
+            (r.NombreRango?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (r.IdTipoNavigation?.Nombre?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (r.IdOficinaNavigation?.Nombre?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false)
+          );
 
     private string OficinaSeleccionada
     {
         get => rangoActual.IdOficina?.ToString() ?? string.Empty;
-        set
-        {
-            if (int.TryParse(value, out var idOficina))
-            {
-                rangoActual.IdOficina = idOficina;
-            }
-            else
-            {
-                rangoActual.IdOficina = null;
-            }
-        }
+        set => rangoActual.IdOficina = int.TryParse(value, out var id) ? id : null;
     }
 
     protected override async Task OnInitializedAsync()
     {
-        await CargarCatalogos();
-        await CargarRangos();
-        await CargarDatosCupoAsync();
-        await CargarLibroMayorCuposAsync();
-        await RecargarBitacora();
+        try
+        {
+            await CargarCatalogos();
+            await CargarTodo();
+        }
+        finally
+        {
+            cargandoInicial = false;
+        }
     }
 
-    private async Task CargarLibroMayorCuposAsync()
+    private async Task CargarTodo()
     {
-        libroMayorCupos = await RangoService.ObtenerLibroMayorCuposAsync();
+        procesando = true;
+        try
+        {
+            var t1 = CargarRangos();
+            var t2 = CargarLibroMayorCuposAsync();
+            var t3 = RecargarBitacora();
+            await Task.WhenAll(t1, t2, t3);
+        }
+        finally
+        {
+            procesando = false;
+        }
     }
+
+    private async Task CargarLibroMayorCuposAsync() => libroMayorCupos = await RangoService.ObtenerLibroMayorCuposAsync();
 
     private async Task CargarCatalogos()
     {
@@ -325,15 +456,9 @@
         oficinas = (await RepoOficinas.GetAllAsync()).OrderBy(o => o.Nombre).ToList();
     }
 
-    private async Task CargarRangos()
-    {
-        listaRangos = await RangoService.ObtenerRangosAsync();
-    }
+    private async Task CargarRangos() => listaRangos = await RangoService.ObtenerRangosAsync();
 
-    private async Task RecargarBitacora()
-    {
-        bitacora = await RangoService.ObtenerBitacoraAsync();
-    }
+    private async Task RecargarBitacora() => bitacora = await RangoService.ObtenerBitacoraAsync();
 
     private async Task CargarDatosCupoAsync()
     {
@@ -343,78 +468,68 @@
             cupoConsumido = 0;
             return;
         }
-
         cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(cupoTipoSeleccionado, cupoAnio) ?? 0;
         cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(cupoTipoSeleccionado, cupoAnio);
     }
 
-    private async Task OnCupoFiltroCambio(ChangeEventArgs _)
+    // Evento para input select/text del cupo
+    private async Task OnCupoFiltroCambio(ChangeEventArgs e)
     {
-        await CargarDatosCupoAsync();
+        // Pequeño delay para dejar que el binding ocurra si es oninput
+        if (e.Value is string val && int.TryParse(val, out int id))
+        {
+            cupoTipoSeleccionado = id;
+            await CargarDatosCupoAsync();
+        }
     }
 
     private async Task GuardarCupo()
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
         mensajeErrorModalCupo = string.Empty;
+        procesando = true;
 
-        if (cupoTipoSeleccionado <= 0)
+        try
         {
-            mensajeErrorModalCupo = "Debe seleccionar un tipo de documento para configurar el cupo.";
-            return;
-        }
+            // Validaciones básicas antes de llamar al servicio
+            if (cupoTipoSeleccionado <= 0) { mensajeErrorModalCupo = "Seleccione un tipo."; return; }
+            if (cupoAnio < 2000) { mensajeErrorModalCupo = "Año inválido."; return; }
+            if (cupoCantidad < cupoConsumido) { mensajeErrorModalCupo = $"El cupo no puede ser menor a lo ya consumido ({cupoConsumido})."; return; }
 
-        if (cupoAnio < 2000 || cupoAnio > 2100)
+            var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
+
+            if (!resultado.Exitoso)
+            {
+                mensajeErrorModalCupo = resultado.Mensaje;
+                return;
+            }
+
+            mensajeOk = "Cupo guardado correctamente.";
+            mostrarModalCupo = false;
+            await CargarTodo();
+        }
+        finally
         {
-            mensajeErrorModalCupo = "Debe indicar un año válido para el cupo.";
-            return;
+            procesando = false;
         }
-
-        if (cupoCantidad < 0)
-        {
-            mensajeErrorModalCupo = "La cantidad de cupo no puede ser negativa.";
-            return;
-        }
-
-        if (cupoCantidad < cupoConsumido)
-        {
-            mensajeErrorModalCupo = $"El cupo no puede ser menor al consumo actual ({cupoConsumido}).";
-            return;
-        }
-
-        var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
-        if (!resultado.Exitoso)
-        {
-            mensajeErrorModalCupo = resultado.Mensaje;
-            return;
-        }
-
-        mensajeOk = "Cupo guardado correctamente.";
-        await CargarDatosCupoAsync();
-        await CargarLibroMayorCuposAsync();
-        await RecargarBitacora();
-        mostrarModalCupo = false;
     }
 
     private void AbrirNuevoCupo()
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
-        mensajeErrorModalCupo = string.Empty;
+        LimpiarMensajes();
+        cupoTipoSeleccionado = 0;
+        cupoCantidad = 0;
+        cupoConsumido = 0;
         mostrarModalCupo = true;
     }
 
     private void AbrirNuevoRango()
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
-        mensajeErrorModalRango = string.Empty;
+        LimpiarMensajes();
         rangoActual = new MaeNumeracionRango
         {
             NombreRango = "AUTO",
             NumeroInicio = 1,
-            NumeroFin = 999999,
+            NumeroFin = 1000,
             UltimoUtilizado = 0,
             Activo = true,
             Anio = DateTime.Now.Year
@@ -424,9 +539,8 @@
 
     private void Editar(MaeNumeracionRango rango)
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
-        mensajeErrorModalRango = string.Empty;
+        LimpiarMensajes();
+        // Clonamos el objeto para no modificar la tabla directamente hasta guardar
         rangoActual = new MaeNumeracionRango
         {
             IdRango = rango.IdRango,
@@ -436,97 +550,84 @@
             NumeroFin = rango.NumeroFin,
             UltimoUtilizado = rango.UltimoUtilizado,
             Activo = rango.Activo,
-            FechaCreacion = rango.FechaCreacion,
             IdOficina = rango.IdOficina,
             Anio = rango.Anio
         };
-
-        cupoTipoSeleccionado = rango.IdTipo;
-        cupoAnio = rango.Anio;
-        _ = CargarDatosCupoAsync();
         mostrarModal = true;
     }
 
-    private void CerrarModal()
-    {
-        mostrarModal = false;
-        mensajeErrorModalRango = string.Empty;
-    }
-
-    private void CerrarModalCupo()
-    {
-        mostrarModalCupo = false;
-        mensajeErrorModalCupo = string.Empty;
-    }
+    private void CerrarModal() => mostrarModal = false;
+    private void CerrarModalCupo() => mostrarModalCupo = false;
 
     private async Task Guardar()
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
         mensajeErrorModalRango = string.Empty;
+        procesando = true;
 
-        if (rangoActual.IdTipo <= 0)
+        try
         {
-            mensajeErrorModalRango = "Debe seleccionar un tipo de documento.";
-            return;
+            // Validaciones de UI rápidas
+            if (rangoActual.IdTipo <= 0) { mensajeErrorModalRango = "Seleccione un tipo."; return; }
+            if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { mensajeErrorModalRango = "Rango inválido (Inicio > Fin)."; return; }
+
+            var resultado = await RangoService.GuardarRangoAsync(rangoActual);
+
+            if (!resultado.Exitoso)
+            {
+                mensajeErrorModalRango = resultado.Mensaje;
+                return;
+            }
+
+            mostrarModal = false;
+            mensajeOk = "Rango guardado correctamente.";
+            await CargarTodo();
         }
-
-
-        if (rangoActual.NumeroInicio <= 0 || rangoActual.NumeroFin <= 0)
+        finally
         {
-            mensajeErrorModalRango = "Los valores de rango deben ser mayores a cero.";
-            return;
+            procesando = false;
         }
-
-        if (rangoActual.NumeroInicio > rangoActual.NumeroFin)
-        {
-            mensajeErrorModalRango = "El número inicial no puede ser mayor al número final.";
-            return;
-        }
-
-        if (rangoActual.UltimoUtilizado < rangoActual.NumeroInicio - 1 || rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
-        {
-            mensajeErrorModalRango = "El último utilizado debe estar entre (desde - 1) y hasta.";
-            return;
-        }
-
-        if (rangoActual.Anio < 2000 || rangoActual.Anio > 2100)
-        {
-            mensajeErrorModalRango = "Debe indicar un año válido para el rango.";
-            return;
-        }
-
-        var resultado = await RangoService.GuardarRangoAsync(rangoActual);
-        if (!resultado.Exitoso)
-        {
-            mensajeErrorModalRango = resultado.Mensaje;
-            return;
-        }
-        mostrarModal = false;
-        mensajeOk = "Rango guardado correctamente.";
-        await CargarRangos();
-        await CargarDatosCupoAsync();
-        await CargarLibroMayorCuposAsync();
-        await RecargarBitacora();
     }
 
     private async Task EliminarRango(MaeNumeracionRango rango)
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
+        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Está seguro de eliminar el rango '{rango.NombreRango}'? Esta acción es irreversible.");
+        if (!confirmado) return;
 
-        var resultado = await RangoService.EliminarRangoAsync(rango.IdRango);
-        if (!resultado.Exitoso)
+        procesando = true;
+        LimpiarMensajes();
+
+        try
         {
-            mensajeError = resultado.Mensaje;
-            return;
-        }
+            var resultado = await RangoService.EliminarRangoAsync(rango.IdRango);
+            if (!resultado.Exitoso)
+            {
+                mensajeError = resultado.Mensaje;
+                return;
+            }
 
-        mensajeOk = "Rango eliminado correctamente.";
-        await CargarRangos();
-        await CargarDatosCupoAsync();
-        await CargarLibroMayorCuposAsync();
-        await RecargarBitacora();
+            mensajeOk = "Rango eliminado correctamente.";
+            await CargarTodo();
+        }
+        finally
+        {
+            procesando = false;
+        }
     }
 
+    private void LimpiarMensajes()
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+        mensajeErrorModalRango = string.Empty;
+        mensajeErrorModalCupo = string.Empty;
+    }
+
+    private string ObtenerColorAccion(string accion) => accion switch
+    {
+        "APERTURA" => "bg-success",
+        "CIERRE" => "bg-secondary",
+        "ELIMINACION" => "bg-danger",
+        "CAMBIO" => "bg-warning text-dark",
+        _ => "bg-info text-dark"
+    };
 }
