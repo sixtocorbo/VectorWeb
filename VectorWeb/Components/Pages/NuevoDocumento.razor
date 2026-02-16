@@ -4,6 +4,7 @@
 @using VectorWeb.Services
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
@@ -29,7 +30,7 @@
     }
 </h3>
 
-<EditForm Model="nuevoDoc" OnValidSubmit="Guardar">
+<EditForm EditContext="editContextNuevoDocumento" OnSubmit="IgnorarSubmitNuevoDocumento">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
@@ -235,7 +236,7 @@
     }
 
     <div class="d-grid gap-2 d-md-block">
-        <button type="submit" class="btn btn-success btn-lg" disabled="@bloqueoPorRangoAgotado">
+        <button type="button" class="btn btn-success btn-lg" disabled="@bloqueoPorRangoAgotado" @onclick="GuardarDesdeBotonAsync">
             @if (esActuacion)
             {
                 @if (soloTraerSinActuacion)
@@ -360,6 +361,7 @@
         AnioDocumento = DateTime.Now.Year,
         Asunto = string.Empty
     };
+    private EditContext editContextNuevoDocumento = default!;
     private string? errorGuardar;
 
     private IEnumerable<CatOficina> oficinas = new List<CatOficina>();
@@ -406,6 +408,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        editContextNuevoDocumento = new EditContext(nuevoDoc);
+
         oficinas = await RepoOficinas.GetAllAsync();
         tipos = await RepoTipos.GetAllAsync();
         estados = await RepoEstados.GetAllAsync();
@@ -824,6 +828,19 @@
                 await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             }
         }
+    }
+
+    private Task IgnorarSubmitNuevoDocumento(EditContext _)
+        => Task.CompletedTask;
+
+    private async Task GuardarDesdeBotonAsync()
+    {
+        if (!editContextNuevoDocumento.Validate())
+        {
+            return;
+        }
+
+        await Guardar();
     }
 
     private async Task MoverFamiliaADestino(Guid hiloConversacion, int oficinaDestino, string observacion)
