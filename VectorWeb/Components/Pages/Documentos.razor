@@ -98,10 +98,11 @@ else
                         <div class="text-muted small text-truncate" title="@doc.IdTipoNavigation?.Nombre">@doc.IdTipoNavigation?.Nombre</div>
                         @if (doc.IdDocumentoPadre.HasValue)
                         {
+                            var referenciaPadre = ObtenerReferenciaPadre(doc.IdDocumentoPadre.Value);
                             <a href="documentos/historial/@doc.IdDocumentoPadre"
                                class="badge bg-warning text-dark mt-1 text-decoration-none"
-                               title="Documento hijo del expediente #@doc.IdDocumentoPadre. Abrir historial de movimientos del padre.">
-                                Hijo de #@doc.IdDocumentoPadre
+                               title="Documento hijo de @referenciaPadre. Abrir historial de movimientos del padre.">
+                                Hijo de @referenciaPadre
                             </a>
                         }
                         else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
@@ -153,6 +154,7 @@ else
 @code {
     private List<MaeDocumento>? listaDocs;
     private Dictionary<long, int> cantidadHijosPorPadre = [];
+    private Dictionary<long, string> referenciasPadrePorId = [];
     private Timer? timerBusqueda;
     private string filtroBusqueda = string.Empty;
     private int paginaActual = 1;
@@ -270,6 +272,33 @@ else
             .ToListAsync();
 
         var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
+        var idsPadrePagina = listaDocs
+            .Where(d => d.IdDocumentoPadre.HasValue)
+            .Select(d => d.IdDocumentoPadre!.Value)
+            .Distinct()
+            .ToList();
+
+        if (idsPadrePagina.Count > 0)
+        {
+            referenciasPadrePorId = await dbContext.MaeDocumentos
+                .AsNoTracking()
+                .Where(d => idsPadrePagina.Contains(d.IdDocumento))
+                .Include(d => d.IdTipoNavigation)
+                .Select(d => new
+                {
+                    d.IdDocumento,
+                    Numero = d.NumeroOficial,
+                    Tipo = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null,
+                })
+                .ToDictionaryAsync(
+                    x => x.IdDocumento,
+                    x => ConstruirReferenciaPadre(x.Tipo, x.Numero, x.IdDocumento));
+        }
+        else
+        {
+            referenciasPadrePorId = [];
+        }
+
         if (idsPagina.Count == 0)
         {
             cantidadHijosPorPadre = [];
@@ -378,6 +407,23 @@ else
 
     private static bool EsRojo(string? estadoSemaforo)
         => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase);
+
+    private string ObtenerReferenciaPadre(long idPadre)
+        => referenciasPadrePorId.TryGetValue(idPadre, out var referencia)
+            ? referencia
+            : $"#{idPadre}";
+
+    private static string ConstruirReferenciaPadre(string? tipo, string? numero, long idPadre)
+    {
+        var partes = new[] { tipo, numero }
+            .Where(parte => !string.IsNullOrWhiteSpace(parte))
+            .Select(parte => parte!.Trim())
+            .ToList();
+
+        return partes.Count > 0
+            ? string.Join(' ', partes)
+            : $"#{idPadre}";
+    }
 
     private void IrAPase(MaeDocumento doc)
     {
