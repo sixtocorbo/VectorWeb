@@ -3,6 +3,7 @@
 @inject RenovacionesService Service
 @inject IJSRuntime JS
 @rendermode InteractiveServer
+@implements IDisposable
 
 <h3>Renovaciones Art. 120</h3>
 
@@ -11,9 +12,8 @@
         <input type="text"
                class="form-control"
                placeholder="Buscar..."
-               @bind="textoBuscar"
-               @bind:event="oninput"
-               @bind:after="CargarDatos" />
+               value="@textoBuscar"
+               @oninput="OnBuscarInput" />
     </div>
     <div class="col-md-3">
         <div class="form-check form-switch">
@@ -85,6 +85,8 @@ else
     private List<SalidaGridDto>? lista;
     private string textoBuscar = string.Empty;
     private bool soloActivas = true;
+    private System.Threading.Timer? debounceTimer;
+    private const int DebounceMs = 400;
 
     protected override async Task OnInitializedAsync()
     {
@@ -96,24 +98,44 @@ else
         lista = await Service.ObtenerSalidasAsync(soloActivas, textoBuscar);
     }
 
-    private static string ObtenerClaseFila(string estado)
+    private static string ObtenerClaseFila(EstadoRenovacion estado)
         => estado switch
         {
-            "VENCIDA" => "table-danger",
-            "ALERTA" => "table-warning",
-            "INACTIVA" => "table-secondary",
+            EstadoRenovacion.Vencida => "table-danger",
+            EstadoRenovacion.Alerta => "table-warning",
+            EstadoRenovacion.Inactiva => "table-secondary",
             _ => string.Empty
         };
 
-    private static string ObtenerBadge(string estado)
+    private static string ObtenerBadge(EstadoRenovacion estado)
         => estado switch
         {
-            "VENCIDA" => "bg-danger",
-            "ALERTA" => "bg-warning text-dark",
-            "INACTIVA" => "bg-secondary",
-            "OK" => "bg-success",
+            EstadoRenovacion.Vencida => "bg-danger",
+            EstadoRenovacion.Alerta => "bg-warning text-dark",
+            EstadoRenovacion.Inactiva => "bg-secondary",
+            EstadoRenovacion.Ok => "bg-success",
             _ => "bg-primary"
         };
+
+    private void OnBuscarInput(ChangeEventArgs e)
+    {
+        textoBuscar = e.Value?.ToString() ?? string.Empty;
+
+        debounceTimer?.Dispose();
+        debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await CargarDatos();
+                StateHasChanged();
+            });
+        }, null, DebounceMs, System.Threading.Timeout.Infinite);
+    }
+
+    public void Dispose()
+    {
+        debounceTimer?.Dispose();
+    }
 
     private async Task Desactivar(SalidaGridDto item)
     {
