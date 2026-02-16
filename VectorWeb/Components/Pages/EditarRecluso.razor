@@ -2,6 +2,7 @@
 @page "/reclusos/nuevo"
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using Microsoft.AspNetCore.Components.Forms
 @inject IRepository<MaeRecluso> Repositorio
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
@@ -14,7 +15,7 @@
 }
 else
 {
-    <EditForm Model="miRecluso" OnValidSubmit="Guardar">
+    <EditForm EditContext="editContextRecluso" OnSubmit="IgnorarSubmitRecluso" @onsubmit:preventDefault="true">
         <DataAnnotationsValidator />
 
         <div class="mb-3">
@@ -32,7 +33,7 @@ else
             <label class="form-check-label">¿Está Activo?</label>
         </div>
 
-        <button type="submit" class="btn btn-primary">Guardar</button>
+        <button type="button" class="btn btn-primary" @onclick="GuardarDesdeBoton">Guardar</button>
         <a href="/reclusos" class="btn btn-secondary">Cancelar</a>
     </EditForm>
 }
@@ -42,6 +43,7 @@ else
     public int Id { get; set; }
 
     private MaeRecluso? miRecluso;
+    private EditContext? editContextRecluso;
 
     private bool ActivoBool
     {
@@ -65,6 +67,27 @@ else
         {
             miRecluso = await Repositorio.GetByIdAsync(Id);
         }
+
+        if (miRecluso is not null)
+        {
+            editContextRecluso = new EditContext(miRecluso);
+        }
+    }
+
+    private async Task GuardarDesdeBoton()
+    {
+        if (editContextRecluso is null || !editContextRecluso.Validate())
+        {
+            return;
+        }
+
+        await Guardar();
+    }
+
+    private Task IgnorarSubmitRecluso(EditContext _)
+    {
+        // Evita guardado automático al presionar Enter dentro del formulario.
+        return Task.CompletedTask;
     }
 
     private async Task Guardar()
