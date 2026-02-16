@@ -15,51 +15,72 @@
     <nav class="flex-column">
         <AuthorizeView>
             <Authorized Context="authContext">
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="documentos">
-                        <span class="bi bi-documentos-nav-menu" aria-hidden="true"></span> Documentos
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="documentos/vinculacion">
-                        <span class="bi bi-vinculacion-nav-menu" aria-hidden="true"></span> Vinculación
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="reclusos">
-                        <span class="bi bi-people-nav-menu" aria-hidden="true"></span> Reclusos
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="renovaciones">
-                        <span class="bi bi-art120-nav-menu" aria-hidden="true"></span> Art. 120
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="configuracion/oficinas">
-                        <span class="bi bi-oficinas-nav-menu" aria-hidden="true"></span> Oficinas
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="configuracion/tipos-documento">
-                        <span class="bi bi-tipos-documento-nav-menu" aria-hidden="true"></span> Tipos de Documento
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="configuracion/estados">
-                        <span class="bi bi-estados-nav-menu" aria-hidden="true"></span> Estados
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="configuracion/rangos">
-                        <span class="bi bi-rangos-nav-menu" aria-hidden="true"></span> Rangos
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="configuracion/usuarios">
-                        <span class="bi bi-usuarios-nav-menu" aria-hidden="true"></span> Usuarios y Roles
-                    </NavLink>
-                </div>
+                <AuthorizeView Policy="documentos.ver">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="documentos">
+                            <span class="bi bi-documentos-nav-menu" aria-hidden="true"></span> Documentos
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="vinculacion.gestionar">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="documentos/vinculacion">
+                            <span class="bi bi-vinculacion-nav-menu" aria-hidden="true"></span> Vinculación
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="reclusos.gestionar">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="reclusos">
+                            <span class="bi bi-people-nav-menu" aria-hidden="true"></span> Reclusos
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="renovaciones.gestionar">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="renovaciones">
+                            <span class="bi bi-art120-nav-menu" aria-hidden="true"></span> Art. 120
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="configuracion.catalogos">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="configuracion/oficinas">
+                            <span class="bi bi-oficinas-nav-menu" aria-hidden="true"></span> Oficinas
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="configuracion/tipos-documento">
+                            <span class="bi bi-tipos-documento-nav-menu" aria-hidden="true"></span> Tipos de Documento
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="configuracion/estados">
+                            <span class="bi bi-estados-nav-menu" aria-hidden="true"></span> Estados
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="configuracion.rangos">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="configuracion/rangos">
+                            <span class="bi bi-rangos-nav-menu" aria-hidden="true"></span> Rangos
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="seguridad.usuarios_roles">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="configuracion/usuarios">
+                            <span class="bi bi-usuarios-nav-menu" aria-hidden="true"></span> Usuarios y Roles
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
                 <div class="nav-item px-3 mt-4">
                     <div class="text-white small px-3">
                         Usuario: <strong>@authContext.User.Identity?.Name</strong>

@@ -1,4 +1,6 @@
 @page "/renovaciones/editar/{Id:int}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "renovaciones.gestionar")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services

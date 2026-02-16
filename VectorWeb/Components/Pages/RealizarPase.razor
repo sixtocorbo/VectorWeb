@@ -1,4 +1,6 @@
 @page "/documentos/pase/{Id:long}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.editar")]
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web

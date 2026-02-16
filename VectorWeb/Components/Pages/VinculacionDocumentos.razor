@@ -1,4 +1,6 @@
 @page "/documentos/vinculacion"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "vinculacion.gestionar")]
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories

@@ -1,4 +1,6 @@
 @page "/configuracion/estados"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "configuracion.catalogos")]
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories

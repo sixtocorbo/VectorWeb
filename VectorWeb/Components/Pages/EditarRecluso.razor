@@ -1,5 +1,7 @@
 @page "/reclusos/editar/{Id:int}"
 @page "/reclusos/nuevo"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "reclusos.gestionar")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using Microsoft.AspNetCore.Components.Forms

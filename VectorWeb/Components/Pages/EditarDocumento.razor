@@ -1,4 +1,6 @@
 @page "/documentos/editar/{Id:long}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.editar")]
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories

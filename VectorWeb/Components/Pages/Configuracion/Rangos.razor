@@ -1,4 +1,6 @@
 @page "/configuracion/rangos"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "configuracion.rangos")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services
