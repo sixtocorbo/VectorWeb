@@ -365,7 +365,7 @@
 
         foreach (var rolUsuario in usuarios.Select(u => u.Rol).Where(r => !string.IsNullOrWhiteSpace(r)))
         {
-            rolesDisponibles.Add(rolUsuario!.Trim().ToUpperInvariant());
+            rolesDisponibles.Add(RolePermissionService.NormalizarRol(rolUsuario));
         }
 
         var parametro = (await RepoParametros.FindAsync(p => p.Clave == ParametroRoles)).FirstOrDefault();
@@ -373,7 +373,7 @@
         {
             foreach (var rol in parametro.Valor.Split('|', StringSplitOptions.RemoveEmptyEntries))
             {
-                rolesDisponibles.Add(rol.Trim().ToUpperInvariant());
+                rolesDisponibles.Add(RolePermissionService.NormalizarRol(rol));
             }
         }
     }
@@ -440,7 +440,7 @@
         }
 
         usuarioEdicion.UsuarioLogin = loginNormalizado;
-        usuarioEdicion.Rol = usuarioEdicion.Rol!.Trim().ToUpperInvariant();
+        usuarioEdicion.Rol = RolePermissionService.NormalizarRol(usuarioEdicion.Rol);
 
         if (!string.IsNullOrWhiteSpace(passwordEdicion))
         {
@@ -461,7 +461,7 @@
         if (!rolesDisponibles.Contains(usuarioEdicion.Rol))
         {
             rolesDisponibles.Add(usuarioEdicion.Rol);
-            permisosPorRol[usuarioEdicion.Rol] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            permisosPorRol[usuarioEdicion.Rol] = RolePermissionService.ObtenerPermisosDefaultPorTipoRol(usuarioEdicion.Rol);
             await GuardarRolesAsync();
             await GuardarPermisosAsync();
         }
@@ -513,13 +513,14 @@
 
     private async Task AgregarRol()
     {
-        var rolNormalizado = nuevoRol.Trim().ToUpperInvariant();
-        if (string.IsNullOrWhiteSpace(rolNormalizado)) return;
+        if (string.IsNullOrWhiteSpace(nuevoRol)) return;
+
+        var rolNormalizado = RolePermissionService.NormalizarRol(nuevoRol);
 
         if (!rolesDisponibles.Contains(rolNormalizado))
         {
             rolesDisponibles.Add(rolNormalizado);
-            permisosPorRol[rolNormalizado] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            permisosPorRol[rolNormalizado] = RolePermissionService.ObtenerPermisosDefaultPorTipoRol(rolNormalizado);
             await GuardarRolesAsync();
             await GuardarPermisosAsync();
             mensajeExito = "Rol agregado.";
@@ -579,7 +580,7 @@
         {
             if (!permisosPorRol.ContainsKey(rol))
             {
-                permisosPorRol[rol] = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                permisosPorRol[rol] = RolePermissionService.ObtenerPermisosDefaultPorTipoRol(rol);
             }
         }
     }
@@ -591,7 +592,7 @@
     {
         if (!permisosPorRol.TryGetValue(rol, out var permisos))
         {
-            permisos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            permisos = RolePermissionService.ObtenerPermisosDefaultPorTipoRol(rol);
             permisosPorRol[rol] = permisos;
         }
 
@@ -646,11 +647,11 @@
 
     private bool RolEnUso(string rol) => usuarios.Any(u => RolMostrar(u.Rol).Equals(rol, StringComparison.OrdinalIgnoreCase));
 
-    private static string RolMostrar(string? rol) => string.IsNullOrWhiteSpace(rol) ? "OPERADOR" : rol.Trim().ToUpperInvariant();
+    private static string RolMostrar(string? rol) => RolePermissionService.NormalizarRol(rol);
 
     private string NombreOficina(int? id) => oficinas.FirstOrDefault(o => o.IdOficina == id)?.Nombre ?? "Desconocida";
 
-    private string ObtenerBadgeRol(string? rol) => (rol?.ToUpper()) switch
+    private string ObtenerBadgeRol(string? rol) => RolePermissionService.NormalizarRol(rol) switch
     {
         "ADMIN" => "bg-danger",
         "SUPERVISOR" => "bg-warning text-dark",
