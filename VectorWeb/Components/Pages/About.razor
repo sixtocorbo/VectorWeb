@@ -1,54 +1,209 @@
 @page "/about"
 
-<PageTitle>Acerca de VectorWeb</PageTitle>
+<PageTitle>Manual de uso de VectorWeb</PageTitle>
 
 <div class="container-fluid py-3">
     <div class="row g-4">
         <div class="col-12">
-            <h1 class="mb-3">Acerca de VectorWeb</h1>
+            <h1 class="mb-3">Manual de uso de VectorWeb</h1>
             <p class="lead mb-0">
-                VectorWeb es una plataforma interna para centralizar la gestión documental, el seguimiento de reclusos y el
-                control de procesos administrativos relacionados con renovaciones y numeración oficial.
+                Esta página funciona como guía práctica para usuarios operativos y administrativos. Aquí encontrarás el flujo recomendado
+                para trabajar en el sistema, qué se espera en cada etapa y ejemplos para evitar errores comunes.
             </p>
         </div>
 
-        <div class="col-12 col-lg-8">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
-                    <h2 class="h4">¿Qué hace este sistema?</h2>
-                    <p>
-                        El objetivo principal de VectorWeb es que las áreas operativas trabajen con una sola fuente de verdad,
-                        reduciendo tiempos de búsqueda, errores de digitación y duplicidades entre expedientes.
-                    </p>
-
-                    <ul class="mb-0">
-                        <li><strong>Documentos:</strong> creación, edición y trazabilidad de expedientes y sus vinculaciones.</li>
-                        <li><strong>Reclusos:</strong> consulta y actualización de información relevante para la gestión documental.</li>
-                        <li><strong>Renovaciones:</strong> control de vencimientos para el seguimiento del Art. 120.</li>
-                        <li><strong>Configuración:</strong> administración de oficinas, estados, tipos de documento y rangos.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-lg-4">
-            <div class="card shadow-sm border-0 h-100 bg-light">
-                <div class="card-body">
-                    <h2 class="h5">Beneficios esperados</h2>
-                    <ul class="mb-0">
-                        <li>Mayor consistencia en los datos y numeración documental.</li>
-                        <li>Seguimiento más claro del estado de cada trámite.</li>
-                        <li>Mejor coordinación entre oficinas y usuarios autorizados.</li>
-                        <li>Base para futuras mejoras e integración de reportes.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
         <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">Índice</h2>
+                    <ol class="mb-0">
+                        <li><a href="#objetivo-general">Objetivo general del sistema</a></li>
+                        <li><a href="#flujo-recomendado">Flujo recomendado de operación</a></li>
+                        <li><a href="#modulo-documentos">Módulo de Documentos</a></li>
+                        <li><a href="#modulo-vinculacion">Módulo de Vinculación de Documentos</a></li>
+                        <li><a href="#modulo-reclusos">Módulo de Reclusos</a></li>
+                        <li><a href="#modulo-renovaciones">Módulo de Renovaciones (Art. 120)</a></li>
+                        <li><a href="#modulo-configuracion">Módulo de Configuración</a></li>
+                        <li><a href="#ejemplo-practico">Ejemplo práctico completo</a></li>
+                        <li><a href="#buenas-practicas">Buenas prácticas y errores frecuentes</a></li>
+                        <li><a href="#resultado-esperado">Resultado esperado del uso del sistema</a></li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="objetivo-general">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">1. Objetivo general del sistema</h2>
+                    <p>
+                        VectorWeb centraliza la gestión documental institucional para que todas las áreas trabajen con una misma fuente de datos,
+                        reduciendo duplicidades y mejorando la trazabilidad de cada trámite.
+                    </p>
+                    <p class="mb-0">
+                        <strong>¿Qué se espera del usuario?</strong> Registrar información completa y consistente, mantener actualizados los estados,
+                        y utilizar los módulos en el orden recomendado para conservar un historial limpio y auditable.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="flujo-recomendado">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">2. Flujo recomendado de operación</h2>
+                    <ol class="mb-0">
+                        <li><strong>Registrar o ubicar el documento</strong> en el módulo Documentos.</li>
+                        <li><strong>Vincular documentos relacionados</strong> para consolidar el expediente.</li>
+                        <li><strong>Validar o actualizar datos del recluso</strong> cuando aplique.</li>
+                        <li><strong>Crear seguimiento en Renovaciones</strong> para controlar vencimientos.</li>
+                        <li><strong>Consultar Historial</strong> para verificar cambios y movimientos.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="modulo-documentos">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">3. Módulo de Documentos</h2>
+                    <p>
+                        Aquí se crea y administra cada documento base del proceso. Este módulo es el punto de entrada para la mayoría de trámites.
+                    </p>
+                    <h3 class="h6">Pasos sugeridos</h3>
+                    <ul>
+                        <li>Verifica si el documento ya existe antes de crear uno nuevo.</li>
+                        <li>Completa tipo de documento, oficina, estado y fecha correctamente.</li>
+                        <li>Asocia la información del recluso cuando corresponda.</li>
+                        <li>Guarda y revisa que el número y estado sean coherentes.</li>
+                    </ul>
+                    <p class="mb-0">
+                        <strong>Resultado esperado:</strong> documento único, correctamente identificado y listo para vinculación o seguimiento.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="modulo-vinculacion">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">4. Módulo de Vinculación de Documentos</h2>
+                    <p>
+                        Permite relacionar documentos entre sí para construir el contexto completo de un caso (antecedentes, respuestas,
+                        resoluciones y soportes).
+                    </p>
+                    <p class="mb-0">
+                        <strong>Resultado esperado:</strong> expediente conectado de forma lógica, fácil de consultar y sin enlaces duplicados.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="modulo-reclusos">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">5. Módulo de Reclusos</h2>
+                    <p>
+                        Se utiliza para consultar y actualizar datos personales o de control del recluso asociados a los documentos.
+                    </p>
+                    <ul class="mb-0">
+                        <li>Verifica identidad y datos críticos antes de editar.</li>
+                        <li>Evita crear registros duplicados por diferencias mínimas de digitación.</li>
+                        <li>Cuando se actualicen datos, documenta el motivo en observaciones.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="modulo-renovaciones">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">6. Módulo de Renovaciones (Art. 120)</h2>
+                    <p>
+                        Este módulo ayuda a controlar renovaciones y vencimientos para que las áreas responsables actúen a tiempo.
+                    </p>
+                    <ul>
+                        <li>Registra fecha inicial, plazos y estado de seguimiento.</li>
+                        <li>Actualiza el estado en cada avance para mantener trazabilidad real.</li>
+                        <li>Consulta pendientes de forma periódica para prevenir vencimientos.</li>
+                    </ul>
+                    <p class="mb-0">
+                        <strong>Resultado esperado:</strong> control oportuno, menos atrasos y evidencia clara del seguimiento realizado.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="modulo-configuracion">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">7. Módulo de Configuración</h2>
+                    <p>
+                        Incluye catálogos (oficinas, estados, tipos de documento), rangos de numeración y componentes de seguridad/roles.
+                    </p>
+                    <p class="mb-0">
+                        <strong>Uso recomendado:</strong> limitar cambios de configuración a usuarios autorizados, ya que impactan a todo el sistema.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="ejemplo-practico">
+            <div class="card shadow-sm border-0 bg-light">
+                <div class="card-body">
+                    <h2 class="h4">8. Ejemplo práctico completo</h2>
+                    <p>
+                        <strong>Escenario:</strong> ingresa una solicitud nueva relacionada con un recluso y se requiere seguimiento hasta su resolución.
+                    </p>
+                    <ol class="mb-0">
+                        <li>Crear el documento principal en <em>Documentos</em> con datos completos.</li>
+                        <li>Vincular la solicitud con antecedentes y soportes en <em>Vinculación</em>.</li>
+                        <li>Confirmar y actualizar la ficha del recluso en <em>Reclusos</em>.</li>
+                        <li>Registrar la renovación/control correspondiente en <em>Renovaciones</em>.</li>
+                        <li>Monitorear cambios en <em>Historial</em> hasta cierre del trámite.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="buenas-practicas">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h4">9. Buenas prácticas y errores frecuentes</h2>
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-6">
+                            <h3 class="h6">Buenas prácticas</h3>
+                            <ul class="mb-0">
+                                <li>Validar datos antes de guardar.</li>
+                                <li>Actualizar estados apenas ocurra un cambio.</li>
+                                <li>Trabajar con una nomenclatura consistente.</li>
+                                <li>Consultar historial para auditar decisiones.</li>
+                            </ul>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <h3 class="h6">Errores a evitar</h3>
+                            <ul class="mb-0">
+                                <li>Duplicar documentos por no buscar previamente.</li>
+                                <li>Dejar renovaciones sin estado actualizado.</li>
+                                <li>Vincular registros incorrectos por falta de verificación.</li>
+                                <li>Modificar catálogos sin coordinación administrativa.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12" id="resultado-esperado">
             <div class="alert alert-info mb-0" role="alert">
-                <strong>Recomendación:</strong> para aprovechar al máximo la plataforma, utiliza las secciones de
-                <em>Documentos</em>, <em>Vinculación</em> y <em>Renovaciones</em> como flujo principal de trabajo.
+                <h2 class="h5">10. Resultado esperado del uso del sistema</h2>
+                <p class="mb-2">
+                    Un proceso documental trazable, oportuno y consistente entre oficinas, con menor carga operativa y mejor capacidad
+                    de respuesta ante auditorías o consultas internas.
+                </p>
+                <p class="mb-0">
+                    Si todos los usuarios aplican este flujo, el sistema funcionará como una bitácora institucional confiable.
+                </p>
             </div>
         </div>
     </div>
