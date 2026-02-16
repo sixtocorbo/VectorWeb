@@ -21,17 +21,19 @@
             <div class="alert alert-danger">@mensajeError</div>
         }
 
-        <div class="mb-3">
-            <label>Usuario:</label>
-            <input type="text" class="form-control" @bind="usuario" placeholder="Ej: admin" />
-        </div>
+        <form @onsubmit="IniciarSesion" @onsubmit:preventDefault="true">
+            <div class="mb-3">
+                <label>Usuario:</label>
+                <input type="text" class="form-control" @bind="usuario" placeholder="Ej: admin" />
+            </div>
 
-        <div class="mb-3">
-            <label>Contraseña:</label>
-            <input type="password" class="form-control" @bind="clave" placeholder="******" />
-        </div>
+            <div class="mb-3">
+                <label>Contraseña:</label>
+                <input type="password" class="form-control" @bind="clave" placeholder="******" />
+            </div>
 
-        <button class="btn btn-primary w-100" @onclick="IniciarSesion">Ingresar</button>
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
     </div>
 </div>
 
