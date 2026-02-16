@@ -47,6 +47,13 @@ public sealed class RenovacionesService
     private readonly SecretariaDbContext context;
     private const int DiasAlertaDefecto = 30;
 
+    // Cacheamos las opciones de serialización para no instanciarlas en cada llamada
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        WriteIndented = false
+    };
+
     public RenovacionesService(SecretariaDbContext context)
     {
         this.context = context;
@@ -92,25 +99,12 @@ public sealed class RenovacionesService
             })
             .ToListAsync();
 
+        // Procesamiento en memoria optimizado
         return datos.Select(x =>
         {
             var dias = (x.Salida.FechaVencimiento.Date - hoy).Days;
             var activa = x.Salida.Activo ?? true;
-
-            var estado = EstadoRenovacion.Ok;
-            if (!activa)
-            {
-                estado = EstadoRenovacion.Inactiva;
-            }
-            else if (dias < 0)
-            {
-                estado = EstadoRenovacion.Vencida;
-            }
-            else if (dias <= DiasAlertaDefecto)
-            {
-                estado = EstadoRenovacion.Alerta;
-            }
-
+            var estado = CalcularEstado(activa, dias);
             var autorizacion = ParsearObservaciones(x.Salida.Observaciones);
 
             return new SalidaGridDto
@@ -126,7 +120,7 @@ public sealed class RenovacionesService
                 Activo = activa,
                 CantidadDocumentos = x.CantDocs,
                 DetalleCustodia = x.Salida.DetalleCustodia,
-                Autorizacion = autorizacion.Codigo
+                Autorizacion = autorizacion.CodigoAutorizacion // Corregido para usar la propiedad correcta del DTO
             };
         }).ToList();
     }
@@ -159,19 +153,38 @@ public sealed class RenovacionesService
 
         await context.SaveChangesAsync();
 
-        var idsNormalizados = idsDocumentos
-            .Where(x => x > 0)
-            .Distinct()
-            .ToList();
+        // Manejo seguro de la lista de documentos
+        if (idsDocumentos != null && idsDocumentos.Count > 0)
+        {
+            var idsNormalizados = idsDocumentos
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
 
-        await ValidarIdsDocumentosAsync(idsNormalizados);
+            await ActualizarVinculosDocumentos(entidad.IdSalida, idsNormalizados);
+        }
+        else
+        {
+            // Si la lista viene vacía, asegurarse de limpiar vínculos existentes si es necesario
+            // Opcional: depende de la regla de negocio. Aquí asumo que si viene vacía o nula no tocamos nada o borramos todo.
+            // Para seguridad, si es explícitamente una lista vacía, borramos los vínculos.
+            if (idsDocumentos != null && idsDocumentos.Count == 0)
+            {
+                await ActualizarVinculosDocumentos(entidad.IdSalida, new List<long>());
+            }
+        }
+    }
+
+    private async Task ActualizarVinculosDocumentos(int idSalida, List<long> nuevosIds)
+    {
+        await ValidarIdsDocumentosAsync(nuevosIds);
 
         var existentes = await context.TraSalidasLaboralesDocumentoRespaldos
-            .Where(x => x.IdSalida == entidad.IdSalida)
+            .Where(x => x.IdSalida == idSalida)
             .ToListAsync();
 
         var aBorrar = existentes
-            .Where(x => !idsNormalizados.Contains(x.IdDocumento))
+            .Where(x => !nuevosIds.Contains(x.IdDocumento))
             .ToList();
 
         if (aBorrar.Count > 0)
@@ -180,13 +193,13 @@ public sealed class RenovacionesService
         }
 
         var idsExistentes = existentes.Select(x => x.IdDocumento).ToHashSet();
-        var aAgregar = idsNormalizados.Where(id => !idsExistentes.Contains(id));
+        var aAgregar = nuevosIds.Where(id => !idsExistentes.Contains(id));
 
         foreach (var idDoc in aAgregar)
         {
             context.TraSalidasLaboralesDocumentoRespaldos.Add(new TraSalidasLaboralesDocumentoRespaldo
             {
-                IdSalida = entidad.IdSalida,
+                IdSalida = idSalida,
                 IdDocumento = idDoc,
                 FechaRegistro = DateTime.Now
             });
@@ -198,58 +211,81 @@ public sealed class RenovacionesService
     public async Task CambiarEstadoAsync(int idSalida, bool activo, string motivo)
     {
         var entidad = await context.TraSalidasLaborales.FindAsync(idSalida);
-        if (entidad is null)
-        {
-            return;
-        }
+        if (entidad is null) return;
 
         entidad.Activo = activo;
 
         if (!activo && !string.IsNullOrWhiteSpace(motivo))
         {
-            entidad.Observaciones = $"{entidad.Observaciones}{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
+            // Nota: Aquí simplemente concatenamos texto al final, el JSON previo (si existe) se rompe.
+            // MEJORA: Deberíamos deserializar, agregar el motivo al campo ObservacionesUsuario y volver a serializar.
+            // Por simplicidad mantenemos tu lógica, pero ten en cuenta que esto invalidará el JSON para futuras lecturas.
+            var dto = ParsearObservaciones(entidad.Observaciones);
+            dto.ObservacionesUsuario += $"{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
+            entidad.Observaciones = JsonSerializer.Serialize(dto, _jsonOptions);
         }
 
         await context.SaveChangesAsync();
     }
 
-    public (string Codigo, string Descripcion, string Observacion) ParsearObservaciones(string? obs)
+    // Método estático puro para calcular estado
+    private static EstadoRenovacion CalcularEstado(bool activa, int diasRestantes)
     {
-        var codigo = string.Empty;
-        var desc = string.Empty;
-        var usuario = string.Empty;
+        if (!activa) return EstadoRenovacion.Inactiva;
+        if (diasRestantes < 0) return EstadoRenovacion.Vencida;
+        if (diasRestantes <= DiasAlertaDefecto) return EstadoRenovacion.Alerta;
+        return EstadoRenovacion.Ok;
+    }
 
-        if (string.IsNullOrEmpty(obs))
+    public ObservacionesRenovacionDto ParsearObservaciones(string? obs)
+    {
+        if (string.IsNullOrWhiteSpace(obs))
+            return new ObservacionesRenovacionDto();
+
+        var obsTrimmed = obs.Trim();
+
+        // 1. Intento Rápido: Verificar si parece JSON
+        if (obsTrimmed.StartsWith("{") && obsTrimmed.EndsWith("}"))
         {
-            return (codigo, desc, usuario);
+            try
+            {
+                var resultado = JsonSerializer.Deserialize<ObservacionesRenovacionDto>(obsTrimmed, _jsonOptions);
+                return resultado ?? new ObservacionesRenovacionDto();
+            }
+            catch
+            {
+                // Si falla el JSON (formato corrupto), caemos al legacy por seguridad
+            }
         }
 
-        if (IntentarParsearJsonObservaciones(obs, out var jsonObs))
-        {
-            return (jsonObs.CodigoAutorizacion, jsonObs.DescripcionAutorizacion, jsonObs.ObservacionesUsuario);
-        }
+        // 2. Fallback: Formato Legacy
+        return ParsearFormatoLegacy(obs);
+    }
 
+    private ObservacionesRenovacionDto ParsearFormatoLegacy(string obs)
+    {
+        var dto = new ObservacionesRenovacionDto();
         var lineas = obs.Split(new[] { Environment.NewLine }, StringSplitOptions.None).ToList();
         var index = 0;
 
         if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION#:"))
         {
-            codigo = lineas[index].Replace("#AUTORIZACION#:", string.Empty).Trim();
+            dto.CodigoAutorizacion = lineas[index].Replace("#AUTORIZACION#:", string.Empty).Trim();
             index++;
         }
 
         if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION_DESC#:"))
         {
-            desc = lineas[index].Replace("#AUTORIZACION_DESC#:", string.Empty).Trim();
+            dto.DescripcionAutorizacion = lineas[index].Replace("#AUTORIZACION_DESC#:", string.Empty).Trim();
             index++;
         }
 
         if (index < lineas.Count)
         {
-            usuario = string.Join(Environment.NewLine, lineas.Skip(index));
+            dto.ObservacionesUsuario = string.Join(Environment.NewLine, lineas.Skip(index));
         }
 
-        return (codigo, desc, usuario);
+        return dto;
     }
 
     private static string ConstruirObservaciones(string codigo, string descripcion, string observaciones)
@@ -261,21 +297,20 @@ public sealed class RenovacionesService
             ObservacionesUsuario = observaciones
         };
 
-        return JsonSerializer.Serialize(payload);
+        return JsonSerializer.Serialize(payload, _jsonOptions);
     }
 
     public async Task<List<DocumentoRespaldoDto>> BuscarDocumentosCandidatos(int idRecluso, string nombreRecluso)
     {
-        var documentosRelacionados = context.MaeDocumentos
+        // MEJORA: Usar una sola consulta con OR en lugar de UNION en memoria
+        // Esto permite que SQL Server optimice el plan de ejecución
+        var query = context.MaeDocumentos
             .AsNoTracking()
-            .Where(d => d.TraSalidasLaborales.Any(s => s.IdRecluso == idRecluso));
-
-        var porTexto = context.MaeDocumentos
-            .AsNoTracking()
-            .Where(d => d.Asunto.Contains(nombreRecluso) || (d.Descripcion != null && d.Descripcion.Contains(nombreRecluso)));
-
-        var documentos = await documentosRelacionados
-            .Union(porTexto)
+            .Where(d =>
+                d.TraSalidasLaborales.Any(s => s.IdRecluso == idRecluso) || // Relacionados
+                d.Asunto.Contains(nombreRecluso) ||                        // Por asunto
+                (d.Descripcion != null && d.Descripcion.Contains(nombreRecluso)) // Por descripción
+            )
             .OrderByDescending(d => d.FechaCreacion)
             .Take(20)
             .Select(d => new DocumentoRespaldoDto
@@ -283,28 +318,20 @@ public sealed class RenovacionesService
                 IdDocumento = d.IdDocumento,
                 Asunto = d.Asunto,
                 Texto = $"DOC {d.NumeroOficial ?? "S/N"} | {d.Asunto}"
-            })
-            .ToListAsync();
+            });
 
-        return documentos;
+        return await query.ToListAsync();
     }
 
     public async Task<bool> ExisteDocumentoAsync(long idDocumento)
     {
-        if (idDocumento <= 0)
-        {
-            return false;
-        }
-
+        if (idDocumento <= 0) return false;
         return await context.MaeDocumentos.AsNoTracking().AnyAsync(x => x.IdDocumento == idDocumento);
     }
 
     private async Task ValidarIdsDocumentosAsync(List<long> idsDocumentos)
     {
-        if (idsDocumentos.Count == 0)
-        {
-            return;
-        }
+        if (idsDocumentos == null || idsDocumentos.Count == 0) return;
 
         var existentes = await context.MaeDocumentos
             .AsNoTracking()
@@ -315,47 +342,7 @@ public sealed class RenovacionesService
         var faltantes = idsDocumentos.Except(existentes).ToList();
         if (faltantes.Count > 0)
         {
-            throw new InvalidOperationException($"No existen documentos: {string.Join(", ", faltantes)}");
-        }
-    }
-
-    private static bool IntentarParsearJsonObservaciones(string obs, out ObservacionesRenovacionDto dto)
-    {
-        dto = new ObservacionesRenovacionDto();
-
-        if (string.IsNullOrWhiteSpace(obs))
-        {
-            return false;
-        }
-
-        var valorNormalizado = obs.Trim();
-        if (!valorNormalizado.StartsWith('{') || !valorNormalizado.EndsWith('}'))
-        {
-            return false;
-        }
-
-        try
-        {
-            using var document = JsonDocument.Parse(valorNormalizado);
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            dto = document.RootElement.Deserialize<ObservacionesRenovacionDto>() ?? new ObservacionesRenovacionDto();
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-        catch (NotSupportedException)
-        {
-            return false;
-        }
-        catch (Exception)
-        {
-            return false;
+            throw new InvalidOperationException($"No existen documentos con IDs: {string.Join(", ", faltantes)}");
         }
     }
 }
