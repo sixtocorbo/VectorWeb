@@ -92,7 +92,11 @@ else
                         <div class="text-muted small text-truncate" title="@doc.IdTipoNavigation?.Nombre">@doc.IdTipoNavigation?.Nombre</div>
                         @if (documentoPadrePorHijo.TryGetValue(doc.IdDocumento, out var idPadre))
                         {
-                            <span class="badge bg-warning text-dark mt-1" title="Documento hijo del expediente #@idPadre">Hijo de #@idPadre</span>
+                            <a href="documentos/historial/@idPadre"
+                               class="badge bg-warning text-dark mt-1 text-decoration-none"
+                               title="Documento hijo del expediente #@idPadre. Abrir historial de movimientos del padre.">
+                                Hijo de #@idPadre
+                            </a>
                         }
                         else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
                         {
