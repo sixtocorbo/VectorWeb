@@ -1,5 +1,6 @@
 @page "/documentos/pase/{Id:long}"
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
 @using VectorWeb.Models
@@ -96,13 +97,39 @@
                             }
                             else
                             {
-                                <InputSelect @bind-Value="nuevoMovimiento.IdOficinaDestino" class="form-control form-select-lg">
-                                    <option value="0">-- Seleccione Destino --</option>
-                                    @foreach (var ofi in oficinas)
+                                <div class="position-relative">
+                                    <input type="text"
+                                           class="form-control form-control-lg"
+                                           placeholder="Escriba para buscar oficina destino..."
+                                           value="@oficinaDestinoBusqueda"
+                                           autocomplete="off"
+                                           @oninput="FiltrarOficinasDestino"
+                                           @onfocus="MostrarSugerenciasOficinaDestino"
+                                           @onkeydown="ManejarTecladoOficinasDestino" />
+
+                                    @if (oficinasDestinoFiltradas.Any())
                                     {
-                                        <option value="@ofi.IdOficina">@ofi.Nombre</option>
+                                        <div class="list-group position-absolute start-0 end-0 shadow-sm"
+                                             style="z-index: 1050; max-height: 240px; overflow-y: auto;">
+                                            @for (var i = 0; i < oficinasDestinoFiltradas.Count; i++)
+                                            {
+                                                var ofi = oficinasDestinoFiltradas[i];
+                                                var cssItem = i == indiceOficinaDestinoSeleccionada
+                                                    ? "list-group-item list-group-item-action active"
+                                                    : "list-group-item list-group-item-action";
+
+                                                <button type="button"
+                                                        class="@cssItem"
+                                                        @onclick="() => SeleccionarOficinaDestino(ofi)">
+                                                    @ofi.Nombre
+                                                </button>
+                                            }
+                                        </div>
                                     }
-                                </InputSelect>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Puede buscar escribiendo palabras en cualquier orden. Use ↑ ↓ y Enter para seleccionar.
+                                </small>
                                 <ValidationMessage For="@(() => nuevoMovimiento.IdOficinaDestino)" />
                             }
                         </div>
@@ -192,6 +219,9 @@
     private int? idOficinaBandejaEntrada;
     private string nombreOficinaBandejaEntrada = "BANDEJA DE ENTRADA";
     private int idOficinaOrigenPaquete;
+    private string oficinaDestinoBusqueda = string.Empty;
+    private List<CatOficina> oficinasDestinoFiltradas = new();
+    private int indiceOficinaDestinoSeleccionada = -1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -437,5 +467,101 @@
             await transaction.RollbackAsync();
             mensajeError = "Error crítico al realizar el pase: " + ex.Message;
         }
+    }
+
+    private Task FiltrarOficinasDestino(ChangeEventArgs e)
+    {
+        oficinaDestinoBusqueda = e.Value?.ToString() ?? string.Empty;
+        nuevoMovimiento.IdOficinaDestino = 0;
+        indiceOficinaDestinoSeleccionada = -1;
+
+        if (string.IsNullOrWhiteSpace(oficinaDestinoBusqueda))
+        {
+            oficinasDestinoFiltradas.Clear();
+            return Task.CompletedTask;
+        }
+
+        oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda)
+            .Take(8)
+            .ToList();
+
+        var coincidenciaExacta = oficinas.FirstOrDefault(o =>
+            string.Equals(o.Nombre, oficinaDestinoBusqueda, StringComparison.OrdinalIgnoreCase));
+
+        if (coincidenciaExacta != null)
+        {
+            nuevoMovimiento.IdOficinaDestino = coincidenciaExacta.IdOficina;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void MostrarSugerenciasOficinaDestino()
+    {
+        if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda))
+        {
+            oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda)
+                .Take(8)
+                .ToList();
+        }
+    }
+
+    private Task ManejarTecladoOficinasDestino(KeyboardEventArgs e)
+    {
+        if (!oficinasDestinoFiltradas.Any())
+        {
+            return Task.CompletedTask;
+        }
+
+        if (e.Key == "ArrowDown")
+        {
+            indiceOficinaDestinoSeleccionada = Math.Min(indiceOficinaDestinoSeleccionada + 1, oficinasDestinoFiltradas.Count - 1);
+            return Task.CompletedTask;
+        }
+
+        if (e.Key == "ArrowUp")
+        {
+            indiceOficinaDestinoSeleccionada = Math.Max(indiceOficinaDestinoSeleccionada - 1, 0);
+            return Task.CompletedTask;
+        }
+
+        if (e.Key == "Enter" && indiceOficinaDestinoSeleccionada >= 0)
+        {
+            _ = SeleccionarOficinaDestino(oficinasDestinoFiltradas[indiceOficinaDestinoSeleccionada]);
+            return Task.CompletedTask;
+        }
+
+        if (e.Key == "Escape")
+        {
+            oficinasDestinoFiltradas.Clear();
+            indiceOficinaDestinoSeleccionada = -1;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task SeleccionarOficinaDestino(CatOficina oficina)
+    {
+        nuevoMovimiento.IdOficinaDestino = oficina.IdOficina;
+        oficinaDestinoBusqueda = oficina.Nombre ?? string.Empty;
+        oficinasDestinoFiltradas.Clear();
+        indiceOficinaDestinoSeleccionada = -1;
+        return Task.CompletedTask;
+    }
+
+    private IEnumerable<CatOficina> BuscarOficinasDestino(string terminoBusqueda)
+    {
+        var palabras = terminoBusqueda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (palabras.Length == 0)
+        {
+            return Enumerable.Empty<CatOficina>();
+        }
+
+        return oficinas
+            .Where(o => palabras.All(palabra =>
+                (o.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false)))
+            .OrderBy(o => o.Nombre);
     }
 }
