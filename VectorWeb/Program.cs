@@ -9,6 +9,7 @@ using VectorWeb.Repositories;
 using VectorWeb.Services;
 using VectorWeb.Services.Security;
 using VectorWeb.Services.Security.Authorization;
+using VectorWeb.Services.Security.Audit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,7 @@ builder.Services.AddScoped<NumeracionRangoService>();
 builder.Services.AddScoped<DocumentoVinculacionService>();
 builder.Services.AddScoped<RenovacionesService>();
 builder.Services.AddScoped<RolePermissionService>();
+builder.Services.AddScoped<PermissionAuditService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
