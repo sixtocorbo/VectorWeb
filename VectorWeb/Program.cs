@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.EntityFrameworkCore;
@@ -7,6 +8,7 @@ using VectorWeb.Models;
 using VectorWeb.Repositories;
 using VectorWeb.Services;
 using VectorWeb.Services.Security;
+using VectorWeb.Services.Security.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,13 +30,15 @@ builder.Services.AddScoped<NumeracionRangoService>();
 builder.Services.AddScoped<DocumentoVinculacionService>();
 builder.Services.AddScoped<RenovacionesService>();
 builder.Services.AddScoped<RolePermissionService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
 // Blazor auth services
 builder.Services.AddAuthorizationCore(options =>
 {
     foreach (var permiso in AppPermissions.Todos)
     {
-        options.AddPolicy(permiso, policy => policy.RequireClaim(AppPermissions.ClaimType, permiso));
+        options.AddPolicy(permiso, policy => policy.Requirements.Add(new PermissionRequirement(permiso)));
     }
 });
 builder.Services.AddCascadingAuthenticationState();

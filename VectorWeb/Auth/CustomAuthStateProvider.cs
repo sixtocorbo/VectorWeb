@@ -42,6 +42,30 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
     }
 
+
+    public async Task RefreshCurrentUserPermissionsAsync()
+    {
+        if (_currentUser.Identity?.IsAuthenticated != true)
+        {
+            return;
+        }
+
+        var idClaim = _currentUser.FindFirstValue(ClaimTypes.NameIdentifier);
+        var nameClaim = _currentUser.FindFirstValue(ClaimTypes.Name);
+        var roleClaim = _currentUser.FindFirstValue(ClaimTypes.Role);
+        var oficinaClaim = _currentUser.FindFirstValue("IdOficina");
+
+        if (!int.TryParse(idClaim, out var idUsuario) ||
+            !int.TryParse(oficinaClaim, out var idOficina) ||
+            string.IsNullOrWhiteSpace(nameClaim))
+        {
+            return;
+        }
+
+        await _rolePermissionService.RevalidateCacheAsync();
+        _currentUser = await ConstruirPrincipalAsync(idUsuario, nameClaim, roleClaim ?? "OPERADOR", idOficina);
+        NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_currentUser)));
+    }
     public async Task MarkUserAsLoggedOutAsync()
     {
         await _sessionStorage.DeleteAsync(SessionKey);
