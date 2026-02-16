@@ -2,11 +2,13 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims
+@using System.Timers
 @using VectorWeb.Models
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
+@implements IDisposable
 
 <h3>
     <i class="bi bi-inbox"></i> Oficina: <strong>@nombreOficinaUsuario</strong>
@@ -33,8 +35,7 @@
                class="form-control"
                placeholder="Buscar por número, asunto, tipo, oficina o estado"
                @bind="FiltroBusqueda"
-               @bind:event="oninput"
-               @bind:after="OnFiltroBusquedaChanged" />
+               @bind:event="oninput" />
         <small class="text-muted">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
     </div>
     <div class="col-md-3">
@@ -148,6 +149,7 @@ else
     private List<MaeDocumento>? listaDocs;
     private Dictionary<long, long> documentoPadrePorHijo = [];
     private Dictionary<long, int> cantidadHijosPorPadre = [];
+    private Timer? timerBusqueda;
     private string filtroBusqueda = string.Empty;
     private int paginaActual = 1;
     private int tamanoPagina = 10;
@@ -176,6 +178,7 @@ else
 
             filtroBusqueda = value;
             paginaActual = 1;
+            ReiniciarTemporizadorBusqueda();
         }
     }
 
@@ -193,8 +196,6 @@ else
             paginaActual = 1;
         }
     }
-
-    private Task OnFiltroBusquedaChanged() => CargarDocumentos();
 
     private Task OnTamanoPaginaChanged() => CargarDocumentos();
 
@@ -266,7 +267,7 @@ else
             .Take(tamanoPagina)
             .ToListAsync();
 
-        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToHashSet();
+        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
         if (idsPagina.Count == 0)
         {
             documentoPadrePorHijo = [];
@@ -275,22 +276,53 @@ else
             return;
         }
 
-        var relacionesDirectas = await dbContext.MaeDocumentos
+        var hijosEnPagina = await dbContext.MaeDocumentos
             .AsNoTracking()
-            .Where(d => d.IdDocumentoPadre.HasValue)
+            .Where(d => idsPagina.Contains(d.IdDocumento) && d.IdDocumentoPadre.HasValue)
             .Select(d => new { d.IdDocumento, IdPadre = d.IdDocumentoPadre!.Value })
             .ToListAsync();
 
-        documentoPadrePorHijo = relacionesDirectas
-            .Where(rel => idsPagina.Contains(rel.IdDocumento))
+        documentoPadrePorHijo = hijosEnPagina
             .ToDictionary(rel => rel.IdDocumento, rel => rel.IdPadre);
 
-        cantidadHijosPorPadre = relacionesDirectas
-            .Where(rel => idsPagina.Contains(rel.IdPadre))
-            .GroupBy(rel => rel.IdPadre)
-            .ToDictionary(grupo => grupo.Key, grupo => grupo.Count());
+        var conteoHijos = await dbContext.MaeDocumentos
+            .AsNoTracking()
+            .Where(d => d.IdDocumentoPadre.HasValue && idsPagina.Contains(d.IdDocumentoPadre.Value))
+            .GroupBy(d => d.IdDocumentoPadre!.Value)
+            .Select(g => new { IdPadre = g.Key, Cantidad = g.Count() })
+            .ToListAsync();
+
+        cantidadHijosPorPadre = conteoHijos
+            .ToDictionary(x => x.IdPadre, x => x.Cantidad);
 
         StateHasChanged();
+    }
+
+    private void ReiniciarTemporizadorBusqueda()
+    {
+        timerBusqueda?.Stop();
+        timerBusqueda?.Dispose();
+
+        timerBusqueda = new Timer(500)
+        {
+            AutoReset = false,
+        };
+
+        timerBusqueda.Elapsed += async (_, _) =>
+        {
+            await InvokeAsync(CargarDocumentos);
+            timerBusqueda?.Dispose();
+            timerBusqueda = null;
+        };
+
+        timerBusqueda.Start();
+    }
+
+    public void Dispose()
+    {
+        timerBusqueda?.Stop();
+        timerBusqueda?.Dispose();
+        timerBusqueda = null;
     }
 
     private IQueryable<MaeDocumento> AplicarFiltroBusqueda(IQueryable<MaeDocumento> query)
