@@ -7,167 +7,209 @@
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject DocumentoVinculacionService VinculacionService
 @rendermode InteractiveServer
+@implements IDisposable
 
 <PageTitle>Vinculación de Documentos</PageTitle>
 
-<h3><i class="bi bi-diagram-3"></i> Vinculación Dinámica de Documentos</h3>
-<p class="text-muted">Definí un documento padre y agregá dinámicamente los hijos a vincular. El sistema valida ciclos y mantiene la consistencia del hilo para todo subárbol involucrado.</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-diagram-3"></i> Vinculación de Documentos</h3>
+
+    @if (docPadre != null && hijosSeleccionados.Any())
+    {
+        <button class="btn btn-primary animate__animated animate__pulse animate__infinite shadow"
+                @onclick="EjecutarVinculacion"
+                disabled="@procesando">
+            @if (procesando)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+            }
+            else
+            {
+                <i class="bi bi-link-45deg me-2"></i>
+            }
+            Confirmar Vinculación (@hijosSeleccionados.Count)
+        </button>
+    }
+</div>
 
 @if (!string.IsNullOrWhiteSpace(mensajeResultado))
 {
-    <div class="alert @(resultadoExitoso ? "alert-success" : "alert-danger")" role="alert">@mensajeResultado</div>
+    <div class="alert @(resultadoExitoso ? "alert-success" : "alert-danger") alert-dismissible fade show shadow-sm" role="alert">
+        @mensajeResultado
+        <button type="button" class="btn-close" @onclick="() => mensajeResultado = null"></button>
+    </div>
 }
 
-<div class="card mb-3">
-    <div class="card-header bg-light"><strong>1) Seleccionar documento padre</strong></div>
-    <div class="card-body">
-        <label class="form-label">Buscador de documentos</label>
-        <input class="form-control"
-               placeholder="Buscar por número, asunto o tipo"
-               @bind="filtroPadre"
-               @bind:event="oninput" />
-
-        <div class="table-responsive mt-3">
-            <table class="table table-sm table-hover align-middle">
-                <thead>
-                    <tr>
-                        <th>Nro.</th>
-                        <th>Asunto</th>
-                        <th>Tipo</th>
-                        <th class="text-end">Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!DocumentosPadreDisponibles.Any())
-                    {
-                        <tr>
-                            <td colspan="4" class="text-muted">No hay documentos para mostrar con el filtro actual.</td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var doc in DocumentosPadreDisponibles)
-                        {
-                            <tr class="@(docPadre?.IdDocumento == doc.IdDocumento ? "table-primary" : string.Empty)">
-                                <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
-                                <td>@doc.Asunto</td>
-                                <td>@NombreTipo(doc.IdTipo)</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => DefinirPadre(doc)">Definir padre</button>
-                                </td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        </div>
-
-        @if (docPadre is not null)
-        {
-            <div class="alert alert-info mb-0 mt-2">
-                <strong>Padre seleccionado:</strong>
-                #@docPadre.IdDocumento - @(string.IsNullOrWhiteSpace(docPadre.NumeroOficial) ? "S/N" : docPadre.NumeroOficial) - @docPadre.Asunto
+<div class="row g-4">
+    @* --- COLUMNA 1: DOCUMENTO PADRE --- *@
+    <div class="col-lg-6">
+        <div class="card h-100 shadow-sm border-primary">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-1-circle me-2"></i>Documento Principal (Padre)</span>
+                @if (buscandoPadre)
+                {
+                    <span class="spinner-border spinner-border-sm text-white"></span>
+                }
             </div>
-        }
+            <div class="card-body">
+                @if (docPadre == null)
+                {
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input class="form-control"
+                               placeholder="Buscar por N°, Asunto, ID o palabras clave..."
+                               @oninput="(e) => OnBuscar(e, true)" />
+                    </div>
+
+                    <div class="list-group list-group-flush overflow-auto" style="max-height: 400px;">
+                        @if (resultadosPadre.Count == 0 && !string.IsNullOrEmpty(txtBusquedaPadre))
+                        {
+                            <div class="text-center text-muted py-3">No se encontraron documentos.</div>
+                        }
+                        else if (string.IsNullOrEmpty(txtBusquedaPadre))
+                        {
+                            <div class="text-center text-muted py-3 small">
+                                <i class="bi bi-keyboard mb-2 d-block fs-4"></i>
+                                Escriba para buscar...
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var doc in resultadosPadre)
+                            {
+                                <button type="button" class="list-group-item list-group-item-action" @onclick="() => SeleccionarPadre(doc)">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1 text-primary fw-bold">
+                                            <span class="badge bg-light text-dark border me-1">#@doc.IdDocumento</span>
+                                            @(string.IsNullOrEmpty(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)
+                                        </h6>
+                                        <small class="text-muted">@ObtenerNombreTipo(doc.IdTipo)</small>
+                                    </div>
+                                    <p class="mb-1 small text-truncate">@doc.Asunto</p>
+                                </button>
+                            }
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4 bg-light rounded border border-primary border-opacity-25 animate__animated animate__fadeIn">
+                        <div class="mb-2"><i class="bi bi-file-earmark-check fs-1 text-primary"></i></div>
+                        <h4 class="text-primary">@(string.IsNullOrEmpty(docPadre.NumeroOficial) ? "S/N" : docPadre.NumeroOficial)</h4>
+                        <p class="card-text px-3 fw-bold">@docPadre.Asunto</p>
+                        <span class="badge bg-primary mb-3">@ObtenerNombreTipo(docPadre.IdTipo)</span>
+                        <div class="small text-muted mb-3">ID Interno: @docPadre.IdDocumento</div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="CancelarPadre">
+                                <i class="bi bi-x-circle me-1"></i>Cambiar Padre
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* --- COLUMNA 2: DOCUMENTOS HIJOS --- *@
+    <div class="col-lg-6">
+        <div class="card h-100 shadow-sm @(docPadre == null ? "opacity-50" : "border-success")">
+            <div class="card-header @(docPadre == null ? "bg-secondary" : "bg-success") text-white d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-2-circle me-2"></i>Documentos a Vincular (Hijos)</span>
+                @if (buscandoHijos)
+                {
+                    <span class="spinner-border spinner-border-sm text-white"></span>
+                }
+            </div>
+            <div class="card-body">
+                @if (docPadre == null)
+                {
+                    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted p-5">
+                        <i class="bi bi-arrow-left-circle fs-1 mb-2"></i>
+                        <p>Seleccione primero un documento padre.</p>
+                    </div>
+                }
+                else
+                {
+                    @* Area de seleccionados (Pinned Top) *@
+                    @if (hijosSeleccionados.Any())
+                    {
+                        <div class="mb-3 p-2 border rounded bg-success bg-opacity-10">
+                            <small class="text-success fw-bold d-block mb-2">
+                                <i class="bi bi-check-circle me-1"></i> Seleccionados (@hijosSeleccionados.Count):
+                            </small>
+                            <div class="d-flex flex-wrap gap-2">
+                                @foreach (var doc in hijosSeleccionados)
+                                {
+                                    <span class="badge bg-white text-success border border-success pe-1 shadow-sm d-flex align-items-center">
+                                        <span class="text-truncate" style="max-width: 150px;">
+                                            @(string.IsNullOrEmpty(doc.NumeroOficial) ? $"#{doc.IdDocumento}" : doc.NumeroOficial)
+                                        </span>
+                                        <button class="btn btn-link text-danger p-0 ms-2" @onclick="() => ToggleHijo(doc)" title="Quitar">
+                                            <i class="bi bi-x-circle-fill"></i>
+                                        </button>
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @* Buscador Hijos *@
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <input class="form-control"
+                               placeholder="Buscar por N°, Asunto, ID o descripción..."
+                               @oninput="(e) => OnBuscar(e, false)" />
+                    </div>
+
+                    @* Lista de resultados hijos *@
+                    <div class="list-group list-group-flush overflow-auto" style="max-height: 350px;">
+                        @if (resultadosHijos.Count == 0 && !string.IsNullOrEmpty(txtBusquedaHijos))
+                        {
+                            <div class="text-center text-muted py-3">No se encontraron documentos.</div>
+                        }
+                        else
+                        {
+                            @foreach (var doc in resultadosHijos)
+                            {
+                                var estaSeleccionado = hijosSeleccionados.Any(h => h.IdDocumento == doc.IdDocumento);
+                                var claseItem = estaSeleccionado ? "list-group-item-success" : "list-group-item-action";
+                                var icono = estaSeleccionado ? "bi-check-circle-fill" : "bi-plus-circle";
+
+                                <button type="button" class="list-group-item @claseItem d-flex justify-content-between align-items-center"
+                                        @onclick="() => ToggleHijo(doc)">
+                                    <div class="text-truncate me-2">
+                                        <div class="fw-bold">
+                                            <span class="badge bg-light text-dark border me-1" style="font-size: 0.7em;">#@doc.IdDocumento</span>
+                                            @(string.IsNullOrEmpty(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)
+                                        </div>
+                                        <div class="small text-muted text-truncate">@doc.Asunto</div>
+                                    </div>
+                                    <i class="bi @icono fs-5 @(estaSeleccionado ? "text-success" : "text-muted")"></i>
+                                </button>
+                            }
+                        }
+                    </div>
+                }
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="card mb-3">
-    <div class="card-header bg-light"><strong>2) Agregar documentos hijos</strong></div>
-    <div class="card-body">
-        <label class="form-label">Buscador de potenciales hijos</label>
-        <input class="form-control"
-               placeholder="Buscar por número, asunto o tipo"
-               @bind="filtroHijos"
-               @bind:event="oninput" />
-
-        <div class="table-responsive mt-3">
-            <table class="table table-sm table-striped align-middle">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Nro.</th>
-                        <th>Asunto</th>
-                        <th>Padre actual</th>
-                        <th>Hijos directos</th>
-                        <th class="text-end">Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!DocumentosHijosDisponibles.Any())
-                    {
-                        <tr>
-                            <td colspan="6" class="text-muted">No hay documentos hijos disponibles con el filtro actual.</td>
-                        </tr>
-                    }
-                    else
-                    {
-                        @foreach (var doc in DocumentosHijosDisponibles)
-                        {
-                            <tr>
-                                <td>@doc.IdDocumento</td>
-                                <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
-                                <td>@doc.Asunto</td>
-                                <td>@(doc.IdDocumentoPadre?.ToString() ?? "Sin padre")</td>
-                                <td>@CantidadHijosDirectos(doc.IdDocumento)</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-success"
-                                            disabled="@hijosSeleccionados.Contains(doc.IdDocumento)"
-                                            @onclick="() => AgregarHijo(doc.IdDocumento)">
-                                        Agregar
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    }
-                </tbody>
-            </table>
-        </div>
-
-        @if (!hijosSeleccionados.Any())
-        {
-            <p class="text-muted mb-0">No hay documentos hijos seleccionados.</p>
-        }
-        else
-        {
-            <div class="mt-2">
-                <strong>Hijos seleccionados:</strong>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                    @foreach (var id in hijosSeleccionados)
-                    {
-                        var doc = documentosPorId.GetValueOrDefault(id);
-                        <span class="badge text-bg-secondary">
-                            #@id - @(string.IsNullOrWhiteSpace(doc?.NumeroOficial) ? "S/N" : doc.NumeroOficial)
-                            <button class="btn btn-sm btn-link text-white p-0 ms-1" @onclick="() => QuitarHijo(id)"><i class="bi bi-x-circle"></i></button>
-                        </span>
-                    }
-                </div>
-            </div>
-        }
-    </div>
-</div>
-
-<div class="d-grid d-md-block mb-3">
-    <button class="btn btn-primary" disabled="@(docPadre is null || !hijosSeleccionados.Any())" @onclick="EjecutarVinculacion">
-        <i class="bi bi-link-45deg"></i> Ejecutar vinculación
-    </button>
-</div>
-
+@* Resultado Detallado *@
 @if (ultimoResultado?.Detalles?.Any() == true)
 {
-    <div class="card">
-        <div class="card-header bg-light"><strong>Resultado de operación</strong></div>
-        <div class="card-body">
+    <div class="card mt-4 border-info shadow-sm animate__animated animate__fadeInUp">
+        <div class="card-header bg-info text-dark"><strong><i class="bi bi-info-circle"></i> Resultado de la operación</strong></div>
+        <div class="card-body bg-light">
             <p class="mb-2"><strong>Registros afectados:</strong> @ultimoResultado.TotalRegistrosAfectados</p>
-            <ul class="mb-0">
+            <ul class="mb-0 small">
                 @foreach (var detalle in ultimoResultado.Detalles)
                 {
-                    var doc = documentosPorId.GetValueOrDefault(detalle.IdDocumento);
                     <li>
-                        Documento #@detalle.IdDocumento (@(doc?.NumeroOficial ?? "S/N")): @detalle.Estado
+                        Doc #@detalle.IdDocumento: <span class="fw-bold">@detalle.Estado</span>
                         @if (detalle.CantidadDescendientes > 0)
                         {
-                            <span>(incluye @detalle.CantidadDescendientes hijo(s) descendiente(s))</span>
+                            <span class="text-muted fst-italic ms-1">(incluye @detalle.CantidadDescendientes descendientes)</span>
                         }
                     </li>
                 }
@@ -177,108 +219,155 @@
 }
 
 @code {
-    private List<MaeDocumento> documentos = [];
-    private Dictionary<long, MaeDocumento> documentosPorId = new();
     private Dictionary<int, string> nombresTipo = new();
-    private string filtroPadre = string.Empty;
-    private string filtroHijos = string.Empty;
     private MaeDocumento? docPadre;
-    private HashSet<long> hijosSeleccionados = [];
+    private List<MaeDocumento> hijosSeleccionados = new();
+
+    // Estado de búsqueda
+    private List<MaeDocumento> resultadosPadre = new();
+    private List<MaeDocumento> resultadosHijos = new();
+    private string txtBusquedaPadre = "";
+    private string txtBusquedaHijos = "";
+
+    // Control UI
+    private bool procesando = false;
+    private bool buscandoPadre = false;
+    private bool buscandoHijos = false;
     private string? mensajeResultado;
     private bool resultadoExitoso;
     private VinculacionResultado? ultimoResultado;
 
-    private IEnumerable<MaeDocumento> DocumentosPadreDisponibles
-        => Filtrar(filtroPadre).Take(15);
-
-    private IEnumerable<MaeDocumento> DocumentosHijosDisponibles
-        => Filtrar(filtroHijos)
-            .Where(d => docPadre is null || d.IdDocumento != docPadre.IdDocumento)
-            .Take(20);
+    private System.Threading.Timer? _debounceTimer;
 
     protected override async Task OnInitializedAsync()
     {
-        documentos = await RepoDocs.GetQueryable()
-            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
-            .ToListAsync();
-
-        documentosPorId = documentos.ToDictionary(d => d.IdDocumento);
-
         nombresTipo = (await RepoTipos.GetAllAsync())
             .Where(t => !string.IsNullOrWhiteSpace(t.Nombre))
             .ToDictionary(t => t.IdTipo, t => t.Nombre);
     }
 
-    private IEnumerable<MaeDocumento> Filtrar(string texto)
-    {
-        var terminos = (texto ?? string.Empty)
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private string ObtenerNombreTipo(int id) => nombresTipo.GetValueOrDefault(id, "Tipo desconocido");
 
-        if (!terminos.Any())
+    private void OnBuscar(ChangeEventArgs e, bool esPadre)
+    {
+        var texto = e.Value?.ToString() ?? string.Empty;
+
+        if (esPadre) txtBusquedaPadre = texto;
+        else txtBusquedaHijos = texto;
+
+        _debounceTimer?.Dispose();
+        _debounceTimer = new System.Threading.Timer(async _ =>
         {
-            return documentos;
+            await InvokeAsync(async () => await EjecutarBusqueda(texto, esPadre));
+        }, null, 300, System.Threading.Timeout.Infinite);
+    }
+
+    // --- Lógica de Búsqueda Mejorada ---
+    private async Task EjecutarBusqueda(string texto, bool esPadre)
+    {
+        // 1. Validar longitud mínima para no traer toda la BD
+        if (string.IsNullOrWhiteSpace(texto) || texto.Length < 2)
+        {
+            if (esPadre) { resultadosPadre.Clear(); buscandoPadre = false; }
+            else { resultadosHijos.Clear(); buscandoHijos = false; }
+            StateHasChanged();
+            return;
         }
 
-        return documentos.Where(d => terminos.All(t => ConstruirIndice(d).Contains(t, StringComparison.OrdinalIgnoreCase)));
+        if (esPadre) buscandoPadre = true; else buscandoHijos = true;
+        StateHasChanged();
+
+        // 2. Tokenizar (Dividir palabras)
+        var terminos = texto.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        // 3. Construir consulta base
+        var query = RepoDocs.GetQueryable().AsNoTracking();
+
+        // 4. Aplicar Filtro Multi-Campo por cada término
+        foreach (var termino in terminos)
+        {
+            var t = termino; // Variable local para clausura segura
+            bool esNumero = int.TryParse(t, out int idBusqueda);
+
+            query = query.Where(d =>
+                d.NumeroOficial.Contains(t) ||
+                d.Asunto.Contains(t) ||
+                (d.Descripcion != null && d.Descripcion.Contains(t)) || // Busca en Descripción
+                (esNumero && d.IdDocumento == idBusqueda) // Busca por ID exacto
+            );
+        }
+
+        // 5. Excluir al padre si estamos buscando hijos
+        if (!esPadre && docPadre != null)
+        {
+            query = query.Where(d => d.IdDocumento != docPadre.IdDocumento);
+        }
+
+        var resultados = await query
+            .OrderByDescending(d => d.FechaCreacion)
+            .Take(15)
+            .ToListAsync();
+
+        if (esPadre) { resultadosPadre = resultados; buscandoPadre = false; }
+        else { resultadosHijos = resultados; buscandoHijos = false; }
+
+        StateHasChanged();
     }
 
-    private string ConstruirIndice(MaeDocumento d)
-        => string.Join(' ', d.IdDocumento, d.NumeroOficial, d.Asunto, NombreTipo(d.IdTipo));
-
-    private string NombreTipo(int idTipo)
-        => nombresTipo.GetValueOrDefault(idTipo, $"Tipo #{idTipo}");
-
-    private void DefinirPadre(MaeDocumento doc)
+    private void SeleccionarPadre(MaeDocumento doc)
     {
         docPadre = doc;
-        hijosSeleccionados.Remove(doc.IdDocumento);
+        hijosSeleccionados.Clear();
+        resultadosPadre.Clear();
+        txtBusquedaPadre = "";
+
+        resultadosHijos.Clear();
+        txtBusquedaHijos = "";
+
         mensajeResultado = null;
     }
 
-    private void AgregarHijo(long idDocumento)
+    private void CancelarPadre()
     {
-        hijosSeleccionados.Add(idDocumento);
-        mensajeResultado = null;
+        docPadre = null;
+        hijosSeleccionados.Clear();
+        resultadosHijos.Clear();
     }
 
-    private void QuitarHijo(long idDocumento)
+    private void ToggleHijo(MaeDocumento doc)
     {
-        hijosSeleccionados.Remove(idDocumento);
-    }
+        var existente = hijosSeleccionados.FirstOrDefault(x => x.IdDocumento == doc.IdDocumento);
 
-    private int CantidadHijosDirectos(long idDocumento)
-        => documentos.Count(d => d.IdDocumentoPadre == idDocumento);
+        if (existente != null) hijosSeleccionados.Remove(existente);
+        else hijosSeleccionados.Add(doc);
+    }
 
     private async Task EjecutarVinculacion()
     {
-        if (docPadre is null || !hijosSeleccionados.Any())
+        if (docPadre is null || !hijosSeleccionados.Any()) return;
+
+        procesando = true;
+        try
         {
-            mensajeResultado = "Debe seleccionar un padre y al menos un hijo.";
-            resultadoExitoso = false;
-            return;
+            var idsHijos = hijosSeleccionados.Select(d => d.IdDocumento).ToHashSet();
+            var resultado = await VinculacionService.VincularAsync(docPadre.IdDocumento, idsHijos);
+
+            ultimoResultado = resultado;
+            mensajeResultado = resultado.Mensaje;
+            resultadoExitoso = resultado.Exitoso;
+
+            if (resultado.Exitoso)
+            {
+                hijosSeleccionados.Clear();
+                docPadre = null;
+                resultadosHijos.Clear();
+            }
         }
+        finally { procesando = false; }
+    }
 
-        var resultado = await VinculacionService.VincularAsync(docPadre.IdDocumento, hijosSeleccionados);
-        ultimoResultado = resultado;
-        mensajeResultado = resultado.Mensaje;
-        resultadoExitoso = resultado.Exitoso;
-
-        if (!resultado.Exitoso)
-        {
-            return;
-        }
-
-        hijosSeleccionados.Clear();
-
-        documentos = await RepoDocs.GetQueryable()
-            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
-            .ToListAsync();
-
-        documentosPorId = documentos.ToDictionary(d => d.IdDocumento);
-
-        if (docPadre is not null)
-        {
-            docPadre = documentosPorId.GetValueOrDefault(docPadre.IdDocumento);
-        }
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
     }
 }
