@@ -437,10 +437,12 @@
         procesando = true;
         try
         {
-            var t1 = CargarRangos();
-            var t2 = CargarLibroMayorCuposAsync();
-            var t3 = RecargarBitacora();
-            await Task.WhenAll(t1, t2, t3);
+            // Este componente comparte un único DbContext por circuito.
+            // Evitamos ejecutar lecturas en paralelo para prevenir excepciones de concurrencia
+            // como "A second operation was started on this context instance...".
+            await CargarRangos();
+            await CargarLibroMayorCuposAsync();
+            await RecargarBitacora();
         }
         finally
         {
