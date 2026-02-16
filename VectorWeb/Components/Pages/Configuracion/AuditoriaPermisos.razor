@@ -18,11 +18,11 @@
             </div>
             <div class="col-md-3">
                 <label class="form-label">Desde</label>
-                <input class="form-control" type="date" @bind="fechaDesdeTexto" />
+                <input class="form-control" type="date" @bind="fechaDesde" />
             </div>
             <div class="col-md-3">
                 <label class="form-label">Hasta</label>
-                <input class="form-control" type="date" @bind="fechaHastaTexto" />
+                <input class="form-control" type="date" @bind="fechaHasta" />
             </div>
             <div class="col-md-2 d-grid">
                 <button class="btn btn-primary" @onclick="CargarAsync">
@@ -91,8 +91,8 @@
     private readonly List<SegAuditoriaPermiso> registros = [];
     private bool cargando;
     private string filtroTexto = string.Empty;
-    private string? fechaDesdeTexto;
-    private string? fechaHastaTexto;
+    private DateTime? fechaDesde;
+    private DateTime? fechaHasta;
     private string mensajeError = string.Empty;
 
     protected override async Task OnInitializedAsync()
@@ -118,14 +118,14 @@
                     x.PermisoRequerido.Contains(texto));
             }
 
-            if (DateTime.TryParse(fechaDesdeTexto, out var fechaDesde))
+            if (fechaDesde.HasValue)
             {
-                query = query.Where(x => x.FechaEvento >= fechaDesde.Date);
+                query = query.Where(x => x.FechaEvento >= fechaDesde.Value.Date);
             }
 
-            if (DateTime.TryParse(fechaHastaTexto, out var fechaHasta))
+            if (fechaHasta.HasValue)
             {
-                var hastaExclusivo = fechaHasta.Date.AddDays(1);
+                var hastaExclusivo = fechaHasta.Value.Date.AddDays(1);
                 query = query.Where(x => x.FechaEvento < hastaExclusivo);
             }
 
