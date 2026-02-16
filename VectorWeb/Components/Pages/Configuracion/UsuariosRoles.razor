@@ -6,6 +6,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services.Security
+@using VectorWeb.Auth
 @inject IRepository<CatUsuario> RepoUsuarios
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CfgSistemaParametro> RepoParametros
@@ -220,22 +221,28 @@
             {
                 <div class="border rounded p-3 mb-3">
                     <h6 class="fw-bold mb-3">@rol</h6>
-                    <div class="row g-2">
-                        @foreach (var permiso in AppPermissions.Todos)
-                        {
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox"
-                                           id="perm_@rol.Replace(" ", "_")_@permiso.Replace(".", "_")"
-                                           checked="@TienePermiso(rol, permiso)"
-                                           @onchange="e => TogglePermiso(rol, permiso, e.Value is true)" />
-                                    <label class="form-check-label" for="perm_@rol.Replace(" ", "_")_@permiso.Replace(".", "_")">
-                                        @EtiquetaPermiso(permiso)
-                                    </label>
-                                </div>
+                    @foreach (var grupo in AppPermissions.Listado.GroupBy(p => p.Grupo).OrderBy(g => g.Key))
+                    {
+                        <div class="mb-3">
+                            <p class="text-muted fw-semibold mb-2">@grupo.Key</p>
+                            <div class="row g-2">
+                                @foreach (var permiso in grupo)
+                                {
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox"
+                                                   id="perm_@rol.Replace(" ", "_")_@permiso.Valor.Replace(".", "_")"
+                                                   checked="@TienePermiso(rol, permiso.Valor)"
+                                                   @onchange="e => TogglePermiso(rol, permiso.Valor, e.Value is true)" />
+                                            <label class="form-check-label" for="perm_@rol.Replace(" ", "_")_@permiso.Valor.Replace(".", "_")">
+                                                @permiso.Etiqueta
+                                            </label>
+                                        </div>
+                                    </div>
+                                }
                             </div>
-                        }
-                    </div>
+                        </div>
+                    }
                 </div>
             }
 
@@ -485,10 +492,10 @@
 
         // 2. VALIDACIÓN: Evitar quedarse sin administradores
         // Si el usuario es ADMIN y lo estamos intentando desactivar (está activo)...
-        if (usuario.Activo == true && RolMostrar(usuario.Rol) == "ADMIN")
+        if (usuario.Activo == true && RolePermissionService.EsRolAdministrativo(usuario.Rol))
         {
             // Contamos cuántos admins activos quedarían si procedemos
-            var adminsActivos = usuarios.Count(u => u.Activo == true && RolMostrar(u.Rol) == "ADMIN");
+            var adminsActivos = usuarios.Count(u => u.Activo == true && RolePermissionService.EsRolAdministrativo(u.Rol));
 
             if (adminsActivos <= 1)
             {
@@ -631,7 +638,14 @@
             await RepoParametros.UpdateAsync(parametro);
         }
 
-        mensajeExito = "Permisos guardados. Los cambios aplican en el próximo inicio de sesión.";
+        await RolePermissionService.RevalidateCacheAsync();
+
+        if (AuthStateProvider is CustomAuthStateProvider customAuthProvider)
+        {
+            await customAuthProvider.RefreshCurrentUserPermissionsAsync();
+        }
+
+        mensajeExito = "Permisos guardados y aplicados.";
     }
 
     private static string EtiquetaPermiso(string permiso)
@@ -651,11 +665,18 @@
 
     private string NombreOficina(int? id) => oficinas.FirstOrDefault(o => o.IdOficina == id)?.Nombre ?? "Desconocida";
 
-    private string ObtenerBadgeRol(string? rol) => RolePermissionService.NormalizarRol(rol) switch
+    private string ObtenerBadgeRol(string? rol)
     {
-        "ADMIN" => "bg-danger",
-        "SUPERVISOR" => "bg-warning text-dark",
-        "OPERADOR" => "bg-info text-dark",
-        _ => "bg-secondary"
-    };
+        if (RolePermissionService.EsRolAdministrativo(rol))
+        {
+            return "bg-danger";
+        }
+
+        return RolePermissionService.NormalizarRol(rol) switch
+        {
+            "SUPERVISOR" => "bg-warning text-dark",
+            "OPERADOR" => "bg-info text-dark",
+            _ => "bg-secondary"
+        };
+    }
 }
