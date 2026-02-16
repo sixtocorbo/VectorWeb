@@ -118,7 +118,8 @@ else
 
     private static string ObtenerEtiquetaDocumento(MaeDocumento doc)
     {
-        var tipo = string.IsNullOrWhiteSpace(doc.IdTipoNavigation?.Nombre) ? "DOC" : doc.IdTipoNavigation.Nombre;
+        var nombreTipo = doc.IdTipoNavigation?.Nombre;
+        var tipo = string.IsNullOrWhiteSpace(nombreTipo) ? "DOC" : nombreTipo;
         var numero = string.IsNullOrWhiteSpace(doc.NumeroOficial) ? doc.NumeroInterno : doc.NumeroOficial;
         var anio = doc.AnioDocumento;
         var sufijoAnio = anio.HasValue ? $"/{anio.Value}" : string.Empty;
