@@ -55,6 +55,16 @@ h1:focus {
     border: 1px solid #d8e2ef;
     border-radius: 0.5rem;
     background-color: #f8fbff;
+    margin-bottom: 0.3rem;
+}
+
+.office-switch .form-check-input {
+    float: none;
+    margin: 0;
+}
+
+.office-switch .form-check-label {
+    margin-left: 0.55rem;
 }
 
 .controls-panel {
