@@ -91,6 +91,14 @@ else
                     <td>
                         <div class="fw-semibold small text-truncate" title="@doc.NumeroOficial">@doc.NumeroOficial</div>
                         <div class="text-muted small text-truncate" title="@doc.IdTipoNavigation?.Nombre">@doc.IdTipoNavigation?.Nombre</div>
+                        @if (documentoPadrePorHijo.TryGetValue(doc.IdDocumento, out var idPadre))
+                        {
+                            <span class="badge bg-warning text-dark mt-1" title="Documento hijo del expediente #@idPadre">Hijo de #@idPadre</span>
+                        }
+                        else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
+                        {
+                            <span class="badge bg-primary mt-1" title="Documento padre con @cantidadHijos documento(s) hijo(s)">Padre (@cantidadHijos)</span>
+                        }
                     </td>
                     <td class="text-truncate" title="@doc.Asunto">@doc.Asunto</td>
                     <td title="@doc.IdOficinaActualNavigation?.Nombre">
@@ -104,10 +112,16 @@ else
                         }
                     </td>
                     <td class="text-center">
-                        @if (documentosConVinculos.Contains(doc.IdDocumento))
+                        @if (documentoPadrePorHijo.TryGetValue(doc.IdDocumento, out var idDocumentoPadre))
                         {
-                            <a href="documentos/vinculos/@doc.IdDocumento" class="text-primary" title="Ver vínculos del documento">
-                                <i class="bi bi-diagram-3" aria-hidden="true"></i>
+                            <a href="documentos/vinculos/@doc.IdDocumento" class="text-warning" title="Documento hijo del #@idDocumentoPadre. Ver familia.">
+                                <i class="bi bi-diagram-2" aria-hidden="true"></i>
+                            </a>
+                        }
+                        else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var totalHijos))
+                        {
+                            <a href="documentos/vinculos/@doc.IdDocumento" class="text-primary" title="Documento padre con @totalHijos hijo(s). Ver familia.">
+                                <i class="bi bi-diagram-3-fill" aria-hidden="true"></i>
                             </a>
                         }
                         else
@@ -143,7 +157,8 @@ else
 
 @code {
     private List<MaeDocumento>? listaDocs;
-    private HashSet<long> documentosConVinculos = [];
+    private Dictionary<long, long> documentoPadrePorHijo = [];
+    private Dictionary<long, int> cantidadHijosPorPadre = [];
     private string filtroBusqueda = string.Empty;
     private int paginaActual = 1;
     private int tamanoPagina = 10;
@@ -265,7 +280,8 @@ else
         var idsPagina = listaDocs.Select(d => d.IdDocumento).ToHashSet();
         if (idsPagina.Count == 0)
         {
-            documentosConVinculos = [];
+            documentoPadrePorHijo = [];
+            cantidadHijosPorPadre = [];
             StateHasChanged();
             return;
         }
@@ -276,11 +292,14 @@ else
             .Select(d => new { d.IdDocumento, IdPadre = d.IdDocumentoPadre!.Value })
             .ToListAsync();
 
-        documentosConVinculos = relacionesDirectas
-            .Where(rel => idsPagina.Contains(rel.IdDocumento) || idsPagina.Contains(rel.IdPadre))
-            .SelectMany(rel => new[] { rel.IdDocumento, rel.IdPadre })
-            .Where(idsPagina.Contains)
-            .ToHashSet();
+        documentoPadrePorHijo = relacionesDirectas
+            .Where(rel => idsPagina.Contains(rel.IdDocumento))
+            .ToDictionary(rel => rel.IdDocumento, rel => rel.IdPadre);
+
+        cantidadHijosPorPadre = relacionesDirectas
+            .Where(rel => idsPagina.Contains(rel.IdPadre))
+            .GroupBy(rel => rel.IdPadre)
+            .ToDictionary(grupo => grupo.Key, grupo => grupo.Count());
 
         StateHasChanged();
     }
