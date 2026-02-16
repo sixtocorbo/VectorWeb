@@ -95,7 +95,8 @@
                                         var esPrincipal = mov.IdDocumento == documento.IdDocumento;
                                         // Si es otro documento del hilo, lo destacamos diferente
                                         <a href="documentos/historial/@mov.IdDocumento"
-                                           class="badge text-decoration-none @(esPrincipal ? "bg-primary-subtle text-primary-emphasis border border-primary-subtle" : "bg-warning-subtle text-warning-emphasis border border-warning-subtle")"
+                                           class="badge text-decoration-none border px-2 py-1 @(esPrincipal ? "alert-primary text-primary" : "alert-warning text-dark")"
+                                           style="font-size: 0.9em; opacity: 1 !important;"
                                            title="@(esPrincipal ? "Movimiento del documento actual" : "Movimiento de un documento vinculado/hijo")">
                                             <i class="bi @(esPrincipal ? "bi-file-earmark-text" : "bi-paperclip")"></i>
                                             @mov.IdDocumentoNavigation.IdTipoNavigation?.Nombre @mov.IdDocumentoNavigation.NumeroOficial
