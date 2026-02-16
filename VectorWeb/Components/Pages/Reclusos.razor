@@ -1,4 +1,6 @@
-﻿@page "/reclusos"
+@page "/reclusos"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "reclusos.gestionar")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeRecluso> Repositorio

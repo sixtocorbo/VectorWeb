@@ -1,4 +1,6 @@
 @page "/documentos"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.ver")]
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims

@@ -1,4 +1,6 @@
 @page "/renovaciones"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "renovaciones.gestionar")]
 @using VectorWeb.Services
 @inject RenovacionesService Service
 @inject IJSRuntime JS
