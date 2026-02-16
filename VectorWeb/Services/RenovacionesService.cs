@@ -321,14 +321,30 @@ public sealed class RenovacionesService
 
     private static bool IntentarParsearJsonObservaciones(string obs, out ObservacionesRenovacionDto dto)
     {
+        dto = new ObservacionesRenovacionDto();
+
+        if (string.IsNullOrWhiteSpace(obs))
+        {
+            return false;
+        }
+
         try
         {
-            dto = JsonSerializer.Deserialize<ObservacionesRenovacionDto>(obs) ?? new ObservacionesRenovacionDto();
+            using var document = JsonDocument.Parse(obs);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            dto = document.RootElement.Deserialize<ObservacionesRenovacionDto>() ?? new ObservacionesRenovacionDto();
             return true;
         }
         catch (JsonException)
         {
-            dto = new ObservacionesRenovacionDto();
+            return false;
+        }
+        catch (NotSupportedException)
+        {
             return false;
         }
     }
