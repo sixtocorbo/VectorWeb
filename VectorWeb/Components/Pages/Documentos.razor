@@ -100,7 +100,11 @@ else
                         }
                         else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
                         {
-                            <span class="badge bg-primary mt-1" title="Documento padre con @cantidadHijos documento(s) hijo(s)">Padre (@cantidadHijos)</span>
+                            <a href="documentos/historial/@doc.IdDocumento"
+                               class="badge bg-primary mt-1 text-decoration-none"
+                               title="Documento padre con @cantidadHijos documento(s) hijo(s). Abrir historial de movimientos.">
+                                Padre (@cantidadHijos)
+                            </a>
                         }
                     </td>
                     <td class="text-truncate" title="@doc.Asunto">@doc.Asunto</td>
