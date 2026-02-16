@@ -74,6 +74,10 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ffd54f' viewBox='0 0 16 16'%3E%3Cpath d='M2 2h12v2H2V2Zm0 5h5v2H2V7Zm0 5h8v2H2v-2Zm9-5h3v7h-3V7Zm1 1v5h1V8h-1Z'/%3E%3C/svg%3E");
 }
 
+.bi-usuarios-nav-menu {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2381c784' viewBox='0 0 16 16'%3E%3Cpath d='M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-5 7a5 5 0 0 1 10 0H3Zm9.5-6.5a2.5 2.5 0 1 0-1.197-4.696A3.9 3.9 0 0 1 12 6a3.9 3.9 0 0 1-.209 1.27c.228.147.468.23.709.23Zm.01 1c-.29 0-.576-.04-.85-.116A6 6 0 0 1 15.5 15h-1.75a5.95 5.95 0 0 0-1.24-3.5Z'/%3E%3C/svg%3E");
+}
+
 .nav-item {
     font-size: 0.9rem;
     padding-bottom: 0.5rem;
