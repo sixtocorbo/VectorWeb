@@ -91,12 +91,12 @@ else
                     <td>
                         <div class="fw-semibold small text-truncate" title="@doc.NumeroOficial">@doc.NumeroOficial</div>
                         <div class="text-muted small text-truncate" title="@doc.IdTipoNavigation?.Nombre">@doc.IdTipoNavigation?.Nombre</div>
-                        @if (documentoPadrePorHijo.TryGetValue(doc.IdDocumento, out var idPadre))
+                        @if (doc.IdDocumentoPadre.HasValue)
                         {
-                            <a href="documentos/historial/@idPadre"
+                            <a href="documentos/historial/@doc.IdDocumentoPadre"
                                class="badge bg-warning text-dark mt-1 text-decoration-none"
-                               title="Documento hijo del expediente #@idPadre. Abrir historial de movimientos del padre.">
-                                Hijo de #@idPadre
+                               title="Documento hijo del expediente #@doc.IdDocumentoPadre. Abrir historial de movimientos del padre.">
+                                Hijo de #@doc.IdDocumentoPadre
                             </a>
                         }
                         else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
@@ -147,7 +147,6 @@ else
 
 @code {
     private List<MaeDocumento>? listaDocs;
-    private Dictionary<long, long> documentoPadrePorHijo = [];
     private Dictionary<long, int> cantidadHijosPorPadre = [];
     private Timer? timerBusqueda;
     private string filtroBusqueda = string.Empty;
@@ -268,20 +267,10 @@ else
         var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
         if (idsPagina.Count == 0)
         {
-            documentoPadrePorHijo = [];
             cantidadHijosPorPadre = [];
             StateHasChanged();
             return;
         }
-
-        var hijosEnPagina = await dbContext.MaeDocumentos
-            .AsNoTracking()
-            .Where(d => idsPagina.Contains(d.IdDocumento) && d.IdDocumentoPadre.HasValue)
-            .Select(d => new { d.IdDocumento, IdPadre = d.IdDocumentoPadre!.Value })
-            .ToListAsync();
-
-        documentoPadrePorHijo = hijosEnPagina
-            .ToDictionary(rel => rel.IdDocumento, rel => rel.IdPadre);
 
         var conteoHijos = await dbContext.MaeDocumentos
             .AsNoTracking()
@@ -310,17 +299,26 @@ else
         {
             _ = InvokeAsync(async () =>
             {
-                if (!ReferenceEquals(timerBusqueda, nuevoTimer))
+                try
                 {
-                    return;
+                    if (!ReferenceEquals(timerBusqueda, nuevoTimer))
+                    {
+                        return;
+                    }
+
+                    await CargarDocumentos();
                 }
-
-                await CargarDocumentos();
-
-                if (ReferenceEquals(timerBusqueda, nuevoTimer))
+                catch (Exception ex)
                 {
-                    timerBusqueda?.Dispose();
-                    timerBusqueda = null;
+                    Console.Error.WriteLine($"Error en búsqueda de documentos: {ex.Message}");
+                }
+                finally
+                {
+                    if (ReferenceEquals(timerBusqueda, nuevoTimer))
+                    {
+                        timerBusqueda?.Dispose();
+                        timerBusqueda = null;
+                    }
                 }
             });
         };
