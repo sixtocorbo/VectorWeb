@@ -243,7 +243,7 @@
                         <div class="alert alert-danger" role="alert">@mensajeErrorModalRango</div>
                     }
 
-                    <EditForm Model="rangoActual" OnValidSubmit="Guardar">
+                    <EditForm Model="rangoActual" OnSubmit="IgnorarSubmitRango" @onsubmit:preventDefault="true">
                         <DataAnnotationsValidator />
 
                         <div class="row g-3">
@@ -269,7 +269,7 @@
                                                @oninput="FiltrarOficinasRango"
                                                @onfocus="MostrarSugerenciasOficinaRango"
                                                @onkeydown="ManejarTecladoOficinasRango" />
-                                        <button type="button" class="btn btn-outline-secondary" @onclick="SeleccionarGlobal">Global</button>
+                                        <button type="button" class="btn @ClaseBotonGlobalRango" @onclick="SeleccionarGlobal">Global</button>
                                     </div>
 
                                     @if (oficinasRangoFiltradas.Any())
@@ -286,7 +286,7 @@
                                         </div>
                                     }
                                 </div>
-                                <div class="form-text">Si selecciona Global, el rango será compartido.</div>
+                                <div class="form-text @ClaseMensajeOficinaRango">@MensajeOficinaRango</div>
                             </div>
 
                             <div class="col-md-4">
@@ -319,7 +319,7 @@
 
                         <div class="modal-footer px-0 pb-0 mt-3">
                             <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
-                            <button type="submit" class="btn btn-primary" disabled="@procesando">
+                            <button type="button" class="btn btn-primary" @onclick="Guardar" disabled="@procesando">
                                 @if (procesando)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1"></span>
@@ -420,6 +420,7 @@
     private string oficinaBusquedaRango = string.Empty;
     private List<CatOficina> oficinasRangoFiltradas = new();
     private int indiceOficinaRangoSeleccionada = -1;
+    private bool globalSeleccionadoRango = true;
 
     // Estado Cupo
     private int cupoTipoSeleccionado;
@@ -568,6 +569,7 @@
             Activo = true,
             Anio = DateTime.Now.Year
         };
+        globalSeleccionadoRango = true;
         oficinaBusquedaRango = string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
@@ -591,6 +593,7 @@
             Anio = rango.Anio
         };
         oficinaBusquedaRango = rango.IdOficinaNavigation?.Nombre ?? string.Empty;
+        globalSeleccionadoRango = rango.IdOficina is null;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         mostrarModal = true;
@@ -608,6 +611,7 @@
     {
         oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
         rangoActual.IdOficina = null;
+        globalSeleccionadoRango = false;
         indiceOficinaRangoSeleccionada = -1;
 
         if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
@@ -634,6 +638,7 @@
     private Task SeleccionarOficinaRango(CatOficina oficina)
     {
         rangoActual.IdOficina = oficina.IdOficina;
+        globalSeleccionadoRango = false;
         oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
@@ -643,9 +648,36 @@
     private void SeleccionarGlobal()
     {
         rangoActual.IdOficina = null;
+        globalSeleccionadoRango = true;
         oficinaBusquedaRango = string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
+    }
+
+    private string ClaseBotonGlobalRango => globalSeleccionadoRango
+        ? "btn-success"
+        : "btn-outline-secondary";
+
+    private string ClaseMensajeOficinaRango => globalSeleccionadoRango
+        ? "text-success fw-semibold"
+        : "text-muted";
+
+    private string MensajeOficinaRango
+    {
+        get
+        {
+            if (globalSeleccionadoRango)
+            {
+                return "Global seleccionado: este rango aplica a todas las oficinas.";
+            }
+
+            if (rangoActual.IdOficina is not null)
+            {
+                return "La numeración se aplicará únicamente a la oficina seleccionada.";
+            }
+
+            return "Seleccione una oficina específica o pulse Global.";
+        }
     }
 
     private void MostrarSugerenciasOficinaRango()
@@ -733,6 +765,12 @@
         {
             procesando = false;
         }
+    }
+
+    private Task IgnorarSubmitRango(EditContext _)
+    {
+        // Evita guardar automáticamente al presionar Enter dentro del formulario.
+        return Task.CompletedTask;
     }
 
     private async Task EliminarRango(MaeNumeracionRango rango)
