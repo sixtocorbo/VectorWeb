@@ -87,29 +87,29 @@ else
     protected override async Task OnParametersSetAsync()
     {
         cargando = true;
+        relaciones.Clear();
 
-        var query = RepoDocs.GetQueryable("IdTipoNavigation,IdDocumentoPadreNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
+        var queryDoc = RepoDocs.GetQueryable("IdTipoNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
 
-        documentoActual = await query.FirstOrDefaultAsync(d => d.IdDocumento == IdDocumento);
+        documentoActual = await queryDoc.FirstOrDefaultAsync(d => d.IdDocumento == IdDocumento);
 
         if (documentoActual is null)
         {
-            relaciones = [];
             cargando = false;
             return;
         }
-
-        var hijos = await query
-            .Where(d => d.IdDocumentoPadre == IdDocumento)
-            .OrderByDescending(d => d.FechaCreacion)
-            .ToListAsync();
-
-        relaciones = [];
 
         if (documentoActual.IdDocumentoPadreNavigation is not null)
         {
             relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, TipoRelacionVinculo.Padre));
         }
+
+        var queryHijos = RepoDocs.GetQueryable("IdTipoNavigation");
+
+        var hijos = await queryHijos
+            .Where(d => d.IdDocumentoPadre == IdDocumento)
+            .OrderByDescending(d => d.FechaCreacion)
+            .ToListAsync();
 
         relaciones.AddRange(hijos.Select(h => new RelacionVinculo(h, TipoRelacionVinculo.Hijo)));
 
@@ -120,7 +120,10 @@ else
     {
         var tipo = string.IsNullOrWhiteSpace(doc.IdTipoNavigation?.Nombre) ? "DOC" : doc.IdTipoNavigation.Nombre;
         var numero = string.IsNullOrWhiteSpace(doc.NumeroOficial) ? doc.NumeroInterno : doc.NumeroOficial;
-        return $"{tipo} {numero}";
+        var anio = doc.AnioDocumento;
+        var sufijoAnio = anio.HasValue ? $"/{anio.Value}" : string.Empty;
+
+        return $"{tipo} {numero}{sufijoAnio}";
     }
 
     private void VolverABandeja()
