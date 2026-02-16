@@ -290,8 +290,8 @@
             bool esNumero = int.TryParse(t, out int idBusqueda);
 
             query = query.Where(d =>
-                d.NumeroOficial.Contains(t) ||
-                d.Asunto.Contains(t) ||
+                (d.NumeroOficial != null && d.NumeroOficial.Contains(t)) ||
+                (d.Asunto != null && d.Asunto.Contains(t)) ||
                 (d.Descripcion != null && d.Descripcion.Contains(t)) || // Busca en Descripción
                 (esNumero && d.IdDocumento == idBusqueda) // Busca por ID exacto
             );
