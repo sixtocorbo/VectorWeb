@@ -83,11 +83,36 @@
         </div>
 
         <div class="mb-3">
-            <label>Documentos Vinculados (IDs)</label>
-            <div class="input-group">
+            <label>Documentos Vinculados</label>
+            <div class="input-group mb-2">
                 <input type="number" class="form-control" placeholder="ID Documento" @bind="idDocAgregar" />
                 <button type="button" class="btn btn-outline-secondary" @onclick="AgregarDoc">Agregar ID</button>
             </div>
+
+            <div class="input-group mb-2">
+                <input type="text" class="form-control" placeholder="Buscar por asunto/descripcion" @bind="filtroDocumento" />
+                <button type="button" class="btn btn-outline-primary" @onclick="BuscarCandidatos">Buscar candidatos</button>
+            </div>
+            <small class="text-muted">Las sugerencias por texto pueden incluir homónimos; verifique el contenido del documento antes de vincular.</small>
+
+            @if (!string.IsNullOrWhiteSpace(mensajeDocumento))
+            {
+                <div class="alert alert-warning mt-2 mb-2 py-2">@mensajeDocumento</div>
+            }
+
+            @if (documentosCandidatos.Count > 0)
+            {
+                <ul class="list-group mb-2">
+                    @foreach (var doc in documentosCandidatos)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@doc.Texto</span>
+                            <button type="button" class="btn btn-sm btn-outline-success" @onclick="() => AgregarDoc(doc.IdDocumento)">Vincular</button>
+                        </li>
+                    }
+                </ul>
+            }
+
             <ul class="list-group mt-2">
                 @foreach (var docId in idsDocumentos)
                 {
@@ -124,6 +149,9 @@
 
     private List<long> idsDocumentos = [];
     private long idDocAgregar;
+    private string mensajeDocumento = string.Empty;
+    private string filtroDocumento = string.Empty;
+    private List<DocumentoRespaldoDto> documentosCandidatos = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -149,16 +177,55 @@
         idsDocumentos = existente.TraSalidasLaboralesDocumentoRespaldos
             .Select(x => x.IdDocumento)
             .ToList();
+
+        await BuscarCandidatos();
     }
 
-    private void AgregarDoc()
+    private async Task BuscarCandidatos()
     {
-        if (idDocAgregar <= 0 || idsDocumentos.Contains(idDocAgregar))
+        mensajeDocumento = string.Empty;
+
+        var nombreRecluso = reclusos.FirstOrDefault(r => r.IdRecluso == modelo.IdRecluso)?.NombreCompleto ?? string.Empty;
+        var filtro = string.IsNullOrWhiteSpace(filtroDocumento) ? nombreRecluso : filtroDocumento;
+
+        if (string.IsNullOrWhiteSpace(filtro))
         {
+            documentosCandidatos = [];
             return;
         }
 
-        idsDocumentos.Add(idDocAgregar);
+        documentosCandidatos = await Service.BuscarDocumentosCandidatos(modelo.IdRecluso, filtro);
+    }
+
+    private async Task AgregarDoc()
+    {
+        await AgregarDoc(idDocAgregar);
+    }
+
+    private async Task AgregarDoc(long idDocumento)
+    {
+        mensajeDocumento = string.Empty;
+
+        if (idDocumento <= 0)
+        {
+            mensajeDocumento = "Debe ingresar un ID de documento válido.";
+            return;
+        }
+
+        if (idsDocumentos.Contains(idDocumento))
+        {
+            mensajeDocumento = "El documento ya está vinculado.";
+            return;
+        }
+
+        var existe = await Service.ExisteDocumentoAsync(idDocumento);
+        if (!existe)
+        {
+            mensajeDocumento = $"No existe un documento con ID {idDocumento}.";
+            return;
+        }
+
+        idsDocumentos.Add(idDocumento);
         idDocAgregar = 0;
     }
 
@@ -169,7 +236,16 @@
 
     private async Task Guardar()
     {
-        await Service.GuardarAsync(modelo, idsDocumentos, codigoAutorizacion, descAutorizacion, observacionesUsuario);
-        Nav.NavigateTo("renovaciones");
+        mensajeDocumento = string.Empty;
+
+        try
+        {
+            await Service.GuardarAsync(modelo, idsDocumentos, codigoAutorizacion, descAutorizacion, observacionesUsuario);
+            Nav.NavigateTo("renovaciones");
+        }
+        catch (InvalidOperationException ex)
+        {
+            mensajeDocumento = ex.Message;
+        }
     }
 }
