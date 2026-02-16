@@ -5,60 +5,163 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<div class="container py-2">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3><i class="bi bi-file-earmark-text"></i> Ficha del Documento</h3>
-        <a href="documentos" class="btn btn-outline-secondary">Volver a la lista</a>
+<PageTitle>Ficha de Documento - Vector</PageTitle>
+
+<style>
+    .ficha-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        color: white;
+        border-radius: 12px 12px 0 0;
+        padding: 1.5rem;
+    }
+
+    .card-ficha {
+        border: none;
+        border-radius: 12px;
+    }
+
+    .label-info {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+        display: block;
+    }
+
+    .data-box {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        font-size: 0.95rem;
+        color: #212529;
+        min-height: 45px;
+        display: flex;
+        align-items: center;
+    }
+
+    .data-text {
+        white-space: pre-wrap;
+        align-items: flex-start !important;
+        padding-top: 0.75rem;
+    }
+
+    .icon-field {
+        color: #0d6efd;
+        margin-right: 10px;
+        font-size: 1.1rem;
+    }
+
+    /* ESTILOS PARA IMPRESIÓN */
+    @@media print {
+        .btn, .spinner-border, .mb-3, .card-footer {
+            display: none !important; /* Oculta botones y navegación al imprimir */
+        }
+
+        .container {
+            width: 100%;
+            max-width: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .card-ficha {
+            box-shadow: none !important;
+            border: 1px solid #ddd;
+        }
+
+        .ficha-header {
+            background: #eee !important;
+            color: black !important;
+            border-bottom: 2px solid #000;
+        }
+    }
+</style>
+
+<div class="container py-4">
+    <div class="mb-3">
+        <a href="documentos" class="btn btn-link text-decoration-none p-0 text-muted">
+            <i class="bi bi-arrow-left"></i> Volver a la Bandeja de Documentos
+        </a>
     </div>
 
     @if (cargando)
     {
-        <div class="alert alert-info">Cargando documento...</div>
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Obteniendo información del documento...</p>
+        </div>
     }
     else if (documento is null)
     {
-        <div class="alert alert-warning">No se encontró el documento solicitado.</div>
+        <div class="alert alert-warning border-0 shadow-sm d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div>No se ha podido localizar el documento solicitado.</div>
+        </div>
     }
     else
     {
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <div class="row g-3">
+        <div class="card shadow-sm card-ficha">
+            <div class="ficha-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0 fw-bold"><i class="bi bi-file-earmark-text me-2"></i>Detalle del Documento</h3>
+                <span class="badge bg-light text-primary py-2 px-3">ID: @documento.IdDocumento</span>
+            </div>
+
+            <div class="card-body p-4">
+                <div class="row g-4">
+                    <div class="col-md-6 col-lg-3">
+                        <span class="label-info">Número Oficial</span>
+                        <div class="data-box"><i class="bi bi-hash icon-field"></i> @(documento.NumeroOficial ?? "Sin Nro")</div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <span class="label-info">Número Interno</span>
+                        <div class="data-box"><i class="bi bi-bookmark icon-field"></i> @documento.NumeroInterno</div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <span class="label-info">Tipo de Documento</span>
+                        <div class="data-box"><i class="bi bi-files icon-field"></i> @documento.IdTipoNavigation?.Nombre</div>
+                    </div>
+                    <div class="col-md-6 col-lg-3">
+                        <span class="label-info">Fecha Registro</span>
+                        <div class="data-box"><i class="bi bi-calendar-event icon-field"></i> @documento.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</div>
+                    </div>
+
                     <div class="col-md-6">
-                        <label class="form-label text-muted">Número Oficial</label>
-                        <div class="form-control">@documento.NumeroOficial</div>
+                        <span class="label-info">Oficina Actual</span>
+                        <div class="data-box"><i class="bi bi-building icon-field"></i> @documento.IdOficinaActualNavigation?.Nombre</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label text-muted">Número Interno</label>
-                        <div class="form-control">@documento.NumeroInterno</div>
+                        <span class="label-info">Estado en el Sistema</span>
+                        <div class="data-box">
+                            <i class="bi bi-info-circle icon-field"></i>
+                            <span class="fw-bold">@documento.IdEstadoActualNavigation?.Nombre</span>
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted">Tipo de Documento</label>
-                        <div class="form-control">@documento.IdTipoNavigation?.Nombre</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted">Oficina Actual</label>
-                        <div class="form-control">@documento.IdOficinaActualNavigation?.Nombre</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted">Estado Actual</label>
-                        <div class="form-control">@documento.IdEstadoActualNavigation?.Nombre</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label text-muted">Fecha de Creación</label>
-                        <div class="form-control">@documento.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</div>
-                    </div>
+
                     <div class="col-12">
-                        <label class="form-label text-muted">Asunto</label>
-                        <div class="form-control" style="min-height: 80px;">@documento.Asunto</div>
+                        <span class="label-info">Asunto / Título</span>
+                        <div class="data-box fw-semibold border-primary-subtle bg-primary-subtle bg-opacity-10">
+                            <i class="bi bi-chat-left-text icon-field"></i> @documento.Asunto
+                        </div>
                     </div>
+
                     <div class="col-12">
-                        <label class="form-label text-muted">Descripción</label>
-                        <div class="form-control" style="min-height: 100px;">@documento.Descripcion</div>
+                        <span class="label-info">Descripción Detallada</span>
+                        <div class="data-box data-text" style="min-height: 120px;">
+                            @documento.Descripcion
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="card-footer bg-white p-3 border-top-0 d-flex justify-content-end">
+                <button class="btn btn-outline-primary btn-sm me-2" @onclick="Imprimir">
+                    <i class="bi bi-printer me-1"></i> Imprimir Ficha
+                </button>
             </div>
         </div>
     }
@@ -73,11 +176,15 @@
     protected override async Task OnParametersSetAsync()
     {
         cargando = true;
-
         documento = await RepoDocs
             .GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
             .FirstOrDefaultAsync(d => d.IdDocumento == Id);
-
         cargando = false;
+    }
+
+    private async Task Imprimir()
+    {
+        // Llama a la función de impresión nativa del navegador
+        await JS.InvokeVoidAsync("window.print");
     }
 }

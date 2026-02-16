@@ -9,152 +9,263 @@
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 @implements IDisposable
 
-<h3>
-    <i class="bi bi-inbox"></i> Oficina: <strong>@nombreOficinaUsuario</strong>
-</h3>
+<PageTitle>Bandeja de Documentos - Vector</PageTitle>
 
-<div class="row g-2 mb-3 align-items-end">
-    <div class="col-md-6">
-        <a href="documentos/nuevo" class="btn btn-success">
+<style>
+    /* 1. Estructura y contenedores */
+    .page-header {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        border-left: 5px solid #0d6efd;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .search-card {
+        border-radius: 12px;
+        border: none;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1rem;
+    }
+
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
+        width: 100%;
+    }
+
+    /* 2. Control de tabla */
+    .table {
+        width: 100% !important;
+        table-layout: fixed;
+        margin-bottom: 0;
+    }
+
+        .table thead th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            color: #495057;
+            padding: 0.75rem;
+            background: #f1f4f8;
+            border: none;
+        }
+
+        .table tbody td {
+            padding: 0.75rem;
+            vertical-align: middle;
+            font-size: 0.85rem;
+            border-bottom: 1px solid #f8f9fa;
+        }
+
+    /* Definición de anchos fijos para que las leyendas tengan espacio */
+    .col-estado {
+        width: 120px;
+    }
+
+    .col-fecha {
+        width: 95px;
+    }
+
+    .col-id {
+        width: 160px;
+    }
+
+    .col-ubicacion {
+        width: 150px;
+    }
+
+    .col-acciones {
+        width: 250px;
+    }
+    /* Espacio vital para las 4 leyendas */
+
+    /* El Asunto es flexible */
+    .asunto-cell {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+        line-height: 1.4;
+    }
+
+    .search-input-wrapper {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+
+    .search-input {
+        padding-left: 35px !important;
+        border-radius: 8px;
+    }
+
+    .badge-status {
+        padding: 0.4em 0.6em;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.75rem;
+        display: block;
+        text-align: center;
+        width: 100%;
+        shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* Botones con leyendas visibles */
+    .btn-action-text {
+        font-size: 0.75rem;
+        font-weight: bold;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h3 class="mb-0">
+            <i class="bi bi-inbox-fill text-primary me-2"></i>Oficina: <strong>@nombreOficinaUsuario</strong>
+        </h3>
+        <a href="documentos/nuevo" class="btn btn-success shadow-sm fw-bold">
             <i class="bi bi-plus-circle"></i> Nuevo Ingreso
         </a>
     </div>
-    <div class="col-md-6 text-end">
-        <div class="form-check form-switch d-inline-block office-switch">
-            <input id="verTodoOficinas" class="form-check-input" type="checkbox" @bind="verTodo" @bind:after="CargarDocumentos">
-            <label class="form-check-label" for="verTodoOficinas">
-                @* Agregamos la clase me-2 para separar el ícono del texto *@
-                <i class="bi bi-buildings me-2"></i>Ver documentos de otras oficinas
-            </label>
-        </div>
-    </div>
-</div>
 
-<div class="controls-panel mb-3">
-    <div class="row g-3 align-items-end">
-        <div class="col-lg-8">
-            <label for="buscadorDocumentos" class="form-label fw-semibold">Buscador en bandeja</label>
-            <div class="search-input-wrapper">
-                <i class="bi bi-search search-icon"></i>
-                <input id="buscadorDocumentos"
-                       class="form-control search-input"
-                       placeholder="Buscar por número, asunto, tipo, oficina o estado"
-                       @bind="FiltroBusqueda"
-                       @bind:event="oninput" />
+    <div class="card search-card">
+        <div class="card-body p-3">
+            <div class="row g-3 align-items-end">
+                <div class="col-lg-7">
+                    <label for="buscadorDocumentos" class="form-label fw-semibold small text-uppercase text-muted">Buscador en bandeja</label>
+                    <div class="search-input-wrapper">
+                        <i class="bi bi-search search-icon"></i>
+                        <input id="buscadorDocumentos"
+                               class="form-control search-input shadow-none"
+                               placeholder="Buscar por número, asunto, tipo, oficina o estado..."
+                               @bind="FiltroBusqueda"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-lg-3 text-end pb-1">
+                    <div class="form-check form-switch d-inline-block">
+                        <input id="verTodoOficinas" class="form-check-input" type="checkbox" @bind="verTodo" @bind:after="CargarDocumentos">
+                        <label class="form-check-label small fw-bold" for="verTodoOficinas" style="cursor: pointer;">
+                            <i class="bi bi-buildings"></i> Ver Global
+                        </label>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2 pb-1">
+                    <label for="tamanoPagina" class="form-label fw-semibold small text-uppercase text-muted">Registros</label>
+                    <select id="tamanoPagina" class="form-select form-select-sm border-0 bg-light fw-bold" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
+                        @foreach (var opcion in opcionesTamanoPagina)
+                        {
+                            <option value="@opcion">@opcion filas</option>
+                        }
+                    </select>
+                </div>
             </div>
-            <small class="text-muted d-block mt-1">Podés escribir varias palabras en cualquier orden; se buscarán en todos los campos.</small>
-        </div>
-        <div class="col-sm-6 col-lg-4">
-            <label for="tamanoPagina" class="form-label fw-semibold">Resultados por página</label>
-            <select id="tamanoPagina" class="form-select" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
-                @foreach (var opcion in opcionesTamanoPagina)
-                {
-                    <option value="@opcion">@opcion</option>
-                }
-            </select>
         </div>
     </div>
-</div>
 
-<div class="status-legend mb-3">
-    <span class="badge bg-danger me-2">Rojo</span>
-    <span class="me-3">Trámite vencido o de atención urgente.</span>
-    <span class="badge bg-info me-2">Azul</span>
-    <span>Trámite en plazo o en curso normal.</span>
-</div>
+    <div class="d-flex gap-3 mb-3 small fw-bold">
+        <span class="text-danger"><i class="bi bi-circle-fill"></i> URGENTE</span>
+        <span class="text-info"><i class="bi bi-circle-fill"></i> EN PLAZO</span>
+    </div>
 
-@if (listaDocs is null)
-{
-    <p><em>Cargando bandeja...</em></p>
-}
-else
-{
-    @if (!DocumentosPaginados.Any())
+    @if (listaDocs is null)
     {
-        <p><em>No se encontraron documentos con los filtros actuales.</em></p>
-    }
-
-    <table class="table table-striped table-hover" style="table-layout: fixed; width: 100%;">
-        <thead>
-            <tr>
-                <th style="width: 120px;">Estado</th>
-                <th style="width: 95px;">Fecha</th>
-                <th style="width: 170px;">Nro. / Tipo</th>
-                <th>Asunto</th>
-                <th style="width: 170px;">Ubicación</th>
-                <th style="width: 200px;" class="text-end">Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var doc in DocumentosPaginados)
-            {
-                <tr>
-                    <td>
-                        <span class="badge @(EsRojo(doc.EstadoSemaforo) ? "bg-danger" : "bg-info") text-truncate" style="max-width: 100%;" title="@doc.IdEstadoActualNavigation?.Nombre">
-                            @doc.IdEstadoActualNavigation?.Nombre
-                        </span>
-                    </td>
-                    <td class="small text-nowrap">@doc.FechaCreacion?.ToString("dd/MM/yy")</td>
-                    <td>
-                        <div class="fw-semibold small text-truncate" title="@doc.NumeroOficial">@doc.NumeroOficial</div>
-                        <div class="text-muted small text-truncate" title="@doc.IdTipoNavigation?.Nombre">@doc.IdTipoNavigation?.Nombre</div>
-                        @if (doc.IdDocumentoPadre.HasValue)
-                        {
-                            var referenciaPadre = ObtenerReferenciaPadre(doc.IdDocumentoPadre.Value);
-                            <a href="documentos/historial/@doc.IdDocumentoPadre"
-                               class="badge bg-warning text-dark mt-1 text-decoration-none"
-                               title="Documento hijo de @referenciaPadre. Abrir historial de movimientos del padre.">
-                                Hijo de @referenciaPadre
-                            </a>
-                        }
-                        else if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantidadHijos))
-                        {
-                            <a href="documentos/historial/@doc.IdDocumento"
-                               class="badge bg-primary mt-1 text-decoration-none"
-                               title="Documento padre con @cantidadHijos documento(s) hijo(s). Abrir historial de movimientos.">
-                                Padre (@cantidadHijos)
-                            </a>
-                        }
-                    </td>
-                    <td class="text-truncate" title="@doc.Asunto">@doc.Asunto</td>
-                    <td title="@doc.IdOficinaActualNavigation?.Nombre">
-                        @if (doc.IdOficinaActual == idOficinaUsuario)
-                        {
-                            <span class="badge bg-success">EN TU BANDEJA</span>
-                        }
-                        else
-                        {
-                            <span class="small text-truncate d-inline-block" style="max-width: 100%;">@doc.IdOficinaActualNavigation?.Nombre</span>
-                        }
-                    </td>
-                    <td class="text-end text-nowrap">
-                        <button class="btn btn-warning btn-sm text-dark ms-1"
-                                title="Dar pase del documento. El sistema detecta automáticamente si el documento está en tu oficina o en una remota."
-                                @onclick="() => IrAPase(doc)">
-                            <i class="bi bi-arrow-right-circle"></i> Dar pase
-                        </button>
-
-                        <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm text-white ms-1" title="Ver movimientos">
-                            <i class="bi bi-clock-history"></i> Historial
-                        </a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    <div class="d-flex flex-column align-items-center gap-2 mt-3">
-        <div class="btn-group" role="group" aria-label="Paginación">
-            <button class="btn btn-outline-secondary" @onclick="PaginaAnterior" disabled="@(PaginaActualEfectiva == 1)">Anterior</button>
-            <button class="btn btn-outline-secondary disabled">Página @PaginaActualEfectiva de @TotalPaginas</button>
-            <button class="btn btn-outline-secondary" @onclick="PaginaSiguiente" disabled="@(PaginaActualEfectiva >= TotalPaginas)">Siguiente</button>
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted fw-bold">Sincronizando bandeja...</p>
         </div>
-        <small class="text-muted">Mostrando @DesdeRegistro a @HastaRegistro de @TotalRegistros documento(s)</small>
-    </div>
-}
+    }
+    else
+    {
+        <div class="table-container shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th class="col-estado">Estado</th>
+                            <th class="col-fecha">Fecha</th>
+                            <th class="col-id">Identificación</th>
+                            <th>Asunto</th>
+                            <th class="col-ubicacion">Ubicación</th>
+                            <th class="col-acciones text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in DocumentosPaginados)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="badge badge-status @(EsRojo(doc.EstadoSemaforo) ? "bg-danger" : "bg-info")" title="@doc.IdEstadoActualNavigation?.Nombre">
+                                        @doc.IdEstadoActualNavigation?.Nombre
+                                    </span>
+                                </td>
+                                <td class="small fw-bold text-dark">@doc.FechaCreacion?.ToString("dd/MM/yy")</td>
+                                <td>
+                                    <div class="fw-bold text-primary" style="font-size: 0.8rem;">@doc.NumeroOficial</div>
+                                    <div class="text-muted small">@doc.IdTipoNavigation?.Nombre</div>
+                                </td>
+                                <td>
+                                    <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
+                                </td>
+                                <td>
+                                    @if (doc.IdOficinaActual == idOficinaUsuario)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success w-100 py-1" style="font-size: 0.7rem;">TU BANDEJA</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="small text-muted d-inline-block text-truncate fw-medium" style="max-width: 100%;">
+                                            <i class="bi bi-building"></i> @doc.IdOficinaActualNavigation?.Nombre
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group shadow-sm">
+                                        <button class="btn btn-warning btn-sm btn-action-text text-dark" @onclick="() => IrAPase(doc)" title="Dar Pase">
+                                            <i class="bi bi-arrow-right-circle"></i> Pase
+                                        </button>
+                                        <a href="documentos/historial/@doc.IdDocumento" class="btn btn-info btn-sm btn-action-text text-white" title="Historial">
+                                            <i class="bi bi-clock-history"></i> Historial
+                                        </a>
+                                        <button class="btn btn-primary btn-sm btn-action-text" @onclick="() => IrAEditar(doc.IdDocumento)" title="Editar">
+                                            <i class="bi bi-pencil-square"></i> Editar
+                                        </button>
+                                        <button class="btn btn-danger btn-sm btn-action-text" @onclick="() => EliminarDocumento(doc.IdDocumento)" title="Eliminar">
+                                            <i class="bi bi-trash"></i> Borrar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <small class="text-muted fw-bold">Mostrando @DesdeRegistro - @HastaRegistro de @TotalRegistros</small>
+                <div class="btn-group shadow-sm">
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" @onclick="PaginaAnterior" disabled="@(PaginaActualEfectiva == 1)">Anterior</button>
+                    <span class="btn btn-sm btn-white border disabled px-3 fw-bold">@PaginaActualEfectiva / @TotalPaginas</span>
+                    <button class="btn btn-sm btn-outline-secondary fw-bold" @onclick="PaginaSiguiente" disabled="@(PaginaActualEfectiva >= TotalPaginas)">Siguiente</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
 
 @code {
     private List<MaeDocumento>? listaDocs;
@@ -167,10 +278,9 @@ else
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
     private bool verTodo;
-    private static readonly int[] opcionesTamanoPagina = [10, 20, 50];
+    private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
     private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
-
     private int TotalRegistros { get; set; }
     private int TotalPaginas => Math.Max(1, (int)Math.Ceiling(TotalRegistros / (double)tamanoPagina));
     private int PaginaActualEfectiva => Math.Max(1, Math.Min(paginaActual, TotalPaginas));
@@ -180,32 +290,13 @@ else
     private string FiltroBusqueda
     {
         get => filtroBusqueda;
-        set
-        {
-            if (filtroBusqueda == value)
-            {
-                return;
-            }
-
-            filtroBusqueda = value;
-            paginaActual = 1;
-            ReiniciarTemporizadorBusqueda();
-        }
+        set { if (filtroBusqueda == value) return; filtroBusqueda = value; paginaActual = 1; ReiniciarTemporizadorBusqueda(); }
     }
 
     private int TamanoPagina
     {
         get => tamanoPagina;
-        set
-        {
-            if (tamanoPagina == value)
-            {
-                return;
-            }
-
-            tamanoPagina = value;
-            paginaActual = 1;
-        }
+        set { if (tamanoPagina == value) return; tamanoPagina = value; paginaActual = 1; }
     }
 
     private Task OnTamanoPaginaChanged() => CargarDocumentos();
@@ -214,225 +305,81 @@ else
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-
         if (user.Identity?.IsAuthenticated == true)
         {
             var claimOficina = user.FindFirst("IdOficina")?.Value;
-            if (int.TryParse(claimOficina, out var oficinaId))
+            if (int.TryParse(claimOficina, out var ofId))
             {
-                idOficinaUsuario = oficinaId;
-
-                if (idOficinaUsuario > 0)
-                {
-                    await using var dbContext = await DbContextFactory.CreateDbContextAsync();
-                    var oficina = await dbContext.CatOficinas
-                        .AsNoTracking()
-                        .FirstOrDefaultAsync(o => o.IdOficina == oficinaId);
-                    nombreOficinaUsuario = oficina?.Nombre ?? $"Mi Oficina ({oficinaId})";
-                }
-                else
-                {
-                    nombreOficinaUsuario = "Todas las oficinas";
-                    verTodo = true;
-                }
-            }
-            else
-            {
-                nombreOficinaUsuario = user.FindFirstValue(ClaimTypes.Name) ?? "Mi Oficina";
+                idOficinaUsuario = ofId;
+                await using var db = await DbContextFactory.CreateDbContextAsync();
+                var of = await db.CatOficinas.AsNoTracking().FirstOrDefaultAsync(o => o.IdOficina == idOficinaUsuario);
+                nombreOficinaUsuario = of?.Nombre ?? $"Oficina {idOficinaUsuario}";
+                if (idOficinaUsuario <= 0) verTodo = true;
             }
         }
-
         await CargarDocumentos();
     }
 
     private async Task CargarDocumentos()
     {
-        await using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+        var q = db.MaeDocumentos.AsNoTracking()
+            .Include(d => d.IdTipoNavigation).Include(d => d.IdOficinaActualNavigation).Include(d => d.IdEstadoActualNavigation).AsQueryable();
 
-        var query = dbContext.MaeDocumentos
-            .AsNoTracking()
-            .Include(d => d.IdTipoNavigation)
-            .Include(d => d.IdOficinaActualNavigation)
-            .Include(d => d.IdEstadoActualNavigation)
-            .AsQueryable();
+        if (!verTodo && idOficinaUsuario > 0) q = q.Where(d => d.IdOficinaActual == idOficinaUsuario);
+        q = AplicarFiltroBusqueda(q);
+        TotalRegistros = await q.CountAsync();
+        if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
 
-        if (!verTodo && idOficinaUsuario > 0)
+        listaDocs = await q.OrderByDescending(d => d.FechaCreacion).Skip((PaginaActualEfectiva - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
+
+        var idsPadre = listaDocs.Where(d => d.IdDocumentoPadre.HasValue).Select(d => d.IdDocumentoPadre!.Value).Distinct().ToList();
+        if (idsPadre.Any())
         {
-            query = query.Where(d => d.IdOficinaActual == idOficinaUsuario);
+            referenciasPadrePorId = await db.MaeDocumentos.AsNoTracking().Where(d => idsPadre.Contains(d.IdDocumento)).Include(d => d.IdTipoNavigation)
+                .Select(d => new { d.IdDocumento, n = d.NumeroOficial, t = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null })
+                .ToDictionaryAsync(x => x.IdDocumento, x => (x.t + " " + x.n).Trim());
         }
-
-        query = AplicarFiltroBusqueda(query);
-
-        TotalRegistros = await query.CountAsync();
-
-        if (paginaActual > TotalPaginas)
-        {
-            paginaActual = TotalPaginas;
-        }
-
-        listaDocs = await query
-            .OrderByDescending(d => d.FechaCreacion)
-            .Skip((PaginaActualEfectiva - 1) * tamanoPagina)
-            .Take(tamanoPagina)
-            .ToListAsync();
-
-        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
-        var idsPadrePagina = listaDocs
-            .Where(d => d.IdDocumentoPadre.HasValue)
-            .Select(d => d.IdDocumentoPadre!.Value)
-            .Distinct()
-            .ToList();
-
-        if (idsPadrePagina.Count > 0)
-        {
-            referenciasPadrePorId = await dbContext.MaeDocumentos
-                .AsNoTracking()
-                .Where(d => idsPadrePagina.Contains(d.IdDocumento))
-                .Include(d => d.IdTipoNavigation)
-                .Select(d => new
-                {
-                    d.IdDocumento,
-                    Numero = d.NumeroOficial,
-                    Tipo = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null,
-                })
-                .ToDictionaryAsync(
-                    x => x.IdDocumento,
-                    x => ConstruirReferenciaPadre(x.Tipo, x.Numero, x.IdDocumento));
-        }
-        else
-        {
-            referenciasPadrePorId = [];
-        }
-
-        if (idsPagina.Count == 0)
-        {
-            cantidadHijosPorPadre = [];
-            StateHasChanged();
-            return;
-        }
-
-        var conteoHijos = await dbContext.MaeDocumentos
-            .AsNoTracking()
-            .Where(d => d.IdDocumentoPadre.HasValue && idsPagina.Contains(d.IdDocumentoPadre.Value))
-            .GroupBy(d => d.IdDocumentoPadre!.Value)
-            .Select(g => new { IdPadre = g.Key, Cantidad = g.Count() })
-            .ToListAsync();
-
-        cantidadHijosPorPadre = conteoHijos
-            .ToDictionary(x => x.IdPadre, x => x.Cantidad);
-
         StateHasChanged();
     }
 
     private void ReiniciarTemporizadorBusqueda()
     {
-        timerBusqueda?.Stop();
-        timerBusqueda?.Dispose();
-
-        var nuevoTimer = new Timer(500)
-        {
-            AutoReset = false,
-        };
-
-        nuevoTimer.Elapsed += (_, _) =>
-        {
-            _ = InvokeAsync(async () =>
-            {
-                try
-                {
-                    if (!ReferenceEquals(timerBusqueda, nuevoTimer))
-                    {
-                        return;
-                    }
-
-                    await CargarDocumentos();
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error en búsqueda de documentos: {ex.Message}");
-                }
-                finally
-                {
-                    if (ReferenceEquals(timerBusqueda, nuevoTimer))
-                    {
-                        timerBusqueda?.Dispose();
-                        timerBusqueda = null;
-                    }
-                }
-            });
-        };
-
-        timerBusqueda = nuevoTimer;
-        nuevoTimer.Start();
+        timerBusqueda?.Stop(); timerBusqueda?.Dispose();
+        var nT = new Timer(500) { AutoReset = false };
+        nT.Elapsed += (_, _) => { _ = InvokeAsync(async () => { await CargarDocumentos(); }); };
+        timerBusqueda = nT; nT.Start();
     }
 
-    public void Dispose()
+    private IQueryable<MaeDocumento> AplicarFiltroBusqueda(IQueryable<MaeDocumento> q)
     {
-        timerBusqueda?.Stop();
-        timerBusqueda?.Dispose();
-        timerBusqueda = null;
-    }
-
-    private IQueryable<MaeDocumento> AplicarFiltroBusqueda(IQueryable<MaeDocumento> query)
-    {
-        var terminos = filtroBusqueda
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        foreach (var termino in terminos)
+        if (string.IsNullOrWhiteSpace(filtroBusqueda)) return q;
+        var tms = filtroBusqueda.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var t in tms)
         {
-            var patron = $"%{termino}%";
-            query = query.Where(doc =>
-                EF.Functions.Like(doc.NumeroOficial ?? string.Empty, patron)
-                || EF.Functions.Like(doc.Asunto ?? string.Empty, patron)
-                || EF.Functions.Like(doc.IdTipoNavigation!.Nombre ?? string.Empty, patron)
-                || EF.Functions.Like(doc.IdOficinaActualNavigation!.Nombre ?? string.Empty, patron)
-                || EF.Functions.Like(doc.IdEstadoActualNavigation!.Nombre ?? string.Empty, patron));
+            var p = $"%{t}%";
+            q = q.Where(d => EF.Functions.Like(d.NumeroOficial ?? "", p) || EF.Functions.Like(d.Asunto ?? "", p) || EF.Functions.Like(d.IdTipoNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdOficinaActualNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdEstadoActualNavigation.Nombre ?? "", p));
         }
-
-        return query;
+        return q;
     }
 
-    private async Task PaginaAnterior()
+    private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
+
+    private async Task EliminarDocumento(long id)
     {
-        if (PaginaActualEfectiva > 1)
+        bool conf = await JS.InvokeAsync<bool>("confirm", "¿Confirmar eliminación permanente?");
+        if (conf)
         {
-            paginaActual = PaginaActualEfectiva - 1;
-            await CargarDocumentos();
+            await using var db = await DbContextFactory.CreateDbContextAsync();
+            var doc = await db.MaeDocumentos.FindAsync(id);
+            if (doc != null) { db.MaeDocumentos.Remove(doc); await db.SaveChangesAsync(); await CargarDocumentos(); }
         }
     }
 
-    private async Task PaginaSiguiente()
-    {
-        if (PaginaActualEfectiva < TotalPaginas)
-        {
-            paginaActual = PaginaActualEfectiva + 1;
-            await CargarDocumentos();
-        }
-    }
-
-    private static bool EsRojo(string? estadoSemaforo)
-        => string.Equals(estadoSemaforo, "ROJO", StringComparison.OrdinalIgnoreCase);
-
-    private string ObtenerReferenciaPadre(long idPadre)
-        => referenciasPadrePorId.TryGetValue(idPadre, out var referencia)
-            ? referencia
-            : $"#{idPadre}";
-
-    private static string ConstruirReferenciaPadre(string? tipo, string? numero, long idPadre)
-    {
-        var partes = new[] { tipo, numero }
-            .Where(parte => !string.IsNullOrWhiteSpace(parte))
-            .Select(parte => parte!.Trim())
-            .ToList();
-
-        return partes.Count > 0
-            ? string.Join(' ', partes)
-            : $"#{idPadre}";
-    }
-
-    private void IrAPase(MaeDocumento doc)
-    {
-        Navegador.NavigateTo($"documentos/pase/{doc.IdDocumento}");
-    }
-
+    private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
+    private async Task PaginaSiguiente() { if (PaginaActualEfectiva < TotalPaginas) { paginaActual++; await CargarDocumentos(); } }
+    private static bool EsRojo(string? s) => string.Equals(s, "ROJO", StringComparison.OrdinalIgnoreCase);
+    private string ObtenerReferenciaPadre(long id) => referenciasPadrePorId.TryGetValue(id, out var r) ? r : $"#{id}";
+    private void IrAPase(MaeDocumento d) => Navegador.NavigateTo($"documentos/pase/{d.IdDocumento}");
+    public void Dispose() => timerBusqueda?.Dispose();
 }

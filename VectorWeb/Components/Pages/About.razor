@@ -1,210 +1,199 @@
 @page "/about"
 
-<PageTitle>Manual de uso de Vector</PageTitle>
+<PageTitle>Manual de Uso - Vector</PageTitle>
 
-<div class="container-fluid py-3">
+<style>
+    .about-section {
+        scroll-margin-top: 20px;
+    }
+
+    .nav-pills .nav-link {
+        color: #495057;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+        .nav-pills .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .nav-pills .nav-link.active {
+            background-color: #0d6efd;
+            font-weight: bold;
+        }
+
+    .card {
+        border-radius: 12px;
+    }
+
+    .step-badge {
+        width: 28px;
+        height: 28px;
+        background-color: #0d6efd;
+        color: white;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-weight: bold;
+        font-size: 0.9rem;
+    }
+
+    .sticky-sidebar {
+        position: sticky;
+        top: 20px;
+    }
+
+    .timeline-item {
+        border-left: 2px solid #0d6efd;
+        padding-left: 20px;
+        position: relative;
+        padding-bottom: 20px;
+    }
+
+        .timeline-item::before {
+            content: "";
+            position: absolute;
+            left: -9px;
+            top: 0;
+            width: 16px;
+            height: 16px;
+            background: #0d6efd;
+            border-radius: 50%;
+        }
+</style>
+
+<div class="container-fluid py-4">
     <div class="row g-4">
-        <div class="col-12">
-            <h1 class="mb-3">Manual de uso de Vector</h1>
-            <p class="lead mb-0">
-                Esta página funciona como guía práctica para usuarios operativos y administrativos. Aquí encontrarás el flujo recomendado
-                para trabajar en el sistema, qué se espera en cada etapa y ejemplos para evitar errores comunes.
-            </p>
-        </div>
-
-        <div class="col-12">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">Índice</h2>
-                    <ol class="mb-0">
-                        <li><a href="/about#objetivo-general">Objetivo general del sistema</a></li>
-                        <li><a href="/about#flujo-recomendado">Flujo recomendado de operación</a></li>
-                        <li><a href="/about#modulo-documentos">Módulo de Documentos</a></li>
-                        <li><a href="/about#modulo-vinculacion">Módulo de Vinculación de Documentos</a></li>
-                        <li><a href="/about#modulo-reclusos">Módulo de Reclusos</a></li>
-                        <li><a href="/about#modulo-renovaciones">Módulo de Renovaciones (Art. 120)</a></li>
-                        <li><a href="/about#modulo-configuracion">Módulo de Configuración</a></li>
-                        <li><a href="/about#ejemplo-practico">Ejemplo práctico completo</a></li>
-                        <li><a href="/about#buenas-practicas">Buenas prácticas y errores frecuentes</a></li>
-                        <li><a href="/about#resultado-esperado">Resultado esperado del uso del sistema</a></li>
-                    </ol>
-                </div>
+        <div class="col-lg-3 d-none d-lg-block">
+            <div class="sticky-sidebar">
+                <h5 class="mb-3 ps-2">Guía de Navegación</h5>
+                <nav class="nav nav-pills flex-column">
+                    <a class="nav-link mb-1" href="/about#flujo-documentos"><i class="bi bi-file-earmark-text me-2"></i>Gestión de Documentos</a>
+                    <a class="bi bi-link-45deg nav-link mb-1" href="/about#rangos-cupos"><i class="bi bi-hash me-2"></i>Rangos y Cupos</a>
+                    <a class="nav-link mb-1" href="/about#modulo-reclusos"><i class="bi bi-people me-2"></i>Gestión de Reclusos</a>
+                    <a class="nav-link mb-1" href="/about#renovaciones-120"><i class="bi bi-calendar-check me-2"></i>Permisos (Art. 120)</a>
+                    <a class="nav-link mb-1" href="/about#ejemplo-practico"><i class="bi bi-lightbulb me-2"></i>Escenario Real</a>
+                </nav>
             </div>
         </div>
 
-        <div class="col-12" id="objetivo-general">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">1. Objetivo general del sistema</h2>
-                    <p>
-                        VectorWeb centraliza la gestión documental institucional para que todas las áreas trabajen con una misma fuente de datos,
-                        reduciendo duplicidades y mejorando la trazabilidad de cada trámite.
-                    </p>
-                    <p class="mb-0">
-                        <strong>¿Qué se espera del usuario?</strong> Registrar información completa y consistente, mantener actualizados los estados,
-                        y utilizar los módulos en el orden recomendado para conservar un historial limpio y auditable.
-                    </p>
-                </div>
-            </div>
-        </div>
+        <div class="col-lg-9 col-12">
+            <header class="mb-5 text-center text-lg-start">
+                <h1 class="display-5 fw-bold text-primary">Manual Operativo Vector</h1>
+                <p class="lead text-muted">Estandarización de procesos para la gestión documental y control de permisos.</p>
+                <hr />
+            </header>
 
-        <div class="col-12" id="flujo-recomendado">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">2. Flujo recomendado de operación</h2>
-                    <ol class="mb-0">
-                        <li><strong>Registrar o ubicar el documento</strong> en el módulo Documentos.</li>
-                        <li><strong>Vincular documentos relacionados</strong> para consolidar el expediente.</li>
-                        <li><strong>Validar o actualizar datos del recluso</strong> cuando aplique.</li>
-                        <li><strong>Crear seguimiento en Renovaciones</strong> para controlar vencimientos.</li>
-                        <li><strong>Consultar Historial</strong> para verificar cambios y movimientos.</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="modulo-documentos">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">3. Módulo de Documentos</h2>
-                    <p>
-                        Aquí se crea y administra cada documento base del proceso. Este módulo es el punto de entrada para la mayoría de trámites.
-                    </p>
-                    <h3 class="h6">Pasos sugeridos</h3>
-                    <ul>
-                        <li>Verifica si el documento ya existe antes de crear uno nuevo.</li>
-                        <li>Completa tipo de documento, oficina, estado y fecha correctamente.</li>
-                        <li>Asocia la información del recluso cuando corresponda.</li>
-                        <li>Guarda y revisa que el número y estado sean coherentes.</li>
-                    </ul>
-                    <p class="mb-0">
-                        <strong>Resultado esperado:</strong> documento único, correctamente identificado y listo para vinculación o seguimiento.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="modulo-vinculacion">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">4. Módulo de Vinculación de Documentos</h2>
-                    <p>
-                        Permite relacionar documentos entre sí para construir el contexto completo de un caso (antecedentes, respuestas,
-                        resoluciones y soportes).
-                    </p>
-                    <p class="mb-0">
-                        <strong>Resultado esperado:</strong> expediente conectado de forma lógica, fácil de consultar y sin enlaces duplicados.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="modulo-reclusos">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">5. Módulo de Reclusos</h2>
-                    <p>
-                        Se utiliza para consultar y actualizar datos personales o de control del recluso asociados a los documentos.
-                    </p>
-                    <ul class="mb-0">
-                        <li>Verifica identidad y datos críticos antes de editar.</li>
-                        <li>Evita crear registros duplicados por diferencias mínimas de digitación.</li>
-                        <li>Cuando se actualicen datos, documenta el motivo en observaciones.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="modulo-renovaciones">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">6. Módulo de Renovaciones (Art. 120)</h2>
-                    <p>
-                        Este módulo ayuda a controlar renovaciones y vencimientos para que las áreas responsables actúen a tiempo.
-                    </p>
-                    <ul>
-                        <li>Registra fecha inicial, plazos y estado de seguimiento.</li>
-                        <li>Actualiza el estado en cada avance para mantener trazabilidad real.</li>
-                        <li>Consulta pendientes de forma periódica para prevenir vencimientos.</li>
-                    </ul>
-                    <p class="mb-0">
-                        <strong>Resultado esperado:</strong> control oportuno, menos atrasos y evidencia clara del seguimiento realizado.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="modulo-configuracion">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">7. Módulo de Configuración</h2>
-                    <p>
-                        Incluye catálogos (oficinas, estados, tipos de documento), rangos de numeración y componentes de seguridad/roles.
-                    </p>
-                    <p class="mb-0">
-                        <strong>Uso recomendado:</strong> limitar cambios de configuración a usuarios autorizados, ya que impactan a todo el sistema.
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="ejemplo-practico">
-            <div class="card shadow-sm border-0 bg-light">
-                <div class="card-body">
-                    <h2 class="h4">8. Ejemplo práctico completo</h2>
-                    <p>
-                        <strong>Escenario:</strong> ingresa una solicitud nueva relacionada con un recluso y se requiere seguimiento hasta su resolución.
-                    </p>
-                    <ol class="mb-0">
-                        <li>Crear el documento principal en <em>Documentos</em> con datos completos.</li>
-                        <li>Vincular la solicitud con antecedentes y soportes en <em>Vinculación</em>.</li>
-                        <li>Confirmar y actualizar la ficha del recluso en <em>Reclusos</em>.</li>
-                        <li>Registrar la renovación/control correspondiente en <em>Renovaciones</em>.</li>
-                        <li>Monitorear cambios en <em>Historial</em> hasta cierre del trámite.</li>
-                    </ol>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12" id="buenas-practicas">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h2 class="h4">9. Buenas prácticas y errores frecuentes</h2>
-                    <div class="row g-3">
-                        <div class="col-12 col-lg-6">
-                            <h3 class="h6">Buenas prácticas</h3>
-                            <ul class="mb-0">
-                                <li>Validar datos antes de guardar.</li>
-                                <li>Actualizar estados apenas ocurra un cambio.</li>
-                                <li>Trabajar con una nomenclatura consistente.</li>
-                                <li>Consultar historial para auditar decisiones.</li>
-                            </ul>
-                        </div>
-                        <div class="col-12 col-lg-6">
-                            <h3 class="h6">Errores a evitar</h3>
-                            <ul class="mb-0">
-                                <li>Duplicar documentos por no buscar previamente.</li>
-                                <li>Dejar renovaciones sin estado actualizado.</li>
-                                <li>Vincular registros incorrectos por falta de verificación.</li>
-                                <li>Modificar catálogos sin coordinación administrativa.</li>
-                            </ul>
+            <section id="flujo-documentos" class="about-section mb-5">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h2 class="h4 mb-3 text-dark"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Ingreso de Documentación</h2>
+                        <p>El flujo comienza con el registro de un nuevo documento (Oficio, Memorándum, etc.).</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <ul class="small">
+                                    <li><strong>Uniformidad:</strong> Use la herramienta "Insertar Recluso" en el asunto para normalizar nombres y facilitar auditorías.</li>
+                                    <li><strong>Oficinas:</strong> Si el origen es externo (ej. Juzgado), la numeración es manual. Si es interna, el sistema asigna el número automáticamente según el rango.</li>
+                                    <li><strong>Estados:</strong> Defina el estado inicial (Ingresado, En Trámite, etc.) para reflejar la situación real del expediente.</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-warning small mb-0">
+                                    <strong>Nota sobre Adjuntos:</strong> Al crear un documento, puede buscar un "Documento Padre" para establecer una relación de jerarquía (Anexo/Adjunto) desde el inicio.
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <div class="col-12" id="resultado-esperado">
-            <div class="alert alert-info mb-0" role="alert">
-                <h2 class="h5">10. Resultado esperado del uso del sistema</h2>
-                <p class="mb-2">
-                    Un proceso documental trazable, oportuno y consistente entre oficinas, con menor carga operativa y mejor capacidad
-                    de respuesta ante auditorías o consultas internas.
-                </p>
-                <p class="mb-0">
-                    Si todos los usuarios aplican este flujo, el sistema funcionará como una bitácora institucional confiable.
-                </p>
-            </div>
+            <section id="rangos-cupos" class="about-section mb-5">
+                <div class="card shadow-sm border-0 border-start border-info border-4">
+                    <div class="card-body p-4">
+                        <h4 class="h5">Administración de Numeración</h4>
+                        <p class="small">El sistema gestiona repositorios de números provistos por la Secretaría General:</p>
+                        <div class="d-flex gap-3">
+                            <div class="p-2 bg-light rounded text-center flex-fill">
+                                <span class="fw-bold d-block">Cupos</span>
+                                <small>Repositorio global por tipo de documento.</small>
+                            </div>
+                            <div class="p-2 bg-light rounded text-center flex-fill">
+                                <span class="fw-bold d-block">Rangos</span>
+                                <small>Segmentos de números asignados a oficinas internas.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="modulo-reclusos" class="about-section mb-5">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <h2 class="h4 mb-3"><i class="bi bi-people me-2 text-primary"></i>Gestión de Internos</h2>
+                        <p>Para insertar un recluso en un documento, este debe existir y estar <strong>Activo</strong>.</p>
+                        <ul class="small">
+                            <li>Si no existe, regístrelo previamente en el módulo de Reclusos.</li>
+                            <li><strong>Integridad:</strong> Antes de activar un recluso inactivo, verifique su situación jurídica para asegurar que el registro sea coherente con su estado actual en la unidad.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="renovaciones-120" class="about-section mb-5">
+                <div class="card shadow-sm border-0 bg-dark text-white">
+                    <div class="card-body p-4">
+                        <h2 class="h4 mb-3 text-warning"><i class="bi bi-shield-check me-2"></i>Permisos de Salida (Art. 120)</h2>
+                        <p class="small">Este módulo <strong>no renueva documentos</strong>, sino autorizaciones de trabajo/salida para reclusos.</p>
+                        <div class="row small">
+                            <div class="col-md-7">
+                                <ul>
+                                    <li>Registre la fuente: <strong>Resolución Judicial</strong> o <strong>Acta de Unidad</strong>.</li>
+                                    <li>Complete datos críticos: Destino, horario, tipo de custodia y vigencia.</li>
+                                    <li>Vincule el documento de respaldo (el Oficio cargado previamente en bandeja) para constancia legal.</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-5 border-start border-secondary">
+                                <p class="text-warning fw-bold mb-1">Control de Vencimientos</p>
+                                <p class="small mb-0">Es responsabilidad del usuario revisar este módulo semanalmente para gestionar prórrogas antes del vencimiento del permiso.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="ejemplo-practico" class="about-section mb-5">
+                <h2 class="h4 mb-4 text-primary">Escenario: Respuesta a Oficio Judicial</h2>
+                <div class="ms-3">
+                    <div class="timeline-item">
+                        <small class="text-muted">PASO 1</small>
+                        <p class="mb-0"><strong>Ingreso:</strong> Se registra el Oficio (ej. 100/26) de un Juzgado. Se usa la herramienta para insertar al recluso en el asunto.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <small class="text-muted">PASO 2</small>
+                        <p class="mb-0"><strong>Derivación:</strong> Se realiza el "Pase" al Área Laboral. Se crea una actuación (Memorándum interno) solicitando el informe de horas.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <small class="text-muted">PASO 3</small>
+                        <p class="mb-0"><strong>Respuesta Interna:</strong> El área laboral devuelve el pase con el Memorándum de respuesta. El sistema unifica la "familia" de documentos bajo el Oficio padre.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <small class="text-muted">PASO 4</small>
+                        <p class="mb-0"><strong>Cierre:</strong> Se eleva a Dirección para firma y se envía el Oficio final de respuesta al Juzgado. El historial permite auditar cada paso y tiempo de respuesta.</p>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="alert alert-info border-0 shadow-sm p-4">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-check-all fs-1 me-3"></i>
+                    <div>
+                        <h4 class="h5 mb-1">Sistema Blindado</h4>
+                        <p class="mb-0 small">Siguiendo este flujo, Vector garantiza una bitácora institucional confiable, eliminando errores de numeración y facilitando la respuesta ante cualquier auditoría judicial o ministerial.</p>
+                    </div>
+                </div>
+            </footer>
         </div>
     </div>
 </div>

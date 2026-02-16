@@ -9,36 +9,156 @@
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
 
-<h3>@(Id == 0 ? "Nuevo Recluso" : "Editar Recluso")</h3>
+<PageTitle>@(Id == 0 ? "Nuevo Recluso" : "Editar Recluso") - Vector</PageTitle>
 
-@if (miRecluso == null)
-{
-    <p><em>Cargando datos...</em></p>
-}
-else
-{
-    <EditForm EditContext="editContextRecluso" OnSubmit="IgnorarSubmitRecluso">
-        <DataAnnotationsValidator />
+<style>
+    .form-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
 
+    .card-form {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+
+    .card-form-header {
+        background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+        color: white;
+        padding: 1.5rem;
+        border: none;
+    }
+
+    .label-custom {
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: #495057;
+        margin-bottom: 0.5rem;
+    }
+
+    .input-group-text {
+        background-color: #f8f9fa;
+        border-right: none;
+        color: #0d6efd;
+    }
+
+    .form-control-custom {
+        border-left: none;
+        border-radius: 0 8px 8px 0;
+    }
+
+        .form-control-custom:focus {
+            border-color: #ced4da;
+            box-shadow: none;
+            background-color: #fff;
+        }
+
+    .btn-save {
+        padding: 0.6rem 2rem;
+        font-weight: bold;
+        border-radius: 8px;
+    }
+
+    .btn-cancel {
+        padding: 0.6rem 1.5rem;
+        border-radius: 8px;
+    }
+
+    .status-switch-container {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="form-container">
         <div class="mb-3">
-            <label>Nombre Completo:</label>
-            <InputText class="form-control" @bind-Value="miRecluso.NombreCompleto" />
+            <a href="/reclusos" class="btn btn-link text-decoration-none p-0 text-muted">
+                <i class="bi bi-arrow-left"></i> Volver al listado
+            </a>
         </div>
 
-        <div class="mb-3">
-            <label>Documento:</label>
-            <InputText class="form-control" @bind-Value="miRecluso.Documento" />
-        </div>
+        @if (miRecluso == null)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Cargando ficha del interno...</p>
+            </div>
+        }
+        else
+        {
+            <div class="card card-form">
+                <div class="card-form-header">
+                    <h3 class="mb-0 h4">
+                        <i class="bi @(Id == 0 ? "bi-person-plus" : "bi-person-gear") me-2"></i>
+                        @(Id == 0 ? "Nuevo Registro de Recluso" : "Edición de Recluso")
+                    </h3>
+                </div>
 
-        <div class="mb-3 form-check">
-            <InputCheckbox class="form-check-input" @bind-Value="ActivoBool" />
-            <label class="form-check-label">¿Está Activo?</label>
-        </div>
+                <div class="card-body p-4">
+                    <EditForm EditContext="editContextRecluso" OnSubmit="IgnorarSubmitRecluso">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary class="alert alert-danger small py-2" />
 
-        <button type="button" class="btn btn-primary" @onclick="GuardarDesdeBoton">Guardar</button>
-        <a href="/reclusos" class="btn btn-secondary">Cancelar</a>
-    </EditForm>
-}
+                        <div class="mb-4">
+                            <label class="label-custom">Nombre Completo</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                <InputText class="form-control form-control-custom shadow-none"
+                                           @bind-Value="miRecluso.NombreCompleto"
+                                           placeholder="Ej: Juan Pérez" />
+                            </div>
+                            <ValidationMessage For="@(() => miRecluso.NombreCompleto)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="label-custom">Documento de Identidad</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+                                <InputText class="form-control form-control-custom shadow-none"
+                                           @bind-Value="miRecluso.Documento"
+                                           placeholder="Número de documento" />
+                            </div>
+                            <ValidationMessage For="@(() => miRecluso.Documento)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="label-custom">Estado en la Unidad</label>
+                            <div class="status-switch-container d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi @(ActivoBool ? "bi-check-circle-fill text-success" : "bi-x-circle-fill text-danger") fs-4 me-3"></i>
+                                    <div>
+                                        <div class="fw-bold fw-bold">@(ActivoBool ? "Interno Activo" : "Interno Inactivo")</div>
+                                        <small class="text-muted">Determina si el recluso está presente en el sistema</small>
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch m-0">
+                                    <InputCheckbox class="form-check-input" @bind-Value="ActivoBool" style="transform: scale(1.5); cursor: pointer;" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4 text-muted" />
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="/reclusos" class="btn btn-outline-secondary btn-cancel fw-bold">
+                                Cancelar
+                            </a>
+                            <button type="button" class="btn btn-primary btn-save shadow-sm" @onclick="GuardarDesdeBoton">
+                                <i class="bi bi-cloud-check me-2"></i>Guardar Cambios
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        }
+    </div>
+</div>
 
 @code {
     [Parameter]
@@ -88,7 +208,6 @@ else
 
     private Task IgnorarSubmitRecluso(EditContext _)
     {
-        // Evita guardado automático al presionar Enter dentro del formulario.
         return Task.CompletedTask;
     }
 

@@ -9,125 +9,201 @@
 @inject NavigationManager Nav
 @rendermode InteractiveServer
 
-<div class="container p-4">
-    <h3>@(Id == 0 ? "Nueva Salida" : "Editar Salida")</h3>
+<PageTitle>@(Id == 0 ? "Nueva Salida" : "Editar Salida") - Vector</PageTitle>
+
+<style>
+    .form-section-title {
+        color: #0d6efd;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #e9ecef;
+        padding-bottom: 5px;
+        margin-bottom: 1.5rem;
+    }
+
+    .card-custom {
+        border: none;
+        border-radius: 12px;
+        shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .bg-authorization {
+        background-color: #f0f7ff;
+        border: 1px solid #cfe2ff;
+    }
+
+    .badge-doc {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.8rem;
+    }
+</style>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 mb-0 fw-bold">
+            <i class="bi bi-calendar-check text-primary me-2"></i>
+            @(Id == 0 ? "Registro de Nueva Salida" : "Editar Salida Autorizada")
+        </h2>
+        <a href="renovaciones" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Volver al listado
+        </a>
+    </div>
 
     <EditForm Model="modelo" OnValidSubmit="Guardar">
         <DataAnnotationsValidator />
+        <ValidationSummary class="alert alert-danger py-2 small" />
 
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label>Recluso</label>
-                <select class="form-select" @bind="modelo.IdRecluso" disabled="@(Id > 0)">
-                    <option value="0">-- Seleccione --</option>
-                    @foreach (var r in reclusos)
-                    {
-                        <option value="@r.IdRecluso">@r.NombreCompleto</option>
-                    }
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label>Lugar de Trabajo</label>
-                <InputText class="form-control" @bind-Value="modelo.LugarTrabajo" />
-            </div>
-        </div>
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card card-custom shadow-sm mb-4">
+                    <div class="card-body p-4">
+                        <div class="form-section-title">Información General</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Interno / Recluso</label>
+                                <select class="form-select shadow-none" @bind="modelo.IdRecluso" disabled="@(Id > 0)">
+                                    <option value="0">-- Seleccione --</option>
+                                    @foreach (var r in reclusos)
+                                    {
+                                        <option value="@r.IdRecluso">@r.NombreCompleto</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Lugar de Trabajo</label>
+                                <InputText class="form-control shadow-none" @bind-Value="modelo.LugarTrabajo" placeholder="Nombre de la empresa o destino" />
+                            </div>
 
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <label>Inicio</label>
-                <InputDate class="form-control" @bind-Value="modelo.FechaInicio" />
-            </div>
-            <div class="col-md-4">
-                <label>Vencimiento</label>
-                <InputDate class="form-control" @bind-Value="modelo.FechaVencimiento" />
-            </div>
-            <div class="col-md-4">
-                <label>Notificación Juez</label>
-                <InputDate class="form-control" @bind-Value="modelo.FechaNotificacionJuez" />
-            </div>
-        </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Fecha Inicio</label>
+                                <InputDate class="form-control shadow-none" @bind-Value="modelo.FechaInicio" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-danger">Fecha Vencimiento</label>
+                                <InputDate class="form-control shadow-none border-danger border-opacity-25" @bind-Value="modelo.FechaVencimiento" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Notificación Juez</label>
+                                <InputDate class="form-control shadow-none" @bind-Value="modelo.FechaNotificacionJuez" />
+                            </div>
 
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label>Horario</label>
-                <InputText class="form-control" @bind-Value="modelo.Horario" />
-            </div>
-            <div class="col-md-6">
-                <label>Custodia</label>
-                <InputText class="form-control" @bind-Value="modelo.DetalleCustodia" />
-            </div>
-        </div>
-
-        <div class="card mb-3 bg-light">
-            <div class="card-body">
-                <h6>Autorización</h6>
-                <div class="row">
-                    <div class="col-md-4">
-                        <select class="form-select" @bind="codigoAutorizacion">
-                            <option value="">(Seleccione)</option>
-                            <option value="RESOLUCION_JUEZ">Resolución Juez</option>
-                            <option value="ACTA">Acta</option>
-                        </select>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Horario de Salida</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-clock"></i></span>
+                                    <InputText class="form-control shadow-none" @bind-Value="modelo.Horario" placeholder="Ej: 08:00 a 17:00" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Detalle de Custodia</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-shield-lock"></i></span>
+                                    <InputText class="form-control shadow-none" @bind-Value="modelo.DetalleCustodia" placeholder="Policía / Sin Custodia" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-8">
-                        <input type="text"
-                               class="form-control"
-                               placeholder="Descripción de la autorización"
-                               @bind="descAutorizacion" />
+                </div>
+
+                <div class="card card-custom bg-authorization shadow-sm mb-4">
+                    <div class="card-body p-4">
+                        <div class="form-section-title">Respaldo de Autorización</div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold small text-muted">Tipo de Acto</label>
+                                <select class="form-select shadow-none" @bind="codigoAutorizacion">
+                                    <option value="">(Seleccione)</option>
+                                    <option value="RESOLUCION_JUEZ text-primary fw-bold">Resolución Juez</option>
+                                    <option value="ACTA text-success fw-bold">Acta Administrativa</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold small text-muted">Número o Referencia del Acto</label>
+                                <input type="text" class="form-control shadow-none"
+                                       placeholder="Ej: Resolución Nro 123/2026"
+                                       @bind="descAutorizacion" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label fw-bold small text-muted">Observaciones del Permiso</label>
+                                <InputTextArea class="form-control shadow-none" rows="2" @bind-Value="observacionesUsuario"
+                                               placeholder="Notas adicionales sobre la salida..." />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card card-custom shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-body p-4">
+                        <div class="form-section-title">Documentos Respaldantes</div>
+
+                        <div class="mb-3">
+                            <div class="input-group input-group-sm mb-2">
+                                <input type="number" class="form-control" placeholder="ID Documento" @bind="idDocAgregar" />
+                                <button type="button" class="btn btn-primary" @onclick="AgregarDoc">Vincular ID</button>
+                            </div>
+
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                                <input type="text" class="form-control border-start-0" placeholder="Buscar por asunto..." @bind="filtroDocumento" />
+                                <button type="button" class="btn btn-outline-primary" @onclick="BuscarCandidatos">Buscar</button>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(mensajeDocumento))
+                        {
+                            <div class="alert alert-warning py-2 small mb-3">
+                                <i class="bi bi-exclamation-triangle me-2"></i>@mensajeDocumento
+                            </div>
+                        }
+
+                        @if (documentosCandidatos.Count > 0)
+                        {
+                            <div class="list-group mb-3" style="max-height: 200px; overflow-y: auto;">
+                                @foreach (var doc in documentosCandidatos)
+                                {
+                                    <button type="button" class="list-group-item list-group-item-action p-2 small d-flex justify-content-between align-items-center" @onclick="() => AgregarDoc(doc.IdDocumento)">
+                                        <span class="text-truncate" style="max-width: 80%;">@doc.Texto</span>
+                                        <i class="bi bi-plus-circle-fill text-success"></i>
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        <h6 class="small fw-bold text-muted mb-2">Vínculos Actuales</h6>
+                        <div class="list-group">
+                            @if (!idsDocumentos.Any())
+                            {
+                                <div class="text-center py-3 text-muted border border-dashed rounded bg-light">
+                                    <small>Sin documentos adjuntos</small>
+                                </div>
+                            }
+                            @foreach (var docId in idsDocumentos)
+                            {
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                    <span class="small fw-bold"><i class="bi bi-file-earmark-check me-2 text-primary"></i>ID @docId</span>
+                                    <button type="button" class="btn btn-link text-danger p-0" @onclick="() => RemoverDoc(docId)">
+                                        <i class="bi bi-x-circle-fill"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="mb-3">
-            <label>Observaciones Adicionales</label>
-            <InputTextArea class="form-control" rows="3" @bind-Value="observacionesUsuario" />
-        </div>
-
-        <div class="mb-3">
-            <label>Documentos Vinculados</label>
-            <div class="input-group mb-2">
-                <input type="number" class="form-control" placeholder="ID Documento" @bind="idDocAgregar" />
-                <button type="button" class="btn btn-outline-secondary" @onclick="AgregarDoc">Agregar ID</button>
+        <div class="row mt-4 mb-5">
+            <div class="col-12 d-flex justify-content-end gap-2">
+                <a href="renovaciones" class="btn btn-outline-secondary px-4 fw-bold">Cancelar</a>
+                <button type="submit" class="btn btn-primary px-5 fw-bold shadow">
+                    <i class="bi bi-save me-2"></i>Guardar Autorización
+                </button>
             </div>
-
-            <div class="input-group mb-2">
-                <input type="text" class="form-control" placeholder="Buscar por asunto/descripcion" @bind="filtroDocumento" />
-                <button type="button" class="btn btn-outline-primary" @onclick="BuscarCandidatos">Buscar candidatos</button>
-            </div>
-            <small class="text-muted">Las sugerencias por texto pueden incluir homónimos; verifique el contenido del documento antes de vincular.</small>
-
-            @if (!string.IsNullOrWhiteSpace(mensajeDocumento))
-            {
-                <div class="alert alert-warning mt-2 mb-2 py-2">@mensajeDocumento</div>
-            }
-
-            @if (documentosCandidatos.Count > 0)
-            {
-                <ul class="list-group mb-2">
-                    @foreach (var doc in documentosCandidatos)
-                    {
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span>@doc.Texto</span>
-                            <button type="button" class="btn btn-sm btn-outline-success" @onclick="() => AgregarDoc(doc.IdDocumento)">Vincular</button>
-                        </li>
-                    }
-                </ul>
-            }
-
-            <ul class="list-group mt-2">
-                @foreach (var docId in idsDocumentos)
-                {
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        Documento ID: @docId
-                        <button type="button" class="btn btn-sm btn-danger" @onclick="() => RemoverDoc(docId)">X</button>
-                    </li>
-                }
-            </ul>
         </div>
-
-        <button type="submit" class="btn btn-primary">Guardar</button>
-        <a href="renovaciones" class="btn btn-secondary">Cancelar</a>
     </EditForm>
 </div>
 
@@ -144,11 +220,9 @@
     };
 
     private IEnumerable<MaeRecluso> reclusos = [];
-
     private string codigoAutorizacion = string.Empty;
     private string descAutorizacion = string.Empty;
     private string observacionesUsuario = string.Empty;
-
     private List<long> idsDocumentos = [];
     private long idDocAgregar;
     private string mensajeDocumento = string.Empty;
@@ -158,17 +232,10 @@
     protected override async Task OnInitializedAsync()
     {
         reclusos = await RepoReclusos.GetAllAsync();
-
-        if (Id <= 0)
-        {
-            return;
-        }
+        if (Id <= 0) return;
 
         var existente = await Service.ObtenerPorIdAsync(Id);
-        if (existente is null)
-        {
-            return;
-        }
+        if (existente is null) return;
 
         modelo = existente;
         var parsed = Service.ParsearObservaciones(modelo.Observaciones);
@@ -186,7 +253,6 @@
     private async Task BuscarCandidatos()
     {
         mensajeDocumento = string.Empty;
-
         var nombreRecluso = reclusos.FirstOrDefault(r => r.IdRecluso == modelo.IdRecluso)?.NombreCompleto ?? string.Empty;
         var filtro = string.IsNullOrWhiteSpace(filtroDocumento) ? nombreRecluso : filtroDocumento;
 
@@ -195,59 +261,34 @@
             documentosCandidatos = [];
             return;
         }
-
         documentosCandidatos = await Service.BuscarDocumentosCandidatos(modelo.IdRecluso, filtro);
     }
 
-    private async Task AgregarDoc()
-    {
-        await AgregarDoc(idDocAgregar);
-    }
+    private async Task AgregarDoc() => await AgregarDoc(idDocAgregar);
 
     private async Task AgregarDoc(long idDocumento)
     {
         mensajeDocumento = string.Empty;
-
-        if (idDocumento <= 0)
-        {
-            mensajeDocumento = "Debe ingresar un ID de documento válido.";
-            return;
-        }
-
-        if (idsDocumentos.Contains(idDocumento))
-        {
-            mensajeDocumento = "El documento ya está vinculado.";
-            return;
-        }
+        if (idDocumento <= 0) { mensajeDocumento = "Debe ingresar un ID de documento válido."; return; }
+        if (idsDocumentos.Contains(idDocumento)) { mensajeDocumento = "El documento ya está vinculado."; return; }
 
         var existe = await Service.ExisteDocumentoAsync(idDocumento);
-        if (!existe)
-        {
-            mensajeDocumento = $"No existe un documento con ID {idDocumento}.";
-            return;
-        }
+        if (!existe) { mensajeDocumento = $"No existe un documento con ID {idDocumento}."; return; }
 
         idsDocumentos.Add(idDocumento);
         idDocAgregar = 0;
     }
 
-    private void RemoverDoc(long idDocumento)
-    {
-        idsDocumentos.Remove(idDocumento);
-    }
+    private void RemoverDoc(long idDocumento) => idsDocumentos.Remove(idDocumento);
 
     private async Task Guardar()
     {
         mensajeDocumento = string.Empty;
-
         try
         {
             await Service.GuardarAsync(modelo, idsDocumentos, codigoAutorizacion, descAutorizacion, observacionesUsuario);
             Nav.NavigateTo("renovaciones");
         }
-        catch (InvalidOperationException ex)
-        {
-            mensajeDocumento = ex.Message;
-        }
+        catch (InvalidOperationException ex) { mensajeDocumento = ex.Message; }
     }
 }

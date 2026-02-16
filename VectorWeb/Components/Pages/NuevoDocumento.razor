@@ -22,399 +22,410 @@
 @inject SecretariaDbContext DbContext
 @rendermode InteractiveServer
 
-<h3>
-    @if (esActuacion)
-    {
-        <span><i class="bi bi-reply-all-fill"></i> Confeccionar Respuesta / Actuación</span>
-    }
-    else
-    {
-        <span><i class="bi bi-file-earmark-plus"></i> Ingreso de Documento - Mesa de Entrada</span>
-    }
-</h3>
+<PageTitle>@(esActuacion ? "Nueva Actuación" : "Nuevo Ingreso") - Vector</PageTitle>
 
-<EditForm EditContext="editContextNuevoDocumento" OnSubmit="IgnorarSubmitNuevoDocumento">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
-
-    @if (!string.IsNullOrWhiteSpace(errorGuardar))
-    {
-        <div class="alert alert-danger" role="alert">@errorGuardar</div>
+<style>
+    .form-section {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e9ecef;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
 
-    @if (!string.IsNullOrWhiteSpace(mensajeNumeracion))
-    {
-        <div class="alert alert-info" role="alert">@mensajeNumeracion</div>
+    .section-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #0d6efd;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #f1f4f8;
+        padding-bottom: 8px;
+        margin-bottom: 1.5rem;
     }
 
-    @if (esActuacion)
-    {
-        <div class="alert alert-warning shadow-sm">
-            <h5 class="alert-heading"><i class="bi bi-folder-fill"></i> Trabajando sobre el Expediente: @docPadreSeleccionado?.NumeroOficial</h5>
-            <p class="mb-0">@docPadreSeleccionado?.Asunto</p>
-            <hr>
-            <small class="mb-0 text-muted">
-                <i class="bi bi-geo-alt-fill"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
-            </small>
-            @if (paseConActuacionForzado)
+    .search-panel {
+        background: #f8fbff;
+        border-radius: 8px;
+        border: 1px solid #d0e2ff;
+    }
+
+    .label-custom {
+        font-weight: 600;
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    .modal-backdrop-custom {
+        background-color: rgba(0,0,0,.5);
+        backdrop-filter: blur(4px);
+    }
+</style>
+
+<div class="container py-4">
+    <header class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 fw-bold mb-0">
+            @if (esActuacion)
             {
-                <div class="alert alert-info mt-3 mb-0 py-2">
-                    El pase fue confirmado con actuación, por lo que esta actuación se guardará y se aplicará el traslado automático configurado.
-                </div>
+                <span class="text-primary"><i class="bi bi-reply-all-fill me-2"></i>Actuación sobre Expediente</span>
             }
             else
             {
-                <div class="form-check mt-3">
-                    <InputCheckbox id="soloTraerSinActuacion" class="form-check-input" @bind-Value="soloTraerSinActuacion" />
-                    <label for="soloTraerSinActuacion" class="form-check-label">
-                        La documentación ya está completa, solo deseo traer el expediente sin agregar esta actuación (no se guardará esta actuación ni se agregará al hilo de conversación)
-                    </label>
-                </div>
+                <span class="text-success"><i class="bi bi-file-earmark-plus me-2"></i>Ingreso - Mesa de Entrada</span>
             }
-        </div>
-    }
+        </h2>
+        <a href="documentos" class="btn btn-outline-secondary btn-sm shadow-sm">
+            <i class="bi bi-arrow-left"></i> Cancelar y Volver
+        </a>
+    </header>
 
-    <div class="card mb-3">
-        <div class="card-body">
-            @if (!(esActuacion && soloTraerSinActuacion))
-            {
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label>Tipo de Documento:</label>
-                        <select class="form-control" value="@nuevoDoc.IdTipo" @onchange="OnTipoDocumentoChanged">
-                            <option value="0">-- Seleccione Tipo --</option>
-                            @foreach (var tipo in tipos)
-                            {
-                                <option value="@tipo.IdTipo">@tipo.Nombre</option>
-                            }
-                        </select>
+    <EditForm EditContext="editContextNuevoDocumento" OnSubmit="IgnorarSubmitNuevoDocumento">
+        <DataAnnotationsValidator />
+
+        @if (!string.IsNullOrWhiteSpace(errorGuardar))
+        {
+            <div class="alert alert-danger shadow-sm border-start border-4 border-danger" role="alert">
+                <i class="bi bi-exclamation-octagon-fill me-2"></i> @errorGuardar
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(mensajeNumeracion))
+        {
+            <div class="alert alert-info border-0 shadow-sm small py-2 mb-4" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i> @mensajeNumeracion
+            </div>
+        }
+
+        @if (esActuacion)
+        {
+            <div class="alert alert-warning shadow-sm border-0 mb-4 p-4">
+                <div class="row align-items-center">
+                    <div class="col-md-9">
+                        <h5 class="fw-bold mb-1"><i class="bi bi-folder-fill me-2"></i>Expediente: @docPadreSeleccionado?.NumeroOficial</h5>
+                        <p class="mb-0 text-dark">@docPadreSeleccionado?.Asunto</p>
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-geo-alt-fill text-danger"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
+                        </small>
                     </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label>Año fiscal / numeración:</label>
-                        <InputNumber @bind-Value="anioNumeracionSeleccionado" @bind-Value:after="OnAnioNumeracionChanged" class="form-control" min="2000" max="2100" />
-                        @if (anioNumeracionSeleccionado < DateTime.Now.Year)
+                    <div class="col-md-3 text-md-end mt-3 mt-md-0">
+                        @if (paseConActuacionForzado)
                         {
-                            <small class="text-warning">Atención: se usará numeración histórica del año @anioNumeracionSeleccionado.</small>
-                        }
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label>Número Oficial:</label>
-                        @if (esNumeracionAutomatica)
-                        {
-                            <input type="text" class="form-control" value="Automático (se asigna al guardar)" disabled />
-                            <small class="text-muted">Serie: <strong>@serieNumeracionAutomatica</strong> | Próximo estimado: @proximoNumeroAutomatico</small>
-                        }
-                        else if (esNumeracionManualInterna)
-                        {
-                            <InputNumber @bind-Value="numeroManualInterno" class="form-control" placeholder="Ej. 200" disabled="@bloqueoPorRangoAgotado" />
-                            @if (bloqueoPorRangoAgotado)
-                            {
-                                <small class="text-danger">@mensajeNumeracion</small>
-                            }
-                            else
-                            {
-                                <small class="text-muted">@mensajeNumeracion</small>
-                            }
+                            <span class="badge bg-primary px-3 py-2">MODO TRASLADO AUTOMÁTICO</span>
                         }
                         else
                         {
-                            <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control" maxlength="50" placeholder="Ej. MEMO-2024-001" disabled="@bloqueoPorRangoAgotado" />
-                            @if (bloqueoPorRangoAgotado)
-                            {
-                                <small class="text-danger">@mensajeNumeracion</small>
-                            }
-                            else if (esNumeracionExterna)
-                            {
-                                <small class="text-muted">Numeración manual: ingrese el número oficial y se validará su unicidad por oficina, tipo y año.</small>
-                            }
+                            <div class="form-check form-switch d-inline-block text-start">
+                                <InputCheckbox id="soloTraerSinActuacion" class="form-check-input shadow-none" @bind-Value="soloTraerSinActuacion" />
+                                <label for="soloTraerSinActuacion" class="form-check-label small fw-bold">Solo traer expediente</label>
+                            </div>
                         }
                     </div>
                 </div>
-            }
+            </div>
+        }
 
-            @if (!soloTraerSinActuacion)
-            {
-                <div class="mb-3">
-                    <label>Contenido / Asunto del Memorando:</label>
-                    <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control" rows="4" />
-                </div>
+        <div class="row g-4">
+            <div class="col-lg-12">
+                <div class="form-section p-4">
+                    @if (!(esActuacion && soloTraerSinActuacion))
+                    {
+                        <div class="section-title">Identificación y Clasificación</div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="label-custom mb-1">Tipo de Documento</label>
+                                <select class="form-select shadow-none" value="@nuevoDoc.IdTipo" @onchange="OnTipoDocumentoChanged">
+                                    <option value="0">-- Seleccione Tipo --</option>
+                                    @foreach (var tipo in tipos)
+                                    {
+                                        <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                                    }
+                                </select>
+                            </div>
 
-                @if (!esActuacion)
-                {
-                    <div class="mb-3 border rounded p-3 bg-light-subtle">
-                        <label class="form-label mb-1">Insertar PPL en asunto</label>
-                        <small class="d-block text-muted mb-2">
-                            Busque y seleccione una o varias PPL. Luego inserte sus nombres en el asunto con un clic.
-                        </small>
-
-                        <div class="row g-2 align-items-start">
-                            <div class="col-md-7 position-relative">
-                                <input type="text"
-                                       class="form-control"
-                                       placeholder="Buscar por nombre o documento..."
-                                       value="@busquedaReclusoAsunto"
-                                       autocomplete="off"
-                                       @oninput="FiltrarReclusosAsunto"
-                                       @onfocus="MostrarSugerenciasPPL"
-                                       @onkeydown="ManejarTecladoPPL" />
-
-                                @if (reclusosFiltradosAsunto.Any())
+                            <div class="col-md-4">
+                                <label class="label-custom mb-1">Año Fiscal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-calendar-event"></i></span>
+                                    <InputNumber @bind-Value="anioNumeracionSeleccionado" @bind-Value:after="OnAnioNumeracionChanged" class="form-control shadow-none" min="2000" max="2100" />
+                                </div>
+                                @if (anioNumeracionSeleccionado < DateTime.Now.Year)
                                 {
-                                    <div class="list-group position-absolute start-0 end-0 shadow-sm"
-                                         @ref="panelSugerenciasPPLRef"
-                                         style="z-index: 30; top: calc(100% + .25rem);">
-                                        @for (var i = 0; i < reclusosFiltradosAsunto.Count; i++)
-                                        {
-                                            var recluso = reclusosFiltradosAsunto[i];
-                                            var cssItem = i == indicePPLSeleccionado
-                                                ? "list-group-item list-group-item-action active"
-                                                : "list-group-item list-group-item-action";
+                                    <small class="text-warning fw-bold d-block mt-1">Modo numeración histórica.</small>
+                                }
+                            </div>
 
-                                            <button type="button"
-                                                    data-indice-sugerencia="@i"
-                                                    class="@cssItem"
-                                                    @onclick="() => AgregarReclusoAsunto(recluso)">
-                                                <strong>@recluso.NombreCompleto</strong>
-                                                @if (!string.IsNullOrWhiteSpace(recluso.Documento))
+                            <div class="col-md-4">
+                                <label class="label-custom mb-1">Número Oficial</label>
+                                @if (esNumeracionAutomatica)
+                                {
+                                    <div class="input-group">
+                                        <input type="text" class="form-control bg-light" value="Automático" disabled />
+                                        <span class="input-group-text bg-primary text-white"><i class="bi bi-magic"></i></span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">Estimado: <strong>@proximoNumeroAutomatico</strong> (@serieNumeracionAutomatica)</small>
+                                }
+                                else if (esNumeracionManualInterna)
+                                {
+                                    <InputNumber @bind-Value="numeroManualInterno" class="form-control shadow-none border-primary" placeholder="Ingresar número" disabled="@bloqueoPorRangoAgotado" />
+                                }
+                                else
+                                {
+                                    <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control shadow-none" maxlength="50" placeholder="Ej. JUZ-100/26" disabled="@bloqueoPorRangoAgotado" />
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (!soloTraerSinActuacion)
+                    {
+                        <div class="section-title">Detalle del Contenido</div>
+                        <div class="mb-4">
+                            <label class="label-custom mb-1">Contenido / Asunto Principal</label>
+                            <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control shadow-none" rows="4" placeholder="Describa el asunto del documento..." />
+                            <div class="text-end">
+                                <small class="@(nuevoDoc.Asunto?.Length > 200 ? "text-danger" : "text-muted")">@(nuevoDoc.Asunto?.Length ?? 0) / 200 caracteres</small>
+                            </div>
+                        </div>
+
+                        @if (!esActuacion)
+                        {
+                            <div class="search-panel p-3 mb-4">
+                                <label class="label-custom mb-2"><i class="bi bi-people-fill me-1 text-primary"></i> Vincular PPL al Asunto</label>
+                                <div class="row g-2">
+                                    <div class="col-md-7 position-relative">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                                            <input type="text" class="form-control shadow-none" placeholder="Buscar por nombre o CI..."
+                                                   value="@busquedaReclusoAsunto" autocomplete="off"
+                                                   @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onkeydown="ManejarTecladoPPL" />
+                                        </div>
+
+                                        @if (reclusosFiltradosAsunto.Any())
+                                        {
+                                            <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="z-index: 1000;">
+                                                @for (var i = 0; i < reclusosFiltradosAsunto.Count; i++)
                                                 {
-                                                    <span class="text-muted"> · CI @recluso.Documento</span>
+                                                    var recluso = reclusosFiltradosAsunto[i];
+                                                    var activeClass = i == indicePPLSeleccionado ? "active" : "";
+                                                    <button type="button" class="list-group-item list-group-item-action @activeClass small py-2" @onclick="() => AgregarReclusoAsunto(recluso)">
+                                                        <strong>@recluso.NombreCompleto</strong> <span class="opacity-75">· @recluso.Documento</span>
+                                                    </button>
                                                 }
-                                            </button>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="col-md-5 d-flex gap-2">
+                                        <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="InsertarReclusosEnAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                            <i class="bi bi-pencil-square me-1"></i> Insertar
+                                        </button>
+                                        <button type="button" class="btn btn-light btn-sm px-3 border" @onclick="LimpiarReclusosAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                            Limpiar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if (reclusosSeleccionadosAsunto.Any())
+                                {
+                                    <div class="mt-3 d-flex flex-wrap gap-1">
+                                        @foreach (var recluso in reclusosSeleccionadosAsunto)
+                                        {
+                                            <span class="badge bg-white text-primary border border-primary-subtle d-inline-flex align-items-center gap-2 py-2 px-3 shadow-sm">
+                                                @recluso.NombreCompleto
+                                                <i class="bi bi-x-circle-fill text-danger cursor-pointer" style="cursor:pointer" @onclick="() => QuitarReclusoAsunto(recluso.IdRecluso)"></i>
+                                            </span>
                                         }
                                     </div>
                                 }
                             </div>
+                        }
+                    }
 
-                            <div class="col-md-5 d-flex flex-wrap gap-2">
-                                <button type="button" class="btn btn-outline-primary" @onclick="InsertarReclusosEnAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
-                                    <i class="bi bi-input-cursor-text"></i> Insertar en asunto
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary" @onclick="LimpiarReclusosAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
-                                    Limpiar selección
-                                </button>
-                            </div>
-                        </div>
-
-                        @if (reclusosSeleccionadosAsunto.Any())
+                    <div class="row g-3">
+                        @if (!esActuacion)
                         {
-                            <div class="mt-3 d-flex flex-wrap gap-2">
-                                @foreach (var recluso in reclusosSeleccionadosAsunto)
-                                {
-                                    <span class="badge bg-primary d-inline-flex align-items-center gap-1 fs-6">
-                                        @recluso.NombreCompleto
-                                        <button type="button" class="btn btn-sm btn-link text-white text-decoration-none p-0" @onclick="() => QuitarReclusoAsunto(recluso.IdRecluso)">
-                                            <i class="bi bi-x-circle"></i>
-                                        </button>
-                                    </span>
-                                }
+                            <div class="col-md-6">
+                                <label class="label-custom mb-1">Oficina de Ubicación Inicial</label>
+                                <div class="position-relative">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white text-muted"><i class="bi bi-building"></i></span>
+                                        <input type="text" class="form-control shadow-none" placeholder="Buscar oficina..."
+                                               value="@oficinaBusqueda" autocomplete="off"
+                                               @oninput="FiltrarOficinas" @onfocus="MostrarSugerenciasOficina" @onkeydown="ManejarTecladoOficinas" />
+                                    </div>
+
+                                    @if (oficinasFiltradas.Any())
+                                    {
+                                        <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="@EstiloPanelSugerencias">
+                                            @for (var i = 0; i < oficinasFiltradas.Count; i++)
+                                            {
+                                                var ofi = oficinasFiltradas[i];
+                                                var activeClass = i == indiceOficinaSeleccionada ? "active" : "";
+                                                <button type="button" class="list-group-item list-group-item-action @activeClass py-2" @onclick="() => SeleccionarOficina(ofi)">
+                                                    @ofi.Nombre
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         }
 
-                        <small class="text-muted d-block mt-2">
-                            Use ↑ ↓ y Enter para seleccionar una PPL.
-                        </small>
-                    </div>
-                }
-            }
-
-            <div class="row">
-                @if (!esActuacion)
-                {
-                    <div class="col-md-6 mb-3">
-                        <label>Ubicación Inicial:</label>
-                        <div class="position-relative">
-                            <input type="text"
-                                   class="form-control"
-                                   placeholder="Escriba para buscar oficina..."
-                                   value="@oficinaBusqueda"
-                                   autocomplete="off"
-                                   @oninput="FiltrarOficinas"
-                                   @onfocus="MostrarSugerenciasOficina"
-                                   @onkeydown="ManejarTecladoOficinas" />
-
-                            @if (oficinasFiltradas.Any())
-                            {
-                                <div class="list-group position-absolute start-0 end-0 shadow-sm"
-                                     @ref="panelSugerenciasOficinaRef"
-                                     style="@EstiloPanelSugerencias">
-                                    @for (var i = 0; i < oficinasFiltradas.Count; i++)
-                                    {
-                                        var ofi = oficinasFiltradas[i];
-                                        var cssItem = i == indiceOficinaSeleccionada
-                                            ? "list-group-item list-group-item-action active"
-                                            : "list-group-item list-group-item-action";
-
-                                        <button type="button"
-                                                data-indice-sugerencia="@i"
-                                                class="@cssItem"
-                                                @onclick="() => SeleccionarOficina(ofi)">
-                                            @ofi.Nombre
-                                        </button>
-                                    }
+                        @if (!(esActuacion && soloTraerSinActuacion))
+                        {
+                            <div class="col-md-6">
+                                <label class="label-custom mb-1">Estado del Trámite</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white text-muted"><i class="bi bi-flag"></i></span>
+                                    <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-select shadow-none">
+                                        @foreach (var est in estados)
+                                        {
+                                            <option value="@est.IdEstado">@est.Nombre</option>
+                                        }
+                                    </InputSelect>
                                 </div>
-                            }
-                        </div>
-
-                        <small class="text-muted">
-                            Puede buscar escribiendo palabras en cualquier orden. Use ↑ ↓ y Enter para seleccionar.
-                        </small>
+                            </div>
+                        }
                     </div>
-                }
-
-                @if (!(esActuacion && soloTraerSinActuacion))
-                {
-                    <div class="col-md-6 mb-3">
-                        <label>Estado Inicial:</label>
-                        <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-control">
-                            @foreach (var est in estados)
-                            {
-                                <option value="@est.IdEstado">@est.Nombre</option>
-                            }
-                        </InputSelect>
-                    </div>
-                }
+                </div>
             </div>
+
+            @if (!esActuacion)
+            {
+                <div class="col-12">
+                    <div class="form-section p-4 border-primary border-opacity-25">
+                        <div class="section-title text-dark"><i class="bi bi-link-45deg me-1"></i>Referencia de Expediente Padre</div>
+                        @if (docPadreSeleccionado == null)
+                        {
+                            <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded-3 border border-dashed">
+                                <p class="mb-0 text-muted small"><i class="bi bi-info-circle me-1"></i> ¿Este documento es un adjunto de otro expediente?</p>
+                                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" @onclick="AbrirModalPadres">
+                                    <i class="bi bi-search me-1"></i> Vincular Padre
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-primary d-flex justify-content-between align-items-center mb-0 shadow-sm p-3">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-white rounded-circle p-2 me-3">
+                                        <i class="bi bi-diagram-3-fill text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <span class="d-block small text-uppercase fw-bold opacity-75">Documento Padre</span>
+                                        <strong class="fs-5">@docPadreSeleccionado.NumeroOficial</strong>
+                                        <span class="d-block small text-truncate" style="max-width: 400px;">@docPadreSeleccionado.Asunto</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <button type="button" class="btn btn-sm btn-light border fw-bold" @onclick="AbrirModalPadres">Cambiar</button>
+                                    <button type="button" class="btn btn-sm btn-danger fw-bold shadow-sm" @onclick="QuitarVinculo"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
         </div>
-    </div>
 
-    @if (!esActuacion)
-    {
-        <div class="card mb-3 border-primary">
-            <div class="card-header bg-light">
-                <i class="bi bi-link-45deg"></i> Vinculación
-            </div>
-            <div class="card-body">
-                @if (docPadreSeleccionado == null)
+        <div class="mt-5 d-flex gap-2 justify-content-center">
+            <button type="button" class="btn btn-success btn-lg px-5 shadow fw-bold" disabled="@bloqueoPorRangoAgotado" @onclick="GuardarDesdeBotonAsync">
+                @if (esActuacion)
                 {
-                    <p class="mb-2 text-muted">
-                        Si corresponde podés adjuntar este documento a un expediente padre existente.
-                    </p>
-                    <button type="button" class="btn btn-outline-primary" @onclick="AbrirModalPadres">
-                        <i class="bi bi-search"></i> Buscar documento padre
-                    </button>
+                    @if (soloTraerSinActuacion)
+                    {
+                        <span><i class="bi bi-box-arrow-in-down me-2"></i>Traer Expediente</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-send-check me-2"></i>@EtiquetaBotonPaseConActuacion</span>
+                    }
                 }
                 else
                 {
-                    <div class="alert alert-info d-flex justify-content-between align-items-center">
-                        <span class="me-2">
-                            <strong>VINCULADO A:</strong> @docPadreSeleccionado.NumeroOficial - @docPadreSeleccionado.Asunto
-                        </span>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AbrirModalPadres">
-                                <i class="bi bi-search"></i> Cambiar
-                            </button>
-                            <button type="button" class="btn btn-sm btn-danger" @onclick="QuitarVinculo">
-                                <i class="bi bi-x-circle"></i> Quitar
-                            </button>
-                        </div>
-                    </div>
+                    <span><i class="bi bi-save-fill me-2"></i>Registrar Documento</span>
                 }
-            </div>
+            </button>
+            <a href="documentos" class="btn btn-outline-secondary btn-lg px-4">Cancelar</a>
         </div>
-    }
-
-    <div class="d-grid gap-2 d-md-block">
-        <button type="button" class="btn btn-success btn-lg" disabled="@bloqueoPorRangoAgotado" @onclick="GuardarDesdeBotonAsync">
-            @if (esActuacion)
-            {
-                @if (soloTraerSinActuacion)
-                {
-                    <span><i class="bi bi-box-arrow-in-down"></i> Traer sin Actuación</span>
-                }
-                else
-                {
-                    <span><i class="bi bi-send-check"></i> @EtiquetaBotonPaseConActuacion</span>
-                }
-            }
-            else
-            {
-                <span><i class="bi bi-save"></i> Registrar Ingreso</span>
-            }
-        </button>
-        <a href="documentos" class="btn btn-secondary btn-lg">Cancelar</a>
-    </div>
-
-</EditForm>
+    </EditForm>
+</div>
 
 @if (mostrarModalPadres)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,.45);">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-diagram-3"></i> Seleccionar documento padre</h5>
-                    <button type="button" class="btn-close" aria-label="Cerrar" @onclick="CerrarModalPadres"></button>
+    <div class="modal fade show d-block modal-backdrop-custom" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-dark text-white p-4">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-search me-2"></i>Seleccionar Documento Padre</h5>
+                    <button type="button" class="btn-close btn-close-white" aria-label="Cerrar" @onclick="CerrarModalPadres"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="row g-2 mb-3 align-items-end">
-                        <div class="col-md-7">
-                            <label class="form-label">Buscador en bandeja</label>
-                            <input class="form-control"
-                                   placeholder="Buscar por número, asunto, tipo, oficina o estado"
-                                   @bind="FiltroModalPadre"
-                                   @bind:event="oninput" />
-                        </div>
-                        <div class="col-md-5 text-md-end">
-                            <div class="form-check form-switch d-inline-block">
-                                <input class="form-check-input" type="checkbox" checked disabled>
-                                <label class="form-check-label">Ver documentos de otras oficinas</label>
+                <div class="modal-body p-4">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold small text-muted">Buscador Global</label>
+                            <div class="input-group shadow-sm">
+                                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                                <input class="form-control border-start-0 shadow-none" placeholder="Nro oficial, asunto o tipo..."
+                                       @bind="FiltroModalPadre" @bind:event="oninput" />
                             </div>
+                        </div>
+                        <div class="col-md-4 text-md-end d-flex align-items-end justify-content-md-end">
+                            <span class="badge bg-light text-muted border py-2 px-3"><i class="bi bi-info-circle me-1"></i> Búsqueda en todas las oficinas</span>
                         </div>
                     </div>
 
-                    <table class="table table-striped table-sm align-middle">
-                        <thead>
-                            <tr>
-                                <th>Fecha creación</th>
-                                <th>Nro. Oficial</th>
-                                <th>Asunto</th>
-                                <th>Tipo</th>
-                                <th>Ubicación actual</th>
-                                <th>Estado</th>
-                                <th class="text-end">Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (!DocumentosPadrePaginados.Any())
-                            {
+                    <div class="table-responsive rounded-3 border">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-3">No se encontraron documentos.</td>
+                                    <th class="small text-uppercase p-3" style="width: 150px">Fecha</th>
+                                    <th class="small text-uppercase p-3" style="width: 180px">Nro. Oficial</th>
+                                    <th class="small text-uppercase p-3">Asunto</th>
+                                    <th class="small text-uppercase p-3" style="width: 130px">Ubicación</th>
+                                    <th class="small text-uppercase p-3 text-end" style="width: 130px">Acción</th>
                                 </tr>
-                            }
-                            else
-                            {
-                                @foreach (var doc in DocumentosPadrePaginados)
+                            </thead>
+                            <tbody>
+                                @if (!DocumentosPadrePaginados.Any())
                                 {
                                     <tr>
-                                        <td>@doc.FechaCreacion?.ToString("dd/MM/yyyy HH:mm")</td>
-                                        <td>@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</td>
-                                        <td>@doc.Asunto</td>
-                                        <td>@NombreTipo(doc.IdTipo)</td>
-                                        <td>@NombreOficina(doc.IdOficinaActual)</td>
-                                        <td>@NombreEstado(doc.IdEstadoActual)</td>
-                                        <td class="text-end">
-                                            <button type="button" class="btn btn-sm btn-primary" @onclick="() => SeleccionarPadreDesdeModal(doc)">
-                                                Seleccionar
-                                            </button>
+                                        <td colspan="5" class="text-center py-5 text-muted">
+                                            <i class="bi bi-folder-x fs-1 d-block mb-2"></i>
+                                            No se encontraron documentos candidatos.
                                         </td>
                                     </tr>
                                 }
-                            }
-                        </tbody>
-                    </table>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <small class="text-muted">Mostrando @DesdeRegistroPadre a @HastaRegistroPadre de @TotalRegistrosPadre documento(s)</small>
-                        <div class="btn-group" role="group" aria-label="Paginación padres">
-                            <button type="button" class="btn btn-outline-secondary" @onclick="PaginaPadreAnterior" disabled="@(PaginaPadreEfectiva == 1)">Anterior</button>
-                            <button type="button" class="btn btn-outline-secondary disabled">Página @PaginaPadreEfectiva de @TotalPaginasPadre</button>
-                            <button type="button" class="btn btn-outline-secondary" @onclick="PaginaPadreSiguiente" disabled="@(PaginaPadreEfectiva >= TotalPaginasPadre)">Siguiente</button>
-                        </div>
+                                else
+                                {
+                                    @foreach (var doc in DocumentosPadrePaginados)
+                                    {
+                                        <tr>
+                                            <td class="p-3">
+                                                <div class="fw-bold">@doc.FechaCreacion?.ToString("dd/MM/yyyy")</div>
+                                                <small class="text-muted">@doc.FechaCreacion?.ToString("HH:mm") hs</small>
+                                            </td>
+                                            <td class="p-3"><span class="badge bg-light text-primary border border-primary-subtle fw-bold">@(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)</span></td>
+                                            <td class="p-3 small fw-medium">@doc.Asunto</td>
+                                            <td class="p-3 small">@NombreOficina(doc.IdOficinaActual)</td>
+                                            <td class="p-3 text-end">
+                                                <button type="button" class="btn btn-sm btn-primary shadow-sm px-3" @onclick="() => SeleccionarPadreDesdeModal(doc)">
+                                                    Elegir
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CerrarModalPadres">Cerrar</button>
+                <div class="modal-footer bg-light p-3">
+                    <div class="me-auto small text-muted">Mostrando @DesdeRegistroPadre-@HastaRegistroPadre de @TotalRegistrosPadre</div>
+                    <div class="btn-group btn-group-sm me-3 shadow-sm">
+                        <button type="button" class="btn btn-white border" @onclick="PaginaPadreAnterior" disabled="@(PaginaPadreEfectiva == 1)"><i class="bi bi-chevron-left"></i></button>
+                        <span class="btn btn-white border disabled px-3">Página @PaginaPadreEfectiva</span>
+                        <button type="button" class="btn btn-white border" @onclick="PaginaPadreSiguiente" disabled="@(PaginaPadreEfectiva >= TotalPaginasPadre)"><i class="bi bi-chevron-right"></i></button>
+                    </div>
+                    <button type="button" class="btn btn-secondary shadow-sm" @onclick="CerrarModalPadres">Cerrar</button>
                 </div>
             </div>
         </div>
@@ -470,8 +481,8 @@
     private bool soloTraerSinActuacion;
     private bool paseConActuacionForzado => AutoPaseBandeja == true || AutoPaseDestino.HasValue;
     private string EtiquetaBotonPaseConActuacion => AutoPaseDestino.HasValue
-        ? "Guardar Actuación y Enviar todo"
-        : "Guardar Actuación y Traer todo";
+        ? "Guardar y Enviar todo"
+        : "Guardar y Traer todo";
     private string oficinaBusqueda = string.Empty;
     private List<CatOficina> oficinasFiltradas = new();
     private int indiceOficinaSeleccionada = -1;
@@ -504,799 +515,171 @@
             .OrderBy(r => r.NombreCompleto)
             .ToList();
 
-        nombresOficinas.Clear();
-        foreach (var oficina in oficinas)
-        {
-            if (!string.IsNullOrWhiteSpace(oficina.Nombre))
-            {
-                nombresOficinas[oficina.IdOficina] = oficina.Nombre;
-            }
-        }
+        foreach (var of in oficinas) if (!string.IsNullOrWhiteSpace(of.Nombre)) nombresOficinas[of.IdOficina] = of.Nombre;
+        foreach (var t in tipos) if (!string.IsNullOrWhiteSpace(t.Nombre)) nombresTipos[t.IdTipo] = t.Nombre;
+        foreach (var e in estados) if (!string.IsNullOrWhiteSpace(e.Nombre)) nombresEstados[e.IdEstado] = e.Nombre;
 
-        nombresTipos.Clear();
-        foreach (var tipo in tipos)
-        {
-            if (!string.IsNullOrWhiteSpace(tipo.Nombre))
-            {
-                nombresTipos[tipo.IdTipo] = tipo.Nombre;
-            }
-        }
-
-        nombresEstados.Clear();
-        foreach (var estado in estados)
-        {
-            if (!string.IsNullOrWhiteSpace(estado.Nombre))
-            {
-                nombresEstados[estado.IdEstado] = estado.Nombre;
-            }
-        }
-
-        documentosDisponibles = (await RepoDocs.GetAllAsync())
-            .OrderByDescending(d => d.FechaCreacion ?? DateTime.MinValue)
-            .ToList();
-
-        indicesBusquedaPadre.Clear();
-        foreach (var documento in documentosDisponibles)
-        {
-            indicesBusquedaPadre[documento.IdDocumento] = ConstruirIndiceBusquedaPadre(documento);
-        }
-
+        documentosDisponibles = (await RepoDocs.GetAllAsync()).OrderByDescending(d => d.FechaCreacion).ToList();
+        foreach (var doc in documentosDisponibles) indicesBusquedaPadre[doc.IdDocumento] = ConstruirIndiceBusquedaPadre(doc);
         RecalcularDocumentosPadreFiltrados();
 
-        var estadoInicial = estados.FirstOrDefault();
-        if (estadoInicial != null)
-        {
-            nuevoDoc.IdEstadoActual = estadoInicial.IdEstado;
-        }
-
+        if (estados.Any()) nuevoDoc.IdEstadoActual = estados.First().IdEstado;
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
-        idOficinaBandejaEntrada = oficinas
-            .FirstOrDefault(o => string.Equals(o.Nombre, "BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))
-            ?.IdOficina;
+        idOficinaBandejaEntrada = oficinas.FirstOrDefault(o => o.Nombre.Contains("BANDEJA DE ENTRADA", StringComparison.OrdinalIgnoreCase))?.IdOficina;
 
-        var authState = await (AuthStateTask ?? Task.FromResult(new AuthenticationState(new ClaimsPrincipal(new ClaimsIdentity()))));
+        var authState = await (AuthStateTask ?? Task.FromResult(new AuthenticationState(new ClaimsPrincipal())));
         var user = authState.User;
-
         if (user.Identity?.IsAuthenticated == true)
         {
-            var userIdClaim = user.FindFirst(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out var uid))
-            {
-                nuevoDoc.IdUsuarioCreador = uid;
-            }
-
-            var oficinaClaim = user.FindFirst(c => c.Type == "IdOficina");
-            if (oficinaClaim != null && int.TryParse(oficinaClaim.Value, out var oid))
-            {
-                idOficinaUsuarioActual = oid;
-                nuevoDoc.IdOficinaActual = oid;
-            }
+            var uid = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(uid, out var idU)) nuevoDoc.IdUsuarioCreador = idU;
+            var oid = user.FindFirst("IdOficina")?.Value;
+            if (int.TryParse(oid, out var idO)) { idOficinaUsuarioActual = idO; nuevoDoc.IdOficinaActual = idO; }
         }
 
-        oficinaBusqueda = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual)?.Nombre ?? string.Empty;
+        oficinaBusqueda = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual)?.Nombre ?? "";
 
         if (IdPadre.HasValue)
         {
-            var docPadres = await RepoDocs.GetAllAsync();
-            var padre = docPadres.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
-
+            var padre = documentosDisponibles.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
             if (padre != null)
             {
                 esActuacion = true;
                 docPadreSeleccionado = padre;
-
                 nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
-
-                nombreOficinaActualDoc = oficinas.FirstOrDefault(o => o.IdOficina == padre.IdOficinaActual)?.Nombre ?? "Oficina Remota";
-
-                var tipoMemo = tipos.FirstOrDefault(t =>
-                    t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase) ||
-                    t.Nombre.Contains("Actuación", StringComparison.OrdinalIgnoreCase));
-
-                if (tipoMemo != null)
-                {
-                    nuevoDoc.IdTipo = tipoMemo.IdTipo;
-                }
-
-                if (paseConActuacionForzado)
-                {
-                    soloTraerSinActuacion = false;
-                }
+                nombreOficinaActualDoc = NombreOficina(padre.IdOficinaActual);
+                var tM = tipos.FirstOrDefault(t => t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase));
+                if (tM != null) nuevoDoc.IdTipo = tM.IdTipo;
+                if (paseConActuacionForzado) soloTraerSinActuacion = false;
             }
         }
-
-        if (nuevoDoc.AnioDocumento.HasValue && nuevoDoc.AnioDocumento.Value > 0)
-        {
-            anioNumeracionSeleccionado = nuevoDoc.AnioDocumento.Value;
-        }
-
-        if (nuevoDoc.IdTipo > 0)
-        {
-            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
-        }
+        if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
     }
 
-    private IEnumerable<MaeDocumento> DocumentosPadreFiltrados => documentosPadreFiltrados;
-
-    private IEnumerable<MaeDocumento> DocumentosPadrePaginados
-        => DocumentosPadreFiltrados
-            .Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre)
-            .Take(tamanoPaginaPadre);
-
+    private IEnumerable<MaeDocumento> DocumentosPadrePaginados => documentosPadreFiltrados.Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre).Take(tamanoPaginaPadre);
     private int TotalRegistrosPadre => documentosPadreFiltrados.Count;
     private int TotalPaginasPadre => Math.Max(1, (int)Math.Ceiling(TotalRegistrosPadre / (double)tamanoPaginaPadre));
     private int PaginaPadreEfectiva => Math.Min(paginaPadreActual, TotalPaginasPadre);
     private int DesdeRegistroPadre => TotalRegistrosPadre == 0 ? 0 : ((PaginaPadreEfectiva - 1) * tamanoPaginaPadre) + 1;
     private int HastaRegistroPadre => Math.Min(PaginaPadreEfectiva * tamanoPaginaPadre, TotalRegistrosPadre);
 
-    private void AbrirModalPadres()
-    {
-        mostrarModalPadres = true;
-    }
-
-    private void CerrarModalPadres()
-    {
-        mostrarModalPadres = false;
-    }
-
-    private string FiltroModalPadre
-    {
-        get => filtroModalPadre;
-        set
-        {
-            if (filtroModalPadre == value)
-            {
-                return;
-            }
-
-            filtroModalPadre = value;
-            paginaPadreActual = 1;
-            RecalcularDocumentosPadreFiltrados();
-        }
-    }
-
-    private void PaginaPadreAnterior()
-    {
-        if (PaginaPadreEfectiva > 1)
-        {
-            paginaPadreActual = PaginaPadreEfectiva - 1;
-        }
-    }
-
-    private void PaginaPadreSiguiente()
-    {
-        if (PaginaPadreEfectiva < TotalPaginasPadre)
-        {
-            paginaPadreActual = PaginaPadreEfectiva + 1;
-        }
-    }
-
-    private void SeleccionarPadreDesdeModal(MaeDocumento padre)
-    {
-        SeleccionarPadre(padre);
-        mostrarModalPadres = false;
-    }
-
-    private void SeleccionarPadre(MaeDocumento padre)
-    {
-        docPadreSeleccionado = padre;
-        nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
-        nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
-        FiltroModalPadre = string.Empty;
-    }
-
-    private void QuitarVinculo()
-    {
-        docPadreSeleccionado = null;
-        nuevoDoc.IdDocumentoPadre = null;
-        nuevoDoc.IdHiloConversacion = Guid.NewGuid();
-    }
+    private void AbrirModalPadres() => mostrarModalPadres = true;
+    private void CerrarModalPadres() => mostrarModalPadres = false;
+    private string FiltroModalPadre { get => filtroModalPadre; set { if (filtroModalPadre == value) return; filtroModalPadre = value; paginaPadreActual = 1; RecalcularDocumentosPadreFiltrados(); } }
+    private void PaginaPadreAnterior() { if (PaginaPadreEfectiva > 1) paginaPadreActual--; }
+    private void PaginaPadreSiguiente() { if (PaginaPadreEfectiva < TotalPaginasPadre) paginaPadreActual++; }
+    private void SeleccionarPadreDesdeModal(MaeDocumento p) { SeleccionarPadre(p); mostrarModalPadres = false; }
+    private void SeleccionarPadre(MaeDocumento p) { docPadreSeleccionado = p; nuevoDoc.IdDocumentoPadre = p.IdDocumento; nuevoDoc.IdHiloConversacion = p.IdHiloConversacion; }
+    private void QuitarVinculo() { docPadreSeleccionado = null; nuevoDoc.IdDocumentoPadre = null; nuevoDoc.IdHiloConversacion = Guid.NewGuid(); }
 
     private async Task Guardar()
     {
         errorGuardar = null;
         try
         {
-            if (paseConActuacionForzado)
-            {
-                soloTraerSinActuacion = false;
-            }
-
             if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
             {
-                if (!idOficinaBandejaEntrada.HasValue)
-                {
-                    errorGuardar = "No se encontró la oficina BANDEJA DE ENTRADA para realizar el traslado.";
-                    return;
-                }
-
-                await using var transactionSinActuacion = await DbContext.Database.BeginTransactionAsync();
-                try
-                {
-                    await MoverFamiliaADestino(
-                        docPadreSeleccionado.IdHiloConversacion,
-                        idOficinaBandejaEntrada.Value,
-                        "Traslado de familia sin actuación hacia BANDEJA DE ENTRADA");
-
-                    await transactionSinActuacion.CommitAsync();
-                    Navegador.NavigateTo("documentos");
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    await transactionSinActuacion.RollbackAsync();
-                    errorGuardar = "Error al trasladar el expediente sin actuación: " + ex.Message;
-                    return;
-                }
+                if (!idOficinaBandejaEntrada.HasValue) { errorGuardar = "Error: No se encontró la Bandeja de Entrada."; return; }
+                await MoverFamiliaADestino(docPadreSeleccionado.IdHiloConversacion, idOficinaBandejaEntrada.Value, "Traslado de familia sin actuación");
+                Navegador.NavigateTo("documentos"); return;
             }
 
-            nuevoDoc.Asunto = nuevoDoc.Asunto?.Trim() ?? string.Empty;
-
-            if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
-            {
-                errorGuardar = "Debe ingresar el contenido/asunto del documento.";
-                return;
-            }
-
-            if (nuevoDoc.Asunto.Length > 200)
-            {
-                errorGuardar = "El contenido/asunto no puede superar los 200 caracteres.";
-                return;
-            }
-
-            if (!tipos.Any(t => t.IdTipo == nuevoDoc.IdTipo))
-            {
-                errorGuardar = "Tipo de documento inválido.";
-                return;
-            }
-
-            if (!estados.Any(e => e.IdEstado == nuevoDoc.IdEstadoActual))
-            {
-                errorGuardar = "Estado inválido.";
-                return;
-            }
-
-            if (!oficinas.Any(o => o.IdOficina == nuevoDoc.IdOficinaActual))
-            {
-                errorGuardar = "Debe seleccionar una oficina válida.";
-                return;
-            }
-
-            if (bloqueoPorRangoAgotado)
-            {
-                errorGuardar = $"No puede continuar: {mensajeNumeracion}";
-                return;
-            }
-
-            nuevoDoc.AnioDocumento = anioNumeracionSeleccionado;
-
+            if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto)) { errorGuardar = "Asunto obligatorio."; return; }
             if (esNumeracionAutomatica)
             {
-                var resultadoNumeracion = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-                if (!resultadoNumeracion.Exitoso || resultadoNumeracion.Data is null)
-                {
-                    errorGuardar = resultadoNumeracion.Mensaje;
-                    return;
-                }
-
-                var rangoConsumido = resultadoNumeracion.Data;
-                nuevoDoc.NumeroOficial = rangoConsumido.UltimoUtilizado.ToString();
+                var res = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+                if (!res.Exitoso) { errorGuardar = res.Mensaje; return; }
+                nuevoDoc.NumeroOficial = res.Data?.UltimoUtilizado.ToString();
             }
             else if (esNumeracionManualInterna)
             {
-                if (!numeroManualInterno.HasValue)
-                {
-                    errorGuardar = "Debe ingresar el número oficial para la oficina interna.";
-                    return;
-                }
-
-                if (numeroManualInterno <= 0)
-                {
-                    errorGuardar = "El número oficial debe ser mayor que cero.";
-                    return;
-                }
-
-                var rango = rangoManualInternoActivo
-                    ?? await RangoService.ObtenerRangoActivoAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-
-                if (rango is null)
-                {
-                    errorGuardar = "No hay un rango activo configurado para validar el número ingresado.";
-                    return;
-                }
-
-                if (numeroManualInterno < rango.NumeroInicio || numeroManualInterno > rango.NumeroFin)
-                {
-                    errorGuardar = $"El número ingresado está fuera del rango permitido ({rango.NumeroInicio}-{rango.NumeroFin}).";
-                    return;
-                }
-
+                if (!numeroManualInterno.HasValue) { errorGuardar = "Número oficial obligatorio."; return; }
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
-            else
-            {
-                nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial?.Trim();
 
-                if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
-                {
-                    errorGuardar = "Debe ingresar el número oficial para numeración manual.";
-                    return;
-                }
-
-                if (nuevoDoc.NumeroOficial.Length > 50)
-                {
-                    errorGuardar = "El número oficial no puede superar los 50 caracteres.";
-                    return;
-                }
-            }
-
-            var documentosExistentes = await RepoDocs.GetAllAsync();
-            var existeDuplicado = documentosExistentes.Any(d =>
-                d.IdTipo == nuevoDoc.IdTipo &&
-                d.IdOficinaActual == nuevoDoc.IdOficinaActual &&
-                d.FechaCreacion.HasValue &&
-                (d.AnioDocumento ?? d.FechaCreacion.Value.Year) == anioNumeracionSeleccionado &&
-                string.Equals(d.NumeroOficial, nuevoDoc.NumeroOficial, StringComparison.OrdinalIgnoreCase));
-
-            if (existeDuplicado)
-            {
-                errorGuardar = "Ya existe un documento con ese número oficial para la misma oficina, tipo y año.";
-                return;
-            }
-
-            await using var transaction = await DbContext.Database.BeginTransactionAsync();
+            await using var trans = await DbContext.Database.BeginTransactionAsync();
             try
             {
                 await RepoDocs.AddAsync(nuevoDoc);
+                await RepoMovimientos.AddAsync(new TraMovimiento { IdDocumento = nuevoDoc.IdDocumento, IdOficinaOrigen = nuevoDoc.IdOficinaActual, IdOficinaDestino = nuevoDoc.IdOficinaActual, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador, ObservacionPase = esActuacion ? "Actuación agregada" : "Documento creado" });
 
-                var obsCreacion = esActuacion
-                    ? $"Confección de Memorando/Actuación (Ref: {docPadreSeleccionado?.NumeroOficial})"
-                    : "Se crea el documento";
+                if (AutoPaseBandeja == true) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, idOficinaUsuarioActual, "Traslado automático retorno");
+                else if (AutoPaseDestino.HasValue) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, AutoPaseDestino.Value, "Traslado automático destino");
 
-                var movCreacion = new TraMovimiento
-                {
-                    IdDocumento = nuevoDoc.IdDocumento,
-                    IdOficinaOrigen = nuevoDoc.IdOficinaActual,
-                    IdOficinaDestino = nuevoDoc.IdOficinaActual,
-                    FechaMovimiento = DateTime.Now,
-                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                    ObservacionPase = obsCreacion
-                };
-                await RepoMovimientos.AddAsync(movCreacion);
-
-                if (AutoPaseBandeja == true && esActuacion && docPadreSeleccionado != null)
-                {
-                    await MoverFamiliaADestino(
-                        docPadreSeleccionado.IdHiloConversacion,
-                        idOficinaUsuarioActual,
-                        $"Retorno de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-                }
-                else if (AutoPaseDestino.HasValue && esActuacion && docPadreSeleccionado != null)
-                {
-                    await MoverFamiliaADestino(
-                        docPadreSeleccionado.IdHiloConversacion,
-                        AutoPaseDestino.Value,
-                        $"Pase de Expediente por agregación de actuación (Ref: {nuevoDoc.NumeroOficial ?? "S/N"})");
-                }
-                else if (idOficinaUsuarioActual > 0 && nuevoDoc.IdOficinaActual != idOficinaUsuarioActual)
-                {
-                    var oficinaOrigen = nuevoDoc.IdOficinaActual;
-                    var oficinaDestino = idOficinaBandejaEntrada ?? nuevoDoc.IdOficinaActual;
-                    var nombreOficinaOrigen = oficinas.FirstOrDefault(o => o.IdOficina == oficinaOrigen)?.Nombre ?? $"Oficina {oficinaOrigen}";
-
-                    var movPase = new TraMovimiento
-                    {
-                        IdDocumento = nuevoDoc.IdDocumento,
-                        IdOficinaOrigen = oficinaOrigen,
-                        IdOficinaDestino = oficinaDestino,
-                        FechaMovimiento = DateTime.Now.AddSeconds(1),
-                        IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                        ObservacionPase = $"BANDEJA DE ENTRADA recibe el documento desde {nombreOficinaOrigen}"
-                    };
-
-                    await RepoMovimientos.AddAsync(movPase);
-
-                    nuevoDoc.IdOficinaActual = oficinaDestino;
-                    await RepoDocs.UpdateAsync(nuevoDoc);
-                }
-
-                await transaction.CommitAsync();
-                Navegador.NavigateTo("documentos");
+                await trans.CommitAsync(); Navegador.NavigateTo("documentos");
             }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                errorGuardar = "Error al procesar la actuación y el pase: " + ex.Message;
-            }
+            catch { await trans.RollbackAsync(); throw; }
         }
-        finally
-        {
-            if (!string.IsNullOrWhiteSpace(errorGuardar))
-            {
-                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
-            }
-        }
+        catch (Exception ex) { errorGuardar = ex.Message; await JS.InvokeVoidAsync("window.scrollTo", 0, 0); }
     }
 
-    private Task IgnorarSubmitNuevoDocumento(EditContext _)
-        => Task.CompletedTask;
+    private Task IgnorarSubmitNuevoDocumento(EditContext _) => Task.CompletedTask;
+    private async Task GuardarDesdeBotonAsync() { if (editContextNuevoDocumento.Validate()) await Guardar(); }
 
-    private async Task GuardarDesdeBotonAsync()
+    private async Task MoverFamiliaADestino(Guid hilo, int destino, string obs)
     {
-        if (!editContextNuevoDocumento.Validate())
+        var fam = (await RepoDocs.GetAllAsync()).Where(d => d.IdHiloConversacion == hilo).ToList();
+        foreach (var d in fam)
         {
-            return;
-        }
-
-        await Guardar();
-    }
-
-    private async Task MoverFamiliaADestino(Guid hiloConversacion, int oficinaDestino, string observacion)
-    {
-        var documentosFamilia = (await RepoDocs.GetAllAsync())
-            .Where(d => d.IdHiloConversacion == hiloConversacion)
-            .ToList();
-
-        foreach (var documento in documentosFamilia)
-        {
-            if (documento.IdOficinaActual == oficinaDestino)
-            {
-                continue;
-            }
-
-            var movimiento = new TraMovimiento
-            {
-                IdDocumento = documento.IdDocumento,
-                IdOficinaOrigen = documento.IdOficinaActual,
-                IdOficinaDestino = oficinaDestino,
-                FechaMovimiento = DateTime.Now.AddSeconds(1),
-                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
-                ObservacionPase = observacion
-            };
-
-            await RepoMovimientos.AddAsync(movimiento);
-
-            documento.IdOficinaActual = oficinaDestino;
-            await RepoDocs.UpdateAsync(documento);
+            if (d.IdOficinaActual == destino) continue;
+            await RepoMovimientos.AddAsync(new TraMovimiento { IdDocumento = d.IdDocumento, IdOficinaOrigen = d.IdOficinaActual, IdOficinaDestino = destino, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador, ObservacionPase = obs });
+            d.IdOficinaActual = destino; await RepoDocs.UpdateAsync(d);
         }
     }
 
     private async Task OnTipoDocumentoChanged(ChangeEventArgs e)
     {
-        var valor = e.Value?.ToString();
-        if (!int.TryParse(valor, out var idTipoSeleccionado))
-        {
-            idTipoSeleccionado = 0;
-        }
-
-        nuevoDoc.IdTipo = idTipoSeleccionado;
-        await EvaluarNumeracionAutomaticaAsync(idTipoSeleccionado);
+        if (int.TryParse(e.Value?.ToString(), out var idT)) { nuevoDoc.IdTipo = idT; await EvaluarNumeracionAutomaticaAsync(idT); }
     }
 
-    private async Task EvaluarNumeracionAutomaticaAsync(int idTipoDocumento)
+    private async Task EvaluarNumeracionAutomaticaAsync(int idT)
     {
-        esNumeracionAutomatica = false;
-        esNumeracionExterna = false;
-        esNumeracionManualInterna = false;
-        bloqueoPorRangoAgotado = false;
-        mensajeNumeracion = string.Empty;
-        serieNumeracionAutomatica = string.Empty;
-        proximoNumeroAutomatico = 0;
-        rangoManualInternoActivo = null;
-        numeroManualInterno = null;
-        nuevoDoc.NumeroOficial = string.Empty;
-
-        if (idTipoDocumento <= 0)
-        {
-            return;
-        }
-
-        var oficinaSeleccionada = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
-        var esBandejaEntrada = idOficinaBandejaEntrada.HasValue && nuevoDoc.IdOficinaActual == idOficinaBandejaEntrada.Value;
-        if (oficinaSeleccionada?.EsExterna == true)
-        {
-            esNumeracionExterna = true;
-            mensajeNumeracion = "Oficina externa: ingrese manualmente el número oficial con validación de unicidad por oficina, tipo y año.";
-            return;
-        }
-
-        var rango = await RangoService.ObtenerRangoActivoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-
-        if (rango is not null && esBandejaEntrada)
-        {
-            esNumeracionAutomatica = true;
-            serieNumeracionAutomatica = rango.NombreRango;
-            proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
-            mensajeNumeracion = "Modo administrado por rango: el número se asignará automáticamente al guardar.";
-            return;
-        }
-
-        if (rango is not null)
-        {
-            esNumeracionManualInterna = true;
-            rangoManualInternoActivo = rango;
-            mensajeNumeracion = $"Numeración manual controlada: ingrese solo números. Rango activo habilitado: {rango.NumeroInicio} a {rango.NumeroFin}.";
-            return;
-        }
-
-        var existeRangoConfigurado = await RangoService.ExisteRangoConfiguradoAsync(idTipoDocumento, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-        bloqueoPorRangoAgotado = true;
-        mensajeNumeracion = existeRangoConfigurado
-            ? "Rango agotado para esta oficina/tipo. Debe registrar un nuevo rango para continuar."
-            : "Oficina interna: debe configurar un rango de numeración para esta oficina/tipo antes de crear el documento.";
+        esNumeracionAutomatica = esNumeracionExterna = esNumeracionManualInterna = bloqueoPorRangoAgotado = false;
+        var ofi = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
+        if (ofi?.EsExterna == true) { esNumeracionExterna = true; return; }
+        var rango = await RangoService.ObtenerRangoActivoAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+        if (rango != null && idOficinaBandejaEntrada == nuevoDoc.IdOficinaActual) { esNumeracionAutomatica = true; serieNumeracionAutomatica = rango.NombreRango; proximoNumeroAutomatico = rango.UltimoUtilizado + 1; }
+        else if (rango != null) { esNumeracionManualInterna = true; rangoManualInternoActivo = rango; }
+        else { bloqueoPorRangoAgotado = true; mensajeNumeracion = "No hay rango configurado."; }
     }
 
-    private async Task OnAnioNumeracionChanged()
+    private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
+
+    private void FiltrarOficinas(ChangeEventArgs e)
     {
-        if (nuevoDoc.IdTipo > 0)
-        {
-            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
-        }
+        oficinaBusqueda = e.Value?.ToString() ?? "";
+        oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList();
     }
 
-    private async Task FiltrarOficinas(ChangeEventArgs e)
-    {
-        oficinaBusqueda = e.Value?.ToString() ?? string.Empty;
-        nuevoDoc.IdOficinaActual = 0;
-        indiceOficinaSeleccionada = -1;
-
-        if (string.IsNullOrWhiteSpace(oficinaBusqueda))
-        {
-            oficinasFiltradas.Clear();
-            return;
-        }
-
-        oficinasFiltradas = BuscarOficinas(oficinaBusqueda)
-            .Take(8)
-            .ToList();
-
-        var coincidenciaExacta = oficinas.FirstOrDefault(o =>
-            string.Equals(o.Nombre, oficinaBusqueda, StringComparison.OrdinalIgnoreCase));
-
-        if (coincidenciaExacta != null)
-        {
-            nuevoDoc.IdOficinaActual = coincidenciaExacta.IdOficina;
-
-            if (nuevoDoc.IdTipo > 0)
-            {
-                await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
-            }
-        }
-    }
-
-    private async Task SeleccionarOficina(CatOficina oficina)
-    {
-        nuevoDoc.IdOficinaActual = oficina.IdOficina;
-        oficinaBusqueda = oficina.Nombre ?? string.Empty;
-        oficinasFiltradas.Clear();
-        indiceOficinaSeleccionada = -1;
-        if (nuevoDoc.IdTipo > 0)
-        {
-            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
-        }
-    }
-
-    private void MostrarSugerenciasOficina()
-    {
-        if (!string.IsNullOrWhiteSpace(oficinaBusqueda))
-        {
-            oficinasFiltradas = BuscarOficinas(oficinaBusqueda)
-                .Take(8)
-                .ToList();
-        }
-    }
+    private async Task SeleccionarOficina(CatOficina o) { nuevoDoc.IdOficinaActual = o.IdOficina; oficinaBusqueda = o.Nombre; oficinasFiltradas.Clear(); if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
+    private void MostrarSugerenciasOficina() { if (!string.IsNullOrWhiteSpace(oficinaBusqueda)) oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList(); }
 
     private async Task ManejarTecladoOficinas(KeyboardEventArgs e)
     {
-        if (!oficinasFiltradas.Any())
-        {
-            return;
-        }
-
-        if (e.Key == "ArrowDown")
-        {
-            indiceOficinaSeleccionada = Math.Min(indiceOficinaSeleccionada + 1, oficinasFiltradas.Count - 1);
-            await AjustarScrollSugerenciaAsync(panelSugerenciasOficinaRef, indiceOficinaSeleccionada);
-            return;
-        }
-
-        if (e.Key == "ArrowUp")
-        {
-            indiceOficinaSeleccionada = Math.Max(indiceOficinaSeleccionada - 1, 0);
-            await AjustarScrollSugerenciaAsync(panelSugerenciasOficinaRef, indiceOficinaSeleccionada);
-            return;
-        }
-
-        if (e.Key == "Enter" && indiceOficinaSeleccionada >= 0)
-        {
-            _ = SeleccionarOficina(oficinasFiltradas[indiceOficinaSeleccionada]);
-            return;
-        }
-
-        if (e.Key == "Escape")
-        {
-            oficinasFiltradas.Clear();
-            indiceOficinaSeleccionada = -1;
-        }
+        if (e.Key == "ArrowDown") indiceOficinaSeleccionada = Math.Min(indiceOficinaSeleccionada + 1, oficinasFiltradas.Count - 1);
+        else if (e.Key == "ArrowUp") indiceOficinaSeleccionada = Math.Max(indiceOficinaSeleccionada - 1, 0);
+        else if (e.Key == "Enter" && indiceOficinaSeleccionada >= 0) await SeleccionarOficina(oficinasFiltradas[indiceOficinaSeleccionada]);
     }
 
-    private IEnumerable<CatOficina> BuscarOficinas(string terminoBusqueda)
-    {
-        var palabras = terminoBusqueda
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private IEnumerable<CatOficina> BuscarOficinas(string t) => oficinas.Where(o => o.Nombre.Contains(t, StringComparison.OrdinalIgnoreCase)).OrderBy(o => o.Nombre);
+    private string ConstruirIndiceBusquedaPadre(MaeDocumento d) => $"{d.NumeroOficial} {d.Asunto}";
+    private void RecalcularDocumentosPadreFiltrados() => documentosPadreFiltrados = string.IsNullOrWhiteSpace(filtroModalPadre) ? documentosDisponibles : documentosDisponibles.Where(d => indicesBusquedaPadre[d.IdDocumento].Contains(filtroModalPadre, StringComparison.OrdinalIgnoreCase)).ToList();
 
-        if (palabras.Length == 0)
-        {
-            return Enumerable.Empty<CatOficina>();
-        }
-
-        return oficinas
-            .Where(o => palabras.All(palabra =>
-                (o.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false)))
-            .OrderBy(o => o.Nombre);
-    }
-
-    private string ConstruirIndiceBusquedaPadre(MaeDocumento doc)
-        => string.Join(' ',
-            doc.NumeroOficial,
-            doc.Asunto,
-            NombreTipo(doc.IdTipo),
-            NombreOficina(doc.IdOficinaActual),
-            NombreEstado(doc.IdEstadoActual),
-            doc.FechaCreacion?.ToString("dd/MM/yyyy"));
-
-    private void RecalcularDocumentosPadreFiltrados()
-    {
-        var terminos = filtroModalPadre
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        if (terminos.Length == 0)
-        {
-            documentosPadreFiltrados = documentosDisponibles;
-            return;
-        }
-
-        documentosPadreFiltrados = documentosDisponibles
-            .Where(d => indicesBusquedaPadre.TryGetValue(d.IdDocumento, out var indice)
-                && terminos.All(termino => indice.Contains(termino, StringComparison.OrdinalIgnoreCase)))
-            .ToList();
-    }
-
-    private string NombreOficina(int idOficina)
-        => nombresOficinas.GetValueOrDefault(idOficina) ?? $"Oficina {idOficina}";
-
-    private string NombreTipo(int idTipo)
-        => nombresTipos.GetValueOrDefault(idTipo) ?? $"Tipo {idTipo}";
-
-    private string NombreEstado(int idEstado)
-        => nombresEstados.GetValueOrDefault(idEstado) ?? $"Estado {idEstado}";
-
-    private async Task AjustarScrollSugerenciaAsync(ElementReference panelRef, int indiceSugerencia)
-    {
-        if (indiceSugerencia < 0)
-        {
-            return;
-        }
-
-        await JS.InvokeVoidAsync("scrollSugerenciaVisible", panelRef, indiceSugerencia);
-    }
+    private string NombreOficina(int id) => nombresOficinas.GetValueOrDefault(id) ?? "S/D";
+    private async Task AjustarScrollSugerenciaAsync(ElementReference r, int i) => await JS.InvokeVoidAsync("scrollSugerenciaVisible", r, i);
 
     private void FiltrarReclusosAsunto(ChangeEventArgs e)
     {
-        busquedaReclusoAsunto = e.Value?.ToString() ?? string.Empty;
-        indicePPLSeleccionado = -1;
-
-        if (string.IsNullOrWhiteSpace(busquedaReclusoAsunto))
-        {
-            reclusosFiltradosAsunto.Clear();
-            return;
-        }
-
-        var terminos = busquedaReclusoAsunto
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        reclusosFiltradosAsunto = reclusosActivos
-            .Where(r => !reclusosSeleccionadosAsunto.Any(sel => sel.IdRecluso == r.IdRecluso))
-            .Where(r =>
-            {
-                var indice = $"{r.NombreCompleto} {r.Documento}";
-                return terminos.All(t => indice.Contains(t, StringComparison.OrdinalIgnoreCase));
-            })
-            .Take(8)
-            .ToList();
+        busquedaReclusoAsunto = e.Value?.ToString() ?? "";
+        reclusosFiltradosAsunto = reclusosActivos.Where(r => r.NombreCompleto.Contains(busquedaReclusoAsunto, StringComparison.OrdinalIgnoreCase)).Take(8).ToList();
     }
 
-    private void MostrarSugerenciasPPL()
-    {
-        if (string.IsNullOrWhiteSpace(busquedaReclusoAsunto))
-        {
-            return;
-        }
-
-        FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
-    }
-
-    private async Task ManejarTecladoPPL(KeyboardEventArgs e)
-    {
-        if (!reclusosFiltradosAsunto.Any())
-        {
-            return;
-        }
-
-        if (e.Key == "ArrowDown")
-        {
-            indicePPLSeleccionado = Math.Min(indicePPLSeleccionado + 1, reclusosFiltradosAsunto.Count - 1);
-            await AjustarScrollSugerenciaAsync(panelSugerenciasPPLRef, indicePPLSeleccionado);
-            return;
-        }
-
-        if (e.Key == "ArrowUp")
-        {
-            indicePPLSeleccionado = Math.Max(indicePPLSeleccionado - 1, 0);
-            await AjustarScrollSugerenciaAsync(panelSugerenciasPPLRef, indicePPLSeleccionado);
-            return;
-        }
-
-        if (e.Key == "Enter" && indicePPLSeleccionado >= 0)
-        {
-            AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
-            return;
-        }
-
-        if (e.Key == "Escape")
-        {
-            reclusosFiltradosAsunto.Clear();
-            indicePPLSeleccionado = -1;
-        }
-    }
-
-    private void AgregarReclusoAsunto(MaeRecluso recluso)
-    {
-        if (reclusosSeleccionadosAsunto.Any(r => r.IdRecluso == recluso.IdRecluso))
-        {
-            return;
-        }
-
-        reclusosSeleccionadosAsunto.Add(recluso);
-        busquedaReclusoAsunto = string.Empty;
-        reclusosFiltradosAsunto.Clear();
-        indicePPLSeleccionado = -1;
-    }
-
-    private void QuitarReclusoAsunto(int idRecluso)
-    {
-        reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == idRecluso);
-    }
-
-    private void LimpiarReclusosAsunto()
-    {
-        reclusosSeleccionadosAsunto.Clear();
-        reclusosFiltradosAsunto.Clear();
-        busquedaReclusoAsunto = string.Empty;
-        indicePPLSeleccionado = -1;
-    }
-
-    private void InsertarReclusosEnAsunto()
-    {
-        if (!reclusosSeleccionadosAsunto.Any())
-        {
-            return;
-        }
-
-        var nombres = string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto));
-        var bloqueReclusos = $"PPL(s): {nombres}";
-
-        if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto))
-        {
-            nuevoDoc.Asunto = bloqueReclusos;
-            return;
-        }
-
-        if (!nuevoDoc.Asunto.Contains(bloqueReclusos, StringComparison.OrdinalIgnoreCase))
-        {
-            nuevoDoc.Asunto = $"{nuevoDoc.Asunto.Trim()} | {bloqueReclusos}";
-        }
-    }
+    private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
+    private async Task ManejarTecladoPPL(KeyboardEventArgs e) { if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]); }
+    private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); }
+    private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
+    private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
+    private void InsertarReclusosEnAsunto() { if (reclusosSeleccionadosAsunto.Any()) nuevoDoc.Asunto += $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}"; }
 }

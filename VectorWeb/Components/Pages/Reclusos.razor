@@ -7,84 +7,141 @@
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<h3>Listado de Reclusos</h3>
-
-<div class="mb-3">
-    <a href="reclusos/nuevo" class="btn btn-success">
-        <i class="bi bi-plus-circle"></i> Nuevo Recluso
-    </a>
-</div>
-
-@if (listaReclusos == null)
-{
-    <p><em>Cargando datos...</em></p>
-}
-else
-{
-    <div class="mb-3">
-        <input type="text"
-               class="form-control"
-               placeholder="Buscar por nombre o documento..."
-               @bind="textoBusqueda"
-               @bind:event="oninput" />
+<div class="container-fluid py-4">
+    @* --- ENCABEZADO --- *@
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+            <h3 class="fw-bold text-dark mb-0">
+                <i class="bi bi-people-fill text-primary me-2"></i>Listado de Reclusos
+            </h3>
+            <p class="text-muted small mb-0">Gestión de registros y control de internos</p>
+        </div>
+        <a href="reclusos/nuevo" class="btn btn-success shadow-sm d-flex align-items-center px-3">
+            <i class="bi bi-plus-lg me-2"></i> Nuevo Recluso
+        </a>
     </div>
 
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Nombre Completo</th>
-                <th>Documento</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var recluso in ReclusosFiltrados)
-            {
-                <tr>
-                    <td>@recluso.IdRecluso</td>
-                    <td>@recluso.NombreCompleto</td>
-                    <td>@recluso.Documento</td>
-                    <td>
-                        @if (recluso.Activo == true)
-                        {
-                            <span class="badge bg-success">Activo</span>
-                        }
-                        else
-                        {
-
-                            <span class="badge bg-danger">Inactivo</span>
-                        }
-                    </td>
-                    <td>
-                        <a href="reclusos/editar/@recluso.IdRecluso" class="btn btn-primary btn-sm">
-                            Editar
-                        </a>
-                        <button class="btn btn-danger btn-sm ms-2" @onclick="() => ConfirmarEliminacion(recluso)">
-                            <i class="bi bi-trash"></i> Eliminar
+    @if (listaReclusos == null)
+    {
+        @* --- ESTADO DE CARGA --- *@
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+            <p class="text-muted fw-bold">Accediendo a la base de datos...</p>
+        </div>
+    }
+    else
+    {
+        @* --- BARRA DE BÚSQUEDA --- *@
+        <div class="card mb-4 border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-white border-0 ps-3">
+                        <i class="bi bi-search text-muted"></i>
+                    </span>
+                    <input type="text"
+                           class="form-control border-0 shadow-none ps-2"
+                           placeholder="Buscar por nombre, apellido o documento..."
+                           @bind="textoBusqueda"
+                           @bind:event="oninput" />
+                    @if (!string.IsNullOrEmpty(textoBusqueda))
+                    {
+                        <button class="btn btn-link text-muted border-0" @onclick='() => textoBusqueda = ""'>
+                            <i class="bi bi-x-circle-fill"></i>
                         </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* --- TABLA DE RESULTADOS --- *@
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3 text-uppercase small fw-bold text-muted" style="width: 100px;">ID</th>
+                            <th class="text-uppercase small fw-bold text-muted">Nombre Completo</th>
+                            <th class="text-uppercase small fw-bold text-muted">Documento</th>
+                            <th class="text-uppercase small fw-bold text-muted">Estado</th>
+                            <th class="text-end pe-3 text-uppercase small fw-bold text-muted">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var recluso in ReclusosFiltrados)
+                        {
+                            <tr>
+                                <td class="ps-3">
+                                    <span class="badge bg-light text-dark border">#@recluso.IdRecluso</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-dark">@recluso.NombreCompleto</div>
+                                </td>
+                                <td>
+                                    <span class="font-monospace text-secondary">@recluso.Documento</span>
+                                </td>
+                                <td>
+                                    @if (recluso.Activo == true)
+                                    {
+                                        <span class="badge rounded-pill bg-success-subtle text-success border border-success px-3">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger px-3">
+                                            <i class="bi bi-dash-circle-fill me-1"></i> Inactivo
+                                        </span>
+                                    }
+                                </td>
+                                <td class="text-end pe-3">
+                                    <div class="btn-group shadow-sm border rounded">
+                                        <a href="reclusos/editar/@recluso.IdRecluso" class="btn btn-white btn-sm text-primary border-end" title="Editar registro">
+                                            <i class="bi bi-pencil-square me-1"></i> Editar
+                                        </a>
+                                        <button class="btn btn-white btn-sm text-danger" @onclick="() => ConfirmarEliminacion(recluso)" title="Eliminar registro">
+                                            <i class="bi bi-trash me-1"></i> Eliminar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+
+                        @if (!ReclusosFiltrados.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <i class="bi bi-person-exclamation fs-1 text-muted d-block mb-3"></i>
+                                    <p class="text-muted mb-0">No se encontraron registros que coincidan con su búsqueda.</p>
+                                    <button class="btn btn-sm btn-link mt-2" @onclick='() => textoBusqueda = ""'>Mostrar todos</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* --- PIE DE TABLA --- *@
+            <div class="card-footer bg-light border-0 py-3 d-flex justify-content-between align-items-center">
+                <span class="text-muted small">
+                    Mostrando <strong>@ReclusosFiltrados.Count()</strong> de <strong>@listaReclusos.Count()</strong> registros totales
+                </span>
+                <span class="badge bg-dark">VectorWeb v2026</span>
+            </div>
+        </div>
+    }
+</div>
 
 @code {
-    // Esta es tu zona de variables (igual que en VB.NET)
     private IEnumerable<MaeRecluso> listaReclusos = [];
     private string textoBusqueda = string.Empty;
 
+    // Lógica de filtrado en tiempo real
     private IEnumerable<MaeRecluso> ReclusosFiltrados =>
         listaReclusos.Where(CoincideBusqueda);
 
     private bool CoincideBusqueda(MaeRecluso recluso)
     {
-        if (string.IsNullOrWhiteSpace(textoBusqueda))
-        {
-            return true;
-        }
+        if (string.IsNullOrWhiteSpace(textoBusqueda)) return true;
 
         var terminos = textoBusqueda
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -95,21 +152,30 @@ else
             textoRecluso.Contains(termino, StringComparison.OrdinalIgnoreCase));
     }
 
-    // Este evento es como el "Form_Load"
+    // Carga inicial de datos
     protected override async Task OnInitializedAsync()
     {
-        // Usamos el repositorio para traer todos los datos
-        listaReclusos = await Repositorio.GetAllAsync();
+        try
+        {
+            listaReclusos = await Repositorio.GetAllAsync();
+        }
+        catch (Exception ex)
+        {
+            // Aquí podrías manejar un error de conexión si fuera necesario
+            Console.WriteLine($"Error al cargar reclusos: {ex.Message}");
+        }
     }
 
+    // Acción de eliminar con confirmación de JS nativo
     private async Task ConfirmarEliminacion(MaeRecluso recluso)
     {
-        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Estás seguro de que deseas eliminar a {recluso.NombreCompleto}?");
+        bool confirmado = await JS.InvokeAsync<bool>("confirm",
+            $"¿Está completamente seguro de eliminar a {recluso.NombreCompleto}? Esta acción no se puede deshacer.");
 
         if (confirmado)
         {
             await Repositorio.DeleteAsync(recluso.IdRecluso);
-            listaReclusos = await Repositorio.GetAllAsync();
+            listaReclusos = await Repositorio.GetAllAsync(); // Refrescar la lista
         }
     }
 }
