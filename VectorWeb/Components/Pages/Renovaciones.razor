@@ -13,7 +13,7 @@
                placeholder="Buscar..."
                @bind="textoBuscar"
                @bind:event="oninput"
-               @oninput="async _ => await CargarDatos()" />
+               @bind:after="CargarDatos" />
     </div>
     <div class="col-md-3">
         <div class="form-check form-switch">
