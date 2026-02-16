@@ -45,6 +45,8 @@ public partial class SecretariaDbContext : DbContext
 
     public virtual DbSet<MaeRecluso> MaeReclusos { get; set; }
 
+    public virtual DbSet<SegAuditoriaPermiso> SegAuditoriaPermisos { get; set; }
+
     public virtual DbSet<TraAdjuntoDocumento> TraAdjuntoDocumentos { get; set; }
 
     public virtual DbSet<TraMovimiento> TraMovimientos { get; set; }
@@ -275,6 +277,36 @@ public partial class SecretariaDbContext : DbContext
             entity.HasOne(d => d.IdUsuarioNavigation).WithMany(p => p.MaeCuposSecretaria)
                 .HasForeignKey(d => d.IdUsuario)
                 .HasConstraintName("FK_MaeCuposSecretaria_Usuario");
+        });
+
+        modelBuilder.Entity<SegAuditoriaPermiso>(entity =>
+        {
+            entity.HasKey(e => e.IdAuditoria).HasName("PK_Seg_AuditoriaPermisos");
+
+            entity.ToTable("Seg_AuditoriaPermisos");
+
+            entity.HasIndex(e => e.FechaEvento, "IX_Seg_AuditoriaPermisos_FechaEvento").IsDescending();
+
+            entity.HasIndex(e => new { e.UsuarioId, e.FechaEvento }, "IX_Seg_AuditoriaPermisos_Usuario_Fecha").IsDescending(false, true);
+
+            entity.Property(e => e.FechaEvento)
+                .HasDefaultValueSql("(sysdatetime())")
+                .HasColumnType("datetime2(0)");
+            entity.Property(e => e.Modulo)
+                .HasMaxLength(150)
+                .IsUnicode(false);
+            entity.Property(e => e.PermisoRequerido)
+                .HasMaxLength(150)
+                .IsUnicode(false);
+            entity.Property(e => e.Rol)
+                .HasMaxLength(50)
+                .IsUnicode(false);
+            entity.Property(e => e.Ruta)
+                .HasMaxLength(250)
+                .IsUnicode(false);
+            entity.Property(e => e.UsuarioNombre)
+                .HasMaxLength(100)
+                .IsUnicode(false);
         });
 
         modelBuilder.Entity<MaeDocumento>(entity =>
