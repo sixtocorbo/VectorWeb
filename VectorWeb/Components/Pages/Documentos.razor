@@ -262,19 +262,25 @@ else
             .Take(tamanoPagina)
             .ToListAsync();
 
-        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToList();
-        documentosConVinculos = idsPagina.Count == 0
-            ? []
-            : (await dbContext.MaeDocumentos
-                .AsNoTracking()
-                .Where(d => idsPagina.Contains(d.IdDocumento))
-                .Where(d =>
-                    d.IdDocumentoPadre != null
-                    || dbContext.MaeDocumentos.Any(rel => rel.IdDocumentoPadre == d.IdDocumento)
-                    || dbContext.MaeDocumentos.Any(rel => rel.IdHiloConversacion == d.IdHiloConversacion && rel.IdDocumento != d.IdDocumento))
-                .Select(d => d.IdDocumento)
-                .ToListAsync())
-                .ToHashSet();
+        var idsPagina = listaDocs.Select(d => d.IdDocumento).ToHashSet();
+        if (idsPagina.Count == 0)
+        {
+            documentosConVinculos = [];
+            StateHasChanged();
+            return;
+        }
+
+        var relacionesDirectas = await dbContext.MaeDocumentos
+            .AsNoTracking()
+            .Where(d => d.IdDocumentoPadre.HasValue)
+            .Select(d => new { d.IdDocumento, IdPadre = d.IdDocumentoPadre!.Value })
+            .ToListAsync();
+
+        documentosConVinculos = relacionesDirectas
+            .Where(rel => idsPagina.Contains(rel.IdDocumento) || idsPagina.Contains(rel.IdPadre))
+            .SelectMany(rel => new[] { rel.IdDocumento, rel.IdPadre })
+            .Where(idsPagina.Contains)
+            .ToHashSet();
 
         StateHasChanged();
     }
