@@ -259,13 +259,33 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Oficina (Opcional)</label>
-                                <InputSelect @bind-Value="OficinaSeleccionada" class="form-select">
-                                    <option value="">Global (Todas las oficinas)</option>
-                                    @foreach (var oficina in oficinas)
+                                <div class="position-relative">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                                        <input type="text"
+                                               class="form-control"
+                                               placeholder="Escriba para buscar oficina..."
+                                               value="@oficinaBusquedaRango"
+                                               @oninput="FiltrarOficinasRango"
+                                               @onfocus="MostrarSugerenciasOficinaRango"
+                                               @onkeydown="ManejarTecladoOficinasRango" />
+                                        <button type="button" class="btn btn-outline-secondary" @onclick="SeleccionarGlobal">Global</button>
+                                    </div>
+
+                                    @if (oficinasRangoFiltradas.Any())
                                     {
-                                        <option value="@oficina.IdOficina.ToString()">@oficina.Nombre</option>
+                                        <div class="list-group position-absolute w-100 shadow-sm z-3" style="max-height: 220px; overflow-y: auto;">
+                                            @for (var i = 0; i < oficinasRangoFiltradas.Count; i++)
+                                            {
+                                                var oficina = oficinasRangoFiltradas[i];
+                                                var claseActivo = i == indiceOficinaRangoSeleccionada ? "active" : string.Empty;
+                                                <button type="button" class="list-group-item list-group-item-action @claseActivo" @onclick="() => SeleccionarOficinaRango(oficina)">
+                                                    @oficina.Nombre
+                                                </button>
+                                            }
+                                        </div>
                                     }
-                                </InputSelect>
+                                </div>
                                 <div class="form-text">Si selecciona Global, el rango será compartido.</div>
                             </div>
 
@@ -397,6 +417,9 @@
     private string mensajeErrorModalRango = string.Empty;
     private string mensajeErrorModalCupo = string.Empty;
     private string filtroTexto = string.Empty;
+    private string oficinaBusquedaRango = string.Empty;
+    private List<CatOficina> oficinasRangoFiltradas = new();
+    private int indiceOficinaRangoSeleccionada = -1;
 
     // Estado Cupo
     private int cupoTipoSeleccionado;
@@ -426,12 +449,6 @@
 
         return tokensBusqueda.All(token =>
             nombreOficina.Contains(token, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private string OficinaSeleccionada
-    {
-        get => rangoActual.IdOficina?.ToString() ?? string.Empty;
-        set => rangoActual.IdOficina = int.TryParse(value, out var id) ? id : null;
     }
 
     protected override async Task OnInitializedAsync()
@@ -551,6 +568,9 @@
             Activo = true,
             Anio = DateTime.Now.Year
         };
+        oficinaBusquedaRango = string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
         mostrarModal = true;
     }
 
@@ -570,11 +590,121 @@
             IdOficina = rango.IdOficina,
             Anio = rango.Anio
         };
+        oficinaBusquedaRango = rango.IdOficinaNavigation?.Nombre ?? string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
         mostrarModal = true;
     }
 
-    private void CerrarModal() => mostrarModal = false;
+    private void CerrarModal()
+    {
+        mostrarModal = false;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+    }
     private void CerrarModalCupo() => mostrarModalCupo = false;
+
+    private Task FiltrarOficinasRango(ChangeEventArgs e)
+    {
+        oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
+        rangoActual.IdOficina = null;
+        indiceOficinaRangoSeleccionada = -1;
+
+        if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
+        {
+            oficinasRangoFiltradas.Clear();
+            return Task.CompletedTask;
+        }
+
+        oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango)
+            .Take(8)
+            .ToList();
+
+        var coincidenciaExacta = oficinas.FirstOrDefault(oficina =>
+            string.Equals(oficina.Nombre, oficinaBusquedaRango, StringComparison.OrdinalIgnoreCase));
+
+        if (coincidenciaExacta != null)
+        {
+            rangoActual.IdOficina = coincidenciaExacta.IdOficina;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task SeleccionarOficinaRango(CatOficina oficina)
+    {
+        rangoActual.IdOficina = oficina.IdOficina;
+        oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+        return Task.CompletedTask;
+    }
+
+    private void SeleccionarGlobal()
+    {
+        rangoActual.IdOficina = null;
+        oficinaBusquedaRango = string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+    }
+
+    private void MostrarSugerenciasOficinaRango()
+    {
+        if (!string.IsNullOrWhiteSpace(oficinaBusquedaRango))
+        {
+            oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango)
+                .Take(8)
+                .ToList();
+        }
+    }
+
+    private async Task ManejarTecladoOficinasRango(KeyboardEventArgs e)
+    {
+        if (!oficinasRangoFiltradas.Any())
+        {
+            return;
+        }
+
+        if (e.Key == "ArrowDown")
+        {
+            indiceOficinaRangoSeleccionada = Math.Min(indiceOficinaRangoSeleccionada + 1, oficinasRangoFiltradas.Count - 1);
+            return;
+        }
+
+        if (e.Key == "ArrowUp")
+        {
+            indiceOficinaRangoSeleccionada = Math.Max(indiceOficinaRangoSeleccionada - 1, 0);
+            return;
+        }
+
+        if (e.Key == "Enter" && indiceOficinaRangoSeleccionada >= 0)
+        {
+            await SeleccionarOficinaRango(oficinasRangoFiltradas[indiceOficinaRangoSeleccionada]);
+            return;
+        }
+
+        if (e.Key == "Escape")
+        {
+            oficinasRangoFiltradas.Clear();
+            indiceOficinaRangoSeleccionada = -1;
+        }
+    }
+
+    private IEnumerable<CatOficina> BuscarOficinasRango(string terminoBusqueda)
+    {
+        var palabras = terminoBusqueda
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (palabras.Length == 0)
+        {
+            return Enumerable.Empty<CatOficina>();
+        }
+
+        return oficinas
+            .Where(oficina => palabras.All(palabra =>
+                (oficina.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false)))
+            .OrderBy(oficina => oficina.Nombre);
+    }
 
     private async Task Guardar()
     {
