@@ -497,8 +497,6 @@
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
-    private ElementReference panelSugerenciasOficinaRef;
-    private ElementReference panelSugerenciasPPLRef;
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
         ? "z-index: 20; bottom: calc(100% + .25rem);"
         : "z-index: 20; top: calc(100% + .25rem);";
@@ -677,7 +675,11 @@
     }
 
     private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
-    private async Task ManejarTecladoPPL(KeyboardEventArgs e) { if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]); }
+    private Task ManejarTecladoPPL(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
+        return Task.CompletedTask;
+    }
     private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); }
     private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
     private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
