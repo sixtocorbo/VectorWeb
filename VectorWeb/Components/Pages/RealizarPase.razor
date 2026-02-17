@@ -68,7 +68,7 @@
                                     {
                                         <div class="mb-4">
                                             <label class="badge bg-primary mb-2">EXPEDIENTE PRINCIPAL</label>
-                                            <h5 class="text-dark fw-bold mb-1">@docPadre.NumeroOficial</h5>
+                                            <h5 class="text-dark fw-bold mb-1">@FormatearNumeroConTipo(docPadre)</h5>
                                             <p class="text-secondary small mb-2">@docPadre.Asunto</p>
                                             <div class="d-flex align-items-center">
                                                 <span class="badge rounded-pill bg-secondary px-3">
@@ -361,4 +361,11 @@
         catch (Exception ex) { await trans.RollbackAsync(); mensajeError = ex.Message; }
     }
     private Task IgnorarSubmitRealizarPase(EditContext _) => Task.CompletedTask;
+
+    private static string FormatearNumeroConTipo(MaeDocumento documento)
+    {
+        var numero = string.IsNullOrWhiteSpace(documento.NumeroOficial) ? "S/N" : documento.NumeroOficial;
+        var tipo = documento.IdTipoNavigation?.Nombre;
+        return string.IsNullOrWhiteSpace(tipo) ? numero : $"{tipo} {numero}";
+    }
 }
