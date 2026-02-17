@@ -1,0 +1,180 @@
+@page "/documentos/recorrido/{Id:long}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.ver")]
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<TraMovimiento> RepoMovimientos
+@rendermode InteractiveServer
+
+<PageTitle>Recorrido por Oficinas - Vector</PageTitle>
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+            <h2 class="h3 fw-bold mb-1"><i class="bi bi-diagram-3 text-primary me-2"></i>Recorrido del Expediente</h2>
+            @if (documento is not null)
+            {
+                <p class="text-muted mb-0">@documento.NumeroOficial - @documento.Asunto</p>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <a href="documentos/historial/@Id" class="btn btn-outline-info">
+                <i class="bi bi-clock-history me-1"></i> Historial
+            </a>
+            <a href="documentos" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Cargando recorrido...</p>
+        </div>
+    }
+    else if (noEncontrado || documento is null)
+    {
+        <div class="alert alert-warning">No se encontró el expediente solicitado.</div>
+    }
+    else
+    {
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small text-uppercase fw-bold text-muted">Filtrar por destino</label>
+                        <select class="form-select" @bind="filtroDestino">
+                            <option value="">Todos los destinos</option>
+                            @foreach (var destino in destinosDisponibles)
+                            {
+                                <option value="@destino">@destino</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small text-uppercase fw-bold text-muted">Buscar recorrido</label>
+                        <input class="form-control"
+                               placeholder="Origen, destino u observación..."
+                               @bind="filtroTexto"
+                               @bind:event="oninput" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-uppercase fw-bold text-muted">Desde</label>
+                        <input type="date" class="form-control" @bind="filtroDesde" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-uppercase fw-bold text-muted">Hasta</label>
+                        <input type="date" class="form-control" @bind="filtroHasta" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive rounded shadow-sm border">
+            <table class="table table-striped table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Recorrido completo</th>
+                        <th>Fecha</th>
+                        <th>Hora</th>
+                        <th>Destino</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!MovimientosFiltrados.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No hay movimientos para los filtros seleccionados.</td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var item in MovimientosFiltrados.Select((mov, idx) => new { mov, idx }))
+                        {
+                            <tr>
+                                <td class="fw-bold">@(item.idx + 1)</td>
+                                <td>
+                                    <span class="fw-semibold text-secondary">@item.mov.IdOficinaOrigenNavigation?.Nombre</span>
+                                    <i class="bi bi-arrow-right mx-2 text-primary"></i>
+                                    <span class="fw-bold text-success">@item.mov.IdOficinaDestinoNavigation?.Nombre</span>
+                                </td>
+                                <td>@item.mov.FechaMovimiento?.ToString("dd/MM/yyyy")</td>
+                                <td>@item.mov.FechaMovimiento?.ToString("HH:mm")</td>
+                                <td>@item.mov.IdOficinaDestinoNavigation?.Nombre</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public long Id { get; set; }
+
+    private MaeDocumento? documento;
+    private List<TraMovimiento> movimientos = [];
+    private bool cargando = true;
+    private bool noEncontrado;
+
+    private string filtroDestino = string.Empty;
+    private string filtroTexto = string.Empty;
+    private DateTime? filtroDesde;
+    private DateTime? filtroHasta;
+
+    private List<string> destinosDisponibles = [];
+
+    private IEnumerable<TraMovimiento> MovimientosFiltrados => movimientos
+        .Where(m => string.IsNullOrWhiteSpace(filtroDestino) ||
+                    string.Equals(m.IdOficinaDestinoNavigation?.Nombre, filtroDestino, StringComparison.OrdinalIgnoreCase))
+        .Where(m => string.IsNullOrWhiteSpace(filtroTexto) ||
+                    ($"{m.IdOficinaOrigenNavigation?.Nombre} {m.IdOficinaDestinoNavigation?.Nombre} {m.ObservacionPase}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
+        .Where(m => !filtroDesde.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date >= filtroDesde.Value.Date))
+        .Where(m => !filtroHasta.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date <= filtroHasta.Value.Date))
+        .OrderByDescending(m => m.FechaMovimiento)
+        .ThenByDescending(m => m.IdMovimiento);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cargando = true;
+        noEncontrado = false;
+        movimientos.Clear();
+
+        documento = await RepoDocs
+            .GetQueryable("IdTipoNavigation,IdEstadoActualNavigation")
+            .FirstOrDefaultAsync(d => d.IdDocumento == Id);
+
+        if (documento is null)
+        {
+            noEncontrado = true;
+            cargando = false;
+            return;
+        }
+
+        var idsEnHilo = await RepoDocs.GetQueryable()
+            .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
+            .Select(d => d.IdDocumento)
+            .ToListAsync();
+
+        movimientos = await RepoMovimientos
+            .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation")
+            .Where(m => idsEnHilo.Contains(m.IdDocumento))
+            .ToListAsync();
+
+        destinosDisponibles = movimientos
+            .Select(m => m.IdOficinaDestinoNavigation?.Nombre)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n)
+            .Cast<string>()
+            .ToList();
+
+        cargando = false;
+    }
+}
