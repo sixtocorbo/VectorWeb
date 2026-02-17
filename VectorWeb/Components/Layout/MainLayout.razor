@@ -3,18 +3,18 @@
 @inject NavigationManager Navigation
 
 <div class="page @(isMenuVisible ? "menu-visible" : "menu-hidden")">
-    <button class="menu-toggle btn btn-dark" type="button" @onclick="ToggleMenu" aria-label="Mostrar u ocultar menú">
-        <i class="bi bi-list"></i>
-    </button>
-
-    <div class="menu-hover-zone" @onmouseenter="ShowMenu" aria-hidden="true"></div>
+    <div class="menu-hover-zone" @onmouseenter="ShowMenu"></div>
 
     <div class="sidebar" @onmouseenter="ShowMenu" @onmouseleave="HideMenu">
         <NavMenu />
     </div>
 
     <main @onclick="HideMenuOnContentInteraction">
-        <div class="top-row px-4"></div>
+        <div class="top-row px-4">
+            <button class="menu-toggle btn btn-dark" type="button" @onclick="ToggleMenu" aria-label="Mostrar u ocultar menú">
+                <i class="bi bi-list"></i>
+            </button>
+        </div>
 
         <article class="content px-4">
             @Body
@@ -29,7 +29,7 @@
 </div>
 
 @code {
-    private bool isMenuVisible;
+    private bool isMenuVisible = false;
 
     protected override void OnInitialized()
     {
