@@ -29,9 +29,6 @@ public enum EstadoRenovacion
     Inactiva
 }
 
-    public string? Descripcion { get; set; }
-    public string? NumeroOficial { get; set; }
-    public DateTime? FechaCreacion { get; set; }
 // CORRECCIÓN: Renombradas las propiedades para coincidir con lo que espera EditarRenovacion.razor
 public sealed class ObservacionesRenovacionDto
 {
@@ -48,6 +45,9 @@ public sealed class DocumentoRespaldoDto
     public long IdDocumento { get; set; }
     public string Texto { get; set; } = string.Empty;
     public string? Asunto { get; set; }
+    public string? Descripcion { get; set; }
+    public string? NumeroOficial { get; set; }
+    public DateTime? FechaCreacion { get; set; }
 }
 
 public sealed class RenovacionesService
