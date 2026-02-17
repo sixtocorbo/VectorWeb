@@ -368,12 +368,28 @@
     private async Task EliminarDocumento(long id)
     {
         bool conf = await JS.InvokeAsync<bool>("confirm", "¿Confirmar eliminación permanente?");
-        if (conf)
+        if (!conf) return;
+
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+
+        var doc = await db.MaeDocumentos.FindAsync(id);
+        if (doc is null) return;
+
+        // Evita excepciones de clave foránea y muestra una validación amigable.
+        var tieneMovimientos = await db.TraMovimientos.AsNoTracking().AnyAsync(m => m.IdDocumento == id);
+        var tieneAdjuntos = await db.TraAdjuntoDocumentos.AsNoTracking().AnyAsync(a => a.IdDocumento == id);
+        var esPadre = await db.MaeDocumentos.AsNoTracking().AnyAsync(d => d.IdDocumentoPadre == id);
+        var esRespaldoSalida = await db.TraSalidasLaboralesDocumentoRespaldos.AsNoTracking().AnyAsync(r => r.IdDocumento == id);
+
+        if (tieneMovimientos || tieneAdjuntos || esPadre || esRespaldoSalida)
         {
-            await using var db = await DbContextFactory.CreateDbContextAsync();
-            var doc = await db.MaeDocumentos.FindAsync(id);
-            if (doc != null) { db.MaeDocumentos.Remove(doc); await db.SaveChangesAsync(); await CargarDocumentos(); }
+            await JS.InvokeVoidAsync("alert", "No se puede eliminar el documento porque tiene información relacionada (historial, adjuntos, vínculos o respaldos).");
+            return;
         }
+
+        db.MaeDocumentos.Remove(doc);
+        await db.SaveChangesAsync();
+        await CargarDocumentos();
     }
 
     private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
