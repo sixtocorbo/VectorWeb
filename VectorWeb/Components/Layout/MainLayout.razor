@@ -7,7 +7,9 @@
         <i class="bi bi-list"></i>
     </button>
 
-    <div class="sidebar">
+    <div class="menu-hover-zone" @onmouseenter="ShowMenu" aria-hidden="true"></div>
+
+    <div class="sidebar" @onmouseenter="ShowMenu" @onmouseleave="HideMenu">
         <NavMenu />
     </div>
 
@@ -43,6 +45,22 @@
     private void ToggleMenu()
     {
         isMenuVisible = !isMenuVisible;
+    }
+
+    private void ShowMenu()
+    {
+        if (!isMenuVisible)
+        {
+            isMenuVisible = true;
+        }
+    }
+
+    private void HideMenu()
+    {
+        if (isMenuVisible)
+        {
+            isMenuVisible = false;
+        }
     }
 
     private void HideMenuOnContentInteraction()
