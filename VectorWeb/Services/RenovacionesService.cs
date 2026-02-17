@@ -326,6 +326,25 @@ public sealed class RenovacionesService
         return await context.MaeDocumentos.AsNoTracking().AnyAsync(x => x.IdDocumento == idDocumento);
     }
 
+    public async Task<DocumentoRespaldoDto?> ObtenerDocumentoPorIdAsync(long idDocumento)
+    {
+        if (idDocumento <= 0) return null;
+
+        return await context.MaeDocumentos
+            .AsNoTracking()
+            .Where(d => d.IdDocumento == idDocumento)
+            .Select(d => new DocumentoRespaldoDto
+            {
+                IdDocumento = d.IdDocumento,
+                Asunto = d.Asunto,
+                Descripcion = d.Descripcion,
+                NumeroOficial = d.NumeroOficial,
+                FechaCreacion = d.FechaCreacion,
+                Texto = $"DOC {d.NumeroOficial ?? "S/N"} | {d.Asunto}"
+            })
+            .FirstOrDefaultAsync();
+    }
+
     private async Task ValidarIdsDocumentosAsync(List<long> idsDocumentos)
     {
         if (idsDocumentos == null || idsDocumentos.Count == 0) return;
