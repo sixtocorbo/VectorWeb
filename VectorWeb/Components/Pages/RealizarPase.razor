@@ -348,14 +348,47 @@
         await using var trans = await DbContext.Database.BeginTransactionAsync();
         try
         {
+            var documentosPorId = await DbContext.MaeDocumentos
+                .Where(d => documentosAEnviar.Select(doc => doc.IdDocumento).Contains(d.IdDocumento))
+                .ToDictionaryAsync(d => d.IdDocumento);
+
             foreach (var doc in documentosAEnviar)
             {
-                var ori = doc.IdOficinaActual; doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino; doc.IdEstadoActual = nuevoEstadoId;
-                if (docPadre != null && doc.IdDocumento == docPadre.IdDocumento) doc.Fojas = (doc.Fojas ?? 0) + fojasAgregadas;
-                await RepoMovimientos.AddAsync(new TraMovimiento { IdDocumento = doc.IdDocumento, IdOficinaOrigen = (usuarioSinOficinaAsignada || esPaseDesdeOficinaRemota) ? ori : idOficinaUsuario, IdOficinaDestino = nuevoMovimiento.IdOficinaDestino, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = usuarioLogueadoId, IdEstadoEnEseMomento = nuevoEstadoId, ObservacionPase = nuevoMovimiento.ObservacionPase });
-                await RepoDocs.UpdateAsync(doc);
+                if (!documentosPorId.TryGetValue(doc.IdDocumento, out var documentoActualizar))
+                {
+                    continue;
+                }
+
+                var ori = documentoActualizar.IdOficinaActual;
+                documentoActualizar.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
+                documentoActualizar.IdEstadoActual = nuevoEstadoId;
+
+                if (docPadre != null && documentoActualizar.IdDocumento == docPadre.IdDocumento)
+                {
+                    documentoActualizar.Fojas = (documentoActualizar.Fojas ?? 0) + fojasAgregadas;
+                }
+
+                DbContext.TraMovimientos.Add(new TraMovimiento
+                {
+                    IdDocumento = documentoActualizar.IdDocumento,
+                    IdOficinaOrigen = (usuarioSinOficinaAsignada || esPaseDesdeOficinaRemota) ? ori : idOficinaUsuario,
+                    IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = usuarioLogueadoId,
+                    IdEstadoEnEseMomento = nuevoEstadoId,
+                    ObservacionPase = nuevoMovimiento.ObservacionPase
+                });
             }
-            await RepoEventos.AddAsync(new EventosSistema { UsuarioId = usuarioLogueadoId, FechaEvento = DateTime.Now, Modulo = "PASE", Descripcion = $"Pase de {documentosAEnviar.Count} docs." });
+
+            DbContext.EventosSistemas.Add(new EventosSistema
+            {
+                UsuarioId = usuarioLogueadoId,
+                FechaEvento = DateTime.Now,
+                Modulo = "PASE",
+                Descripcion = $"Pase de {documentosAEnviar.Count} docs."
+            });
+
+            await DbContext.SaveChangesAsync();
             await trans.CommitAsync(); Navegador.NavigateTo("documentos");
         }
         catch (Exception ex) { await trans.RollbackAsync(); mensajeError = ex.Message; }
