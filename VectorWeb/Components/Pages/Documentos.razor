@@ -44,7 +44,7 @@
     /* 2. Control de tabla */
     .table {
         width: 100% !important;
-        table-layout: auto;
+        table-layout: fixed;
         margin-bottom: 0;
     }
 
@@ -67,27 +67,27 @@
 
     /* Definición de anchos fijos para que las leyendas tengan espacio */
     .col-estado {
-        width: 110px;
+        width: 120px;
     }
 
     .col-fecha {
-        width: 85px;
+        width: 95px;
     }
 
     .col-id {
-        width: 145px;
+        width: 160px;
     }
 
     .col-ubicacion {
-        width: 125px;
+        width: 150px;
     }
 
     .col-vinculo {
-        width: 130px;
+        width: 160px;
     }
 
     .col-acciones {
-        width: 205px;
+        width: 250px;
     }
     /* Espacio vital para las 4 leyendas */
 
@@ -133,35 +133,6 @@
     .btn-action-text {
         font-size: 0.75rem;
         font-weight: bold;
-    }
-
-    .acciones-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.25rem;
-        justify-content: flex-end;
-    }
-
-    .table th,
-    .table td {
-        white-space: normal;
-        overflow-wrap: anywhere;
-    }
-
-    @media (max-width: 1200px) {
-        .col-vinculo,
-        .td-vinculo,
-        .col-ubicacion,
-        .td-ubicacion {
-            display: none;
-        }
-    }
-
-    @media (max-width: 992px) {
-        .col-fecha,
-        .td-fecha {
-            display: none;
-        }
     }
 </style>
 
@@ -253,12 +224,12 @@
                                         @doc.IdEstadoActualNavigation?.Nombre
                                     </span>
                                 </td>
-                                <td class="td-fecha small fw-bold text-dark">@doc.FechaCreacion?.ToString("dd/MM/yy")</td>
+                                <td class="small fw-bold text-dark">@doc.FechaCreacion?.ToString("dd/MM/yy")</td>
                                 <td>
                                     <div class="fw-bold text-primary" style="font-size: 0.8rem;">@doc.NumeroOficial</div>
                                     <div class="text-muted small">@doc.IdTipoNavigation?.Nombre</div>
                                 </td>
-                                <td class="td-vinculo">
+                                <td>
                                     <div class="d-flex flex-column gap-1">
                                         @if (doc.IdDocumentoPadre.HasValue)
                                         {
@@ -288,7 +259,7 @@
                                 <td>
                                     <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
                                 </td>
-                                <td class="td-ubicacion">
+                                <td>
                                     @if (doc.IdOficinaActual == idOficinaUsuario)
                                     {
                                         <span class="badge bg-success-subtle text-success border border-success w-100 py-1" style="font-size: 0.7rem;">TU BANDEJA</span>
@@ -301,7 +272,7 @@
                                     }
                                 </td>
                                 <td class="text-end">
-                                    <div class="acciones-group shadow-sm">
+                                    <div class="btn-group shadow-sm">
                                         <button class="btn btn-warning btn-sm btn-action-text text-dark" @onclick="() => IrAPase(doc)" title="Dar Pase">
                                             <i class="bi bi-arrow-right-circle"></i> Pase
                                         </button>
