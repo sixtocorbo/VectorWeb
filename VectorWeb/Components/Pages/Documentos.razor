@@ -141,9 +141,15 @@
         <h3 class="mb-0">
             <i class="bi bi-inbox-fill text-primary me-2"></i>Oficina: <strong>@nombreOficinaUsuario</strong>
         </h3>
-        <a href="documentos/nuevo" class="btn btn-success shadow-sm fw-bold">
-            <i class="bi bi-plus-circle"></i> Nuevo Ingreso
-        </a>
+        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-2" title="Cantidad de expedientes únicos pendientes">
+                <i class="bi bi-collection me-1"></i>
+                Expedientes pendientes: <strong>@totalExpedientesPendientes</strong>
+            </span>
+            <a href="documentos/nuevo" class="btn btn-success shadow-sm fw-bold">
+                <i class="bi bi-plus-circle"></i> Nuevo Ingreso
+            </a>
+        </div>
     </div>
 
     <div class="card search-card">
@@ -312,6 +318,7 @@
     private int tamanoPagina = 10;
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
+    private int totalExpedientesPendientes;
     private bool verTodo;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
@@ -358,11 +365,15 @@
     private async Task CargarDocumentos()
     {
         await using var db = await DbContextFactory.CreateDbContextAsync();
-        var q = db.MaeDocumentos.AsNoTracking()
+        var qBase = db.MaeDocumentos.AsNoTracking()
             .Include(d => d.IdTipoNavigation).Include(d => d.IdOficinaActualNavigation).Include(d => d.IdEstadoActualNavigation).AsQueryable();
 
-        if (!verTodo && idOficinaUsuario > 0) q = q.Where(d => d.IdOficinaActual == idOficinaUsuario);
-        q = AplicarFiltroBusqueda(q);
+        if (!verTodo && idOficinaUsuario > 0) qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
+
+        totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
+
+        var q = AplicarFiltroBusqueda(qBase);
+
         TotalRegistros = await q.CountAsync();
         if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
 
