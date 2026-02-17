@@ -38,6 +38,11 @@
         font-size: 0.85rem;
         padding: 0.5rem 0.8rem;
     }
+
+    .doc-candidato-activo {
+        border-left: 3px solid #0d6efd;
+        background-color: #f0f7ff;
+    }
 </style>
 
 <div class="container py-4">
@@ -160,14 +165,58 @@
 
                         @if (documentosCandidatos.Count > 0)
                         {
-                            <div class="list-group mb-3" style="max-height: 200px; overflow-y: auto;">
+                            <div class="list-group mb-3" style="max-height: 220px; overflow-y: auto;">
                                 @foreach (var doc in documentosCandidatos)
                                 {
-                                    <button type="button" class="list-group-item list-group-item-action p-2 small d-flex justify-content-between align-items-center" @onclick="() => AgregarDoc(doc.IdDocumento)">
+                                    var seleccionado = idsDocumentos.Contains(doc.IdDocumento);
+                                    var activo = docVistaPrevia?.IdDocumento == doc.IdDocumento;
+                                    var claseActivo = activo ? "doc-candidato-activo" : string.Empty;
+                                    <button type="button" class="list-group-item list-group-item-action p-2 small d-flex justify-content-between align-items-center @claseActivo" @onclick="() => SeleccionarDocumento(doc)">
                                         <span class="text-truncate" style="max-width: 80%;">@doc.Texto</span>
-                                        <i class="bi bi-plus-circle-fill text-success"></i>
+                                        <span>
+                                            @if (seleccionado)
+                                            {
+                                                <i class="bi bi-check-circle-fill text-primary"></i>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-eye-fill text-secondary"></i>
+                                            }
+                                        </span>
                                     </button>
                                 }
+                            </div>
+                        }
+
+                        @if (docVistaPrevia is not null)
+                        {
+                            var seleccionado = idsDocumentos.Contains(docVistaPrevia.IdDocumento);
+                            <div class="border rounded p-3 mb-3 bg-light small">
+                                <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                                    <div>
+                                        <div class="fw-bold text-primary">Documento #@docVistaPrevia.IdDocumento</div>
+                                        <div class="text-muted">
+                                            <span class="me-2">N° Oficial: @(string.IsNullOrWhiteSpace(docVistaPrevia.NumeroOficial) ? "S/N" : docVistaPrevia.NumeroOficial)</span>
+                                            <span>Fecha: @(docVistaPrevia.FechaCreacion?.ToString("dd/MM/yyyy") ?? "N/D")</span>
+                                        </div>
+                                    </div>
+                                    @if (seleccionado)
+                                    {
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="() => RemoverDoc(docVistaPrevia.IdDocumento)">
+                                            <i class="bi bi-x-circle me-1"></i>Quitar de seleccionados
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => AgregarDoc(docVistaPrevia.IdDocumento)">
+                                            <i class="bi bi-plus-circle me-1"></i>Agregar a seleccionados
+                                        </button>
+                                    }
+                                </div>
+                                <div class="fw-bold mb-1">Asunto</div>
+                                <div class="mb-2">@docVistaPrevia.Asunto</div>
+                                <div class="fw-bold mb-1">Contenido</div>
+                                <div style="white-space: pre-wrap;">@(string.IsNullOrWhiteSpace(docVistaPrevia.Descripcion) ? "Sin descripción disponible." : docVistaPrevia.Descripcion)</div>
                             </div>
                         }
 
@@ -226,6 +275,7 @@
     private string mensajeDocumento = string.Empty;
     private string filtroDocumento = string.Empty;
     private List<DocumentoRespaldoDto> documentosCandidatos = [];
+    private DocumentoRespaldoDto? docVistaPrevia;
 
     protected override async Task OnInitializedAsync()
     {
@@ -260,6 +310,10 @@
             return;
         }
         documentosCandidatos = await Service.BuscarDocumentosCandidatos(modelo.IdRecluso, filtro);
+        if (docVistaPrevia is not null)
+        {
+            docVistaPrevia = documentosCandidatos.FirstOrDefault(x => x.IdDocumento == docVistaPrevia.IdDocumento);
+        }
     }
 
     private async Task AgregarDoc() => await AgregarDoc(idDocAgregar);
@@ -278,6 +332,11 @@
     }
 
     private void RemoverDoc(long idDocumento) => idsDocumentos.Remove(idDocumento);
+
+    private void SeleccionarDocumento(DocumentoRespaldoDto documento)
+    {
+        docVistaPrevia = documento;
+    }
 
     private async Task Guardar()
     {
