@@ -109,8 +109,8 @@ else
                     <tr>
                         <th>Recluso / Autorización</th>
                         <th>Lugar de Trabajo</th>
-                        <th class="text-center">Vencimiento</th>
-                        <th class="text-center">Estado</th>
+                        <th class="text-center text-nowrap w-auto">Vencimiento</th>
+                        <th class="text-center text-nowrap w-auto">Estado</th>
                         <th class="text-end" style="min-width: 280px;">Acciones</th>
                     </tr>
                 </thead>
@@ -130,13 +130,13 @@ else
                                 }
                             </td>
                             <td>@item.LugarTrabajo</td>
-                            <td class="text-center">
+                            <td class="text-center text-nowrap w-auto">
                                 <div>@item.FechaVencimiento.ToShortDateString()</div>
                                 <small class="@ObtenerClaseDias(item.DiasRestantes)">
                                     (@item.DiasRestantes días)
                                 </small>
                             </td>
-                            <td class="text-center">
+                            <td class="text-center text-nowrap w-auto">
                                 <span class="badge @ObtenerBadge(item.Estado)">
                                     @TraducirEstado(item.Estado)
                                 </span>
