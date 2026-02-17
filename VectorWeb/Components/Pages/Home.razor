@@ -385,7 +385,7 @@
 
             // 4. CARGA POR OFICINA
             cargaPorOficina = await db.MaeDocumentos
-                .Where(d => d.IdOficinaActual != null)
+                .Where(d => d.IdOficinaActualNavigation != null)
                 .GroupBy(d => d.IdOficinaActualNavigation.Nombre)
                 .Select(g => new BarraOficina { Nombre = g.Key, Total = g.Count() })
                 .OrderByDescending(x => x.Total)
