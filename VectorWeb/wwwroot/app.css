@@ -67,6 +67,10 @@ h1:focus {
     margin-left: 0.55rem;
 }
 
+.office-switch .form-check-label i {
+    margin-right: 0.5rem;
+}
+
 .controls-panel {
     padding: 1rem;
     border: 1px solid #d8e2ef;
