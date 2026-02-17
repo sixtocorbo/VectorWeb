@@ -29,13 +29,16 @@ public enum EstadoRenovacion
     Inactiva
 }
 
-// CORRECCI”N: Renombradas las propiedades para coincidir con lo que espera EditarRenovacion.razor
+    public string? Descripcion { get; set; }
+    public string? NumeroOficial { get; set; }
+    public DateTime? FechaCreacion { get; set; }
+// CORRECCI√ìN: Renombradas las propiedades para coincidir con lo que espera EditarRenovacion.razor
 public sealed class ObservacionesRenovacionDto
 {
     public string Codigo { get; set; } = string.Empty;
     public string Descripcion { get; set; } = string.Empty;
 
-    // Mapeamos "Observacion" (Razor) a "ObservacionesUsuario" (LÛgica interna) si prefieres, 
+    // Mapeamos "Observacion" (Razor) a "ObservacionesUsuario" (L√≥gica interna) si prefieres, 
     // o simplemente usamos "Observacion" para mantener compatibilidad total.
     public string Observacion { get; set; } = string.Empty;
 }
@@ -158,7 +161,7 @@ public sealed class RenovacionesService
 
         await context.SaveChangesAsync();
 
-        if (idsDocumentos != null) // Permitir lista vacÌa para limpiar, pero no null
+        if (idsDocumentos != null) // Permitir lista vac√≠a para limpiar, pero no null
         {
             var idsNormalizados = idsDocumentos
                 .Where(x => x > 0)
@@ -211,7 +214,7 @@ public sealed class RenovacionesService
 
         if (!activo && !string.IsNullOrWhiteSpace(motivo))
         {
-            // Deserializamos para mantener la estructura JSON v·lida
+            // Deserializamos para mantener la estructura JSON v√°lida
             var dto = ParsearObservaciones(entidad.Observaciones);
             dto.Observacion += $"{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
 
@@ -308,6 +311,9 @@ public sealed class RenovacionesService
             {
                 IdDocumento = d.IdDocumento,
                 Asunto = d.Asunto,
+                Descripcion = d.Descripcion,
+                NumeroOficial = d.NumeroOficial,
+                FechaCreacion = d.FechaCreacion,
                 Texto = $"DOC {d.NumeroOficial ?? "S/N"} | {d.Asunto}"
             });
 
