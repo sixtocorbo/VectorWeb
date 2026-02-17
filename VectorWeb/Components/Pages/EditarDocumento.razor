@@ -6,6 +6,7 @@
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IJSRuntime JS
+@inject NavigationManager Navegador
 @rendermode InteractiveServer
 
 <PageTitle>Ficha de Documento - Vector</PageTitle>
@@ -144,23 +145,43 @@
 
                     <div class="col-12">
                         <span class="label-info">Asunto / Título</span>
-                        <div class="data-box fw-semibold border-primary-subtle bg-primary-subtle bg-opacity-10">
-                            <i class="bi bi-chat-left-text icon-field"></i> @documento.Asunto
-                        </div>
+                        <InputText class="form-control border-primary-subtle bg-primary-subtle bg-opacity-10 fw-semibold"
+                                   @bind-Value="documento.Asunto"
+                                   placeholder="Ingrese el asunto del documento" />
                     </div>
 
                     <div class="col-12">
                         <span class="label-info">Descripción Detallada</span>
-                        <div class="data-box data-text" style="min-height: 120px;">
-                            @documento.Descripcion
-                        </div>
+                        <InputTextArea class="form-control" style="min-height: 120px;"
+                                       @bind-Value="documento.Descripcion"
+                                       placeholder="Ingrese una descripción" />
                     </div>
                 </div>
+
+                @if (!string.IsNullOrWhiteSpace(mensajeError))
+                {
+                    <div class="alert alert-danger mt-4 mb-0">@mensajeError</div>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(mensajeExito))
+                {
+                    <div class="alert alert-success mt-4 mb-0">@mensajeExito</div>
+                }
             </div>
 
             <div class="card-footer bg-white p-3 border-top-0 d-flex justify-content-end">
+                <button class="btn btn-primary btn-sm me-2" @onclick="GuardarCambios" disabled="@guardando">
+                    @if (guardando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    <i class="bi bi-save me-1"></i> Guardar Cambios
+                </button>
                 <button class="btn btn-outline-primary btn-sm me-2" @onclick="Imprimir">
                     <i class="bi bi-printer me-1"></i> Imprimir Ficha
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="VolverABandeja">
+                    <i class="bi bi-x-circle me-1"></i> Cancelar
                 </button>
             </div>
         </div>
@@ -172,6 +193,9 @@
 
     private MaeDocumento? documento;
     private bool cargando = true;
+    private bool guardando;
+    private string? mensajeError;
+    private string? mensajeExito;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -182,9 +206,44 @@
         cargando = false;
     }
 
+    private async Task GuardarCambios()
+    {
+        mensajeError = null;
+        mensajeExito = null;
+
+        if (documento is null)
+        {
+            mensajeError = "No se encontró el documento para actualizar.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(documento.Asunto))
+        {
+            mensajeError = "El asunto es obligatorio.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await RepoDocs.UpdateAsync(documento);
+            mensajeExito = "Documento actualizado correctamente.";
+        }
+        catch
+        {
+            mensajeError = "Ocurrió un problema al guardar los cambios.";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
     private async Task Imprimir()
     {
         // Llama a la función de impresión nativa del navegador
         await JS.InvokeVoidAsync("window.print");
     }
+
+    private void VolverABandeja() => Navegador.NavigateTo("documentos");
 }
