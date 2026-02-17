@@ -82,6 +82,10 @@
         width: 150px;
     }
 
+    .col-vinculo {
+        width: 160px;
+    }
+
     .col-acciones {
         width: 250px;
     }
@@ -199,6 +203,7 @@
                             <th class="col-estado">Estado</th>
                             <th class="col-fecha">Fecha</th>
                             <th class="col-id">Identificación</th>
+                            <th class="col-vinculo">Vinculación</th>
                             <th>Asunto</th>
                             <th class="col-ubicacion">Ubicación</th>
                             <th class="col-acciones text-end">Acciones</th>
@@ -217,6 +222,33 @@
                                 <td>
                                     <div class="fw-bold text-primary" style="font-size: 0.8rem;">@doc.NumeroOficial</div>
                                     <div class="text-muted small">@doc.IdTipoNavigation?.Nombre</div>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                        @if (doc.IdDocumentoPadre.HasValue)
+                                        {
+                                            <span class="badge bg-secondary text-white fw-normal border"
+                                                  title="Este documento depende de otro">
+                                                <i class="bi bi-arrow-return-right me-1"></i>
+                                                Hijo (@ObtenerReferenciaPadre(doc.IdDocumentoPadre.Value))
+                                            </span>
+                                        }
+
+                                        @if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantHijos) && cantHijos > 0)
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary fw-bold"
+                                                  title="Este documento tiene hijos vinculados">
+                                                <i class="bi bi-diagram-3 me-1"></i>
+                                                Padre (@cantHijos)
+                                            </span>
+                                        }
+
+                                        @if (!doc.IdDocumentoPadre.HasValue &&
+                                            (!cantidadHijosPorPadre.ContainsKey(doc.IdDocumento) || cantidadHijosPorPadre[doc.IdDocumento] == 0))
+                                        {
+                                            <span class="text-muted small">-</span>
+                                        }
+                                    </div>
                                 </td>
                                 <td>
                                     <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
@@ -340,6 +372,27 @@
                 .Select(d => new { d.IdDocumento, n = d.NumeroOficial, t = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null })
                 .ToDictionaryAsync(x => x.IdDocumento, x => (x.t + " " + x.n).Trim());
         }
+        else
+        {
+            referenciasPadrePorId.Clear();
+        }
+
+        var idsVisibles = listaDocs.Select(d => d.IdDocumento).ToList();
+        if (idsVisibles.Any())
+        {
+            var conteos = await db.MaeDocumentos.AsNoTracking()
+                .Where(d => d.IdDocumentoPadre.HasValue && idsVisibles.Contains(d.IdDocumentoPadre.Value))
+                .GroupBy(d => d.IdDocumentoPadre!.Value)
+                .Select(g => new { IdPadre = g.Key, Cantidad = g.Count() })
+                .ToListAsync();
+
+            cantidadHijosPorPadre = conteos.ToDictionary(k => k.IdPadre, v => v.Cantidad);
+        }
+        else
+        {
+            cantidadHijosPorPadre.Clear();
+        }
+
         StateHasChanged();
     }
 
