@@ -1,11 +1,17 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
 
-<div class="page">
+<div class="page @(isMenuVisible ? "menu-visible" : "menu-hidden")">
+    <button class="menu-toggle btn btn-dark" type="button" @onclick="ToggleMenu" aria-label="Mostrar u ocultar menú">
+        <i class="bi bi-list"></i>
+    </button>
+
     <div class="sidebar">
         <NavMenu />
     </div>
 
-    <main>
+    <main @onclick="HideMenuOnContentInteraction">
         <div class="top-row px-4"></div>
 
         <article class="content px-4">
@@ -19,3 +25,36 @@
     <a href="" class="reload">Reload</a>
     <a class="dismiss">🗙</a>
 </div>
+
+@code {
+    private bool isMenuVisible;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        isMenuVisible = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMenu()
+    {
+        isMenuVisible = !isMenuVisible;
+    }
+
+    private void HideMenuOnContentInteraction()
+    {
+        if (isMenuVisible)
+        {
+            isMenuVisible = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}
