@@ -144,6 +144,10 @@
                     </div>
                     <div class="col-md-4 text-md-end mt-3 mt-md-0 border-start border-light ps-4">
                         <div class="mb-3">
+                            <label class="d-block small text-muted text-uppercase fw-bold">Ubicación Actual</label>
+                            <div class="fw-bold text-dark">@documento.IdOficinaActualNavigation?.Nombre</div>
+                        </div>
+                        <div class="mb-3">
                             <label class="d-block small text-muted text-uppercase fw-bold">Estado Actual</label>
                             <span class="badge bg-dark px-3 py-2 fs-6">@documento.IdEstadoActualNavigation?.Nombre</span>
                         </div>
@@ -245,7 +249,7 @@
         try
         {
             documento = await RepoDocs
-                .GetQueryable("IdTipoNavigation,IdEstadoActualNavigation")
+                .GetQueryable("IdTipoNavigation,IdEstadoActualNavigation,IdOficinaActualNavigation")
                 .FirstOrDefaultAsync(d => d.IdDocumento == Id);
 
             if (documento is null)
