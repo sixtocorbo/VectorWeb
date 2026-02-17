@@ -230,8 +230,12 @@
                             }
                             @foreach (var docId in idsDocumentos)
                             {
-                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
-                                    <span class="small fw-bold"><i class="bi bi-file-earmark-check me-2 text-primary"></i>ID @docId</span>
+                                var activo = docVistaPrevia?.IdDocumento == docId;
+                                var claseActivo = activo ? "doc-candidato-activo" : string.Empty;
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-2 px-3 @claseActivo">
+                                    <button type="button" class="btn btn-link text-decoration-none p-0 text-start small fw-bold" @onclick="() => SeleccionarDocumentoActual(docId)">
+                                        <i class="bi bi-file-earmark-check me-2 text-primary"></i>ID @docId
+                                    </button>
                                     <button type="button" class="btn btn-link text-danger p-0" @onclick="() => RemoverDoc(docId)">
                                         <i class="bi bi-x-circle-fill"></i>
                                     </button>
@@ -336,6 +340,24 @@
     private void SeleccionarDocumento(DocumentoRespaldoDto documento)
     {
         docVistaPrevia = documento;
+    }
+
+    private async Task SeleccionarDocumentoActual(long idDocumento)
+    {
+        if (idDocumento <= 0) return;
+
+        var existenteEnCandidatos = documentosCandidatos.FirstOrDefault(x => x.IdDocumento == idDocumento);
+        if (existenteEnCandidatos is not null)
+        {
+            docVistaPrevia = existenteEnCandidatos;
+            return;
+        }
+
+        var documento = await Service.ObtenerDocumentoPorIdAsync(idDocumento);
+        if (documento is not null)
+        {
+            docVistaPrevia = documento;
+        }
     }
 
     private async Task Guardar()
