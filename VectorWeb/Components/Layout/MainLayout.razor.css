@@ -12,7 +12,6 @@ main {
     background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
 }
 
-
 .menu-hover-zone {
     display: none;
 }
@@ -39,24 +38,24 @@ main {
     align-items: center;
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
+.top-row ::deep a, .top-row ::deep .btn-link {
+    white-space: nowrap;
+    margin-left: 1.5rem;
+    text-decoration: none;
+}
 
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
+.top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
+    text-decoration: underline;
+}
 
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
+.top-row ::deep a:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 @media (max-width: 640.98px) {
     .menu-toggle {
-        display: none;
+        display: flex;
     }
 
     .top-row {
@@ -66,6 +65,10 @@ main {
     .top-row ::deep a, .top-row ::deep .btn-link {
         margin-left: 0;
     }
+
+    .page.menu-hidden .sidebar {
+        display: none;
+    }
 }
 
 @media (min-width: 641px) {
@@ -73,12 +76,16 @@ main {
         flex-direction: row;
     }
 
+    .menu-toggle {
+        display: none;
+    }
+
     .menu-hover-zone {
         display: block;
         position: fixed;
         top: 0;
         left: 0;
-        width: 1rem;
+        width: 15px;
         height: 100vh;
         z-index: 1050;
     }
@@ -86,15 +93,17 @@ main {
     .sidebar {
         width: 250px;
         height: 100vh;
-        position: sticky;
+        position: fixed;
         top: 0;
-        margin-left: 0;
-        transition: margin-left 0.2s ease;
+        left: 0;
+        box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+        transition: transform 0.3s ease-in-out;
         z-index: 1060;
+        transform: translateX(0);
     }
 
     .page.menu-hidden .sidebar {
-        margin-left: -250px;
+        transform: translateX(-100%);
     }
 
     .top-row {
@@ -127,9 +136,9 @@ main {
     z-index: 1000;
 }
 
-    #blazor-error-ui .dismiss {
-        cursor: pointer;
-        position: absolute;
-        right: 0.75rem;
-        top: 0.5rem;
-    }
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
