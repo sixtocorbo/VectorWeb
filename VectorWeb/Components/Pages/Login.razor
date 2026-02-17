@@ -106,7 +106,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-primary btn-login w-100 mb-3">
+                <button type="submit" class="btn btn-primary btn-login w-100 mb-3" disabled="@iniciandoSesion">
                     <i class="bi bi-box-arrow-in-right me-2"></i>Ingresar al Sistema
                 </button>
             </form>
@@ -122,34 +122,49 @@
     private string usuario = string.Empty;
     private string clave = string.Empty;
     private string mensajeError = string.Empty;
+    private bool iniciandoSesion;
 
     private async Task IniciarSesion()
     {
-        // Limpiar errores previos
-        mensajeError = string.Empty;
-
-        var usuarios = await RepoUsuarios.FindAsync(u =>
-            u.UsuarioLogin == usuario &&
-            u.Clave == clave &&
-            u.Activo == true);
-
-        var usuarioEncontrado = usuarios.FirstOrDefault();
-
-        if (usuarioEncontrado is null)
+        if (iniciandoSesion)
         {
-            mensajeError = "Usuario o contraseña incorrectos.";
             return;
         }
 
-        var auth = (CustomAuthStateProvider)AuthStateProvider;
-        var oficinaId = usuarioEncontrado.IdOficina ?? 0;
+        iniciandoSesion = true;
 
-        await auth.MarkUserAsAuthenticatedAsync(
-            usuarioEncontrado.IdUsuario,
-            usuarioEncontrado.NombreCompleto,
-            usuarioEncontrado.Rol,
-            oficinaId);
+        try
+        {
+            // Limpiar errores previos
+            mensajeError = string.Empty;
 
-        Navegador.NavigateTo("/documentos");
+            var usuarios = await RepoUsuarios.FindAsync(u =>
+                u.UsuarioLogin == usuario &&
+                u.Clave == clave &&
+                u.Activo == true);
+
+            var usuarioEncontrado = usuarios.FirstOrDefault();
+
+            if (usuarioEncontrado is null)
+            {
+                mensajeError = "Usuario o contraseña incorrectos.";
+                return;
+            }
+
+            var auth = (CustomAuthStateProvider)AuthStateProvider;
+            var oficinaId = usuarioEncontrado.IdOficina ?? 0;
+
+            await auth.MarkUserAsAuthenticatedAsync(
+                usuarioEncontrado.IdUsuario,
+                usuarioEncontrado.NombreCompleto,
+                usuarioEncontrado.Rol,
+                oficinaId);
+
+            Navegador.NavigateTo("/documentos");
+        }
+        finally
+        {
+            iniciandoSesion = false;
+        }
     }
 }
