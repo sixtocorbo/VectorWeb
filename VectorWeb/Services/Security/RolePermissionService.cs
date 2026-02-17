@@ -1,7 +1,7 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using VectorWeb.Models;
-using VectorWeb.Repositories;
 
 namespace VectorWeb.Services.Security;
 
@@ -11,12 +11,12 @@ public class RolePermissionService
     private const string MatrizCacheKey = "security.permissions.matrix";
     private static readonly TimeSpan MatrizCacheTtl = TimeSpan.FromMinutes(5);
 
-    private readonly IRepository<CfgSistemaParametro> _repoParametros;
+    private readonly IDbContextFactory<SecretariaDbContext> _dbContextFactory;
     private readonly IMemoryCache _cache;
 
-    public RolePermissionService(IRepository<CfgSistemaParametro> repoParametros, IMemoryCache cache)
+    public RolePermissionService(IDbContextFactory<SecretariaDbContext> dbContextFactory, IMemoryCache cache)
     {
-        _repoParametros = repoParametros;
+        _dbContextFactory = dbContextFactory;
         _cache = cache;
     }
 
@@ -34,7 +34,10 @@ public class RolePermissionService
         }
 
         var defaults = ObtenerMatrizDefault();
-        var parametro = (await _repoParametros.FindAsync(p => p.Clave == ParametroPermisos)).FirstOrDefault();
+        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        var parametro = await context.CfgSistemaParametros
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Clave == ParametroPermisos);
 
         if (parametro is null || string.IsNullOrWhiteSpace(parametro.Valor))
         {
