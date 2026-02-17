@@ -213,6 +213,10 @@
                             <div class="semaphore-item border-start border-end">
                                 <div class="semaphore-value text-warning">@semaforoAmarillo</div>
                                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Riesgo</span>
+                                <div class="small text-muted mt-1">
+                                    <div>@salidasAlertaSemaforo Renovaciones</div>
+                                    <div>@docsAmarilloSemaforo Documentos</div>
+                                </div>
                             </div>
                             <div class="semaphore-item">
                                 <div class="semaphore-value text-danger">@semaforoRojo</div>
@@ -307,6 +311,7 @@
 
     // Semáforos consolidados
     private int semaforoVerde, semaforoAmarillo, semaforoRojo;
+    private int salidasAlertaSemaforo, docsAmarilloSemaforo;
 
     protected override async Task OnInitializedAsync()
     {
@@ -356,6 +361,9 @@
             var docsVerde = docsSemaforo.Where(x => x.Estado == "VERDE").Sum(x => x.Total);
             var docsAmarillo = docsSemaforo.Where(x => x.Estado == "AMARILLO").Sum(x => x.Total);
             var docsRojo = docsSemaforo.Where(x => x.Estado == "ROJO").Sum(x => x.Total);
+
+            docsAmarilloSemaforo = docsAmarillo;
+            salidasAlertaSemaforo = salidasAlerta;
 
             semaforoVerde = docsVerde + (salidasActivas - salidasVencidas - salidasAlerta);
             semaforoAmarillo = docsAmarillo + salidasAlerta;
