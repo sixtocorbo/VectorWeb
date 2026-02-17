@@ -132,7 +132,7 @@ public class NumeracionRangoService
             await AsegurarCupoSecretariaAsync(rango.IdTipo, anioObjetivo);
 
             var consumoSolicitado = rango.NumeroFin - rango.NumeroInicio + 1;
-            var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango, rango.IdOficina);
+            var consumoAcumulado = await CalcularConsumoAcumuladoAsync(rango.IdTipo, anioObjetivo, rango.IdRango == 0 ? null : rango.IdRango);
             var cupo = await _context.MaeCuposSecretaria
                 .FirstAsync(c => c.IdTipo == rango.IdTipo && c.Anio == anioObjetivo);
 
@@ -277,7 +277,7 @@ public class NumeracionRangoService
         }
 
         return await EjecutarLecturaSeguraAsync(async () =>
-            await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango, null),
+            await CalcularConsumoAcumuladoAsync(idTipo, anio, excluirIdRango),
             fallback: 0,
             operacion: "obtener consumo acumulado");
     }
@@ -587,15 +587,10 @@ public class NumeracionRangoService
         return null;
     }
 
-    private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango, int? idOficina)
+    private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango)
     {
         var query = _context.MaeNumeracionRangos
             .Where(r => r.IdTipo == idTipo && r.Anio == anio && (!excluirIdRango.HasValue || r.IdRango != excluirIdRango.Value));
-
-        if (idOficina.HasValue)
-        {
-            query = query.Where(r => r.IdOficina == idOficina.Value);
-        }
 
         return await query
             .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
