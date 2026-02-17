@@ -1,7 +1,377 @@
 @page "/home"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@attribute [Authorize]
+@inject IDbContextFactory<SecretariaDbContext> DbContextFactory
+@rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard Ejecutivo - Vector</PageTitle>
 
-<h1>Hello, world!</h1>
+<style>
+    .dashboard-hero {
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 45%, #084298 100%);
+        border-radius: 1rem;
+        color: #fff;
+        padding: 1.5rem;
+        box-shadow: 0 10px 25px rgba(13, 110, 253, .25);
+    }
 
-Bienvenidos a mi aplicaci�n
+    .metric-card {
+        border: 0;
+        border-radius: 1rem;
+        box-shadow: 0 8px 22px rgba(33, 37, 41, .08);
+        transition: transform .15s ease, box-shadow .15s ease;
+    }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(33, 37, 41, .12);
+        }
+
+    .metric-icon {
+        width: 2.8rem;
+        height: 2.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: .8rem;
+        font-size: 1.3rem;
+    }
+
+    .chart-card {
+        border: 0;
+        border-radius: 1rem;
+        box-shadow: 0 8px 22px rgba(33, 37, 41, .08);
+    }
+
+    .sparkline {
+        width: 100%;
+        height: 130px;
+    }
+
+    .ring-chart {
+        width: 160px;
+        height: 160px;
+        border-radius: 50%;
+        margin: 0 auto;
+        position: relative;
+    }
+
+        .ring-chart::after {
+            content: "";
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            box-shadow: inset 0 0 0 1px #e9ecef;
+        }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="dashboard-hero mb-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1 fw-bold"><i class="bi bi-speedometer2 me-2"></i>Dashboard profundo del sistema</h2>
+                <p class="mb-0 opacity-75">Visión consolidada de operación, carga, trazabilidad y salud de procesos en Vector.</p>
+            </div>
+            <span class="badge rounded-pill bg-light text-primary fs-6 px-3 py-2">
+                Actualizado: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+            </span>
+        </div>
+    </div>
+
+    @if (cargando)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 text-muted">Generando analítica del sistema...</p>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(errorCarga))
+    {
+        <div class="alert alert-danger shadow-sm">
+            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle-fill me-2"></i>No fue posible cargar el dashboard</h5>
+            <p class="mb-0">@errorCarga</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-3 mb-4">
+            @foreach (var metric in metricas)
+            {
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="card metric-card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="metric-icon @metric.IconBgClass"><i class="@metric.Icon"></i></span>
+                                <small class="text-muted">@metric.Subtitulo</small>
+                            </div>
+                            <h3 class="mb-1 fw-bold">@metric.Valor</h3>
+                            <div class="text-secondary small">@metric.Titulo</div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-xl-8">
+                <div class="card chart-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Tendencia de documentos creados (6 meses)</h5>
+                        <svg viewBox="0 0 600 130" class="sparkline" preserveAspectRatio="none">
+                            <polyline fill="none" stroke="#ced4da" stroke-width="1" points="0,110 600,110" />
+                            <polyline fill="none" stroke="#0d6efd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="@puntosTendencia" />
+                        </svg>
+                        <div class="row mt-2 small text-muted">
+                            @foreach (var item in tendenciaMensual)
+                            {
+                                <div class="col text-center">
+                                    <div class="fw-semibold text-dark">@item.Etiqueta</div>
+                                    <div>@item.Valor</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-4">
+                <div class="card chart-card h-100">
+                    <div class="card-body text-center">
+                        <h5 class="card-title mb-3"><i class="bi bi-pie-chart-fill text-primary me-2"></i>Semáforo documental</h5>
+                        <div class="ring-chart" style="background: conic-gradient(#198754 0 @porcentajeVerde%, #fd7e14 @porcentajeVerde% @(porcentajeVerde + porcentajeAmarillo)%, #dc3545 @(porcentajeVerde + porcentajeAmarillo)% 100%);"></div>
+                        <div class="row mt-3 g-2 small">
+                            <div class="col-4"><span class="badge text-bg-success w-100">En plazo<br />@semaforoVerde</span></div>
+                            <div class="col-4"><span class="badge text-bg-warning w-100">Riesgo<br />@semaforoAmarillo</span></div>
+                            <div class="col-4"><span class="badge text-bg-danger w-100">Urgente<br />@semaforoRojo</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card chart-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="bi bi-buildings text-primary me-2"></i>Oficinas con mayor carga</h5>
+                        @foreach (var oficina in cargaPorOficina)
+                        {
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between small fw-semibold mb-1">
+                                    <span>@oficina.Nombre</span>
+                                    <span>@oficina.Total docs</span>
+                                </div>
+                                <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@oficina.Porcentaje">
+                                    <div class="progress-bar bg-primary" style="width:@oficina.Porcentaje%"></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card chart-card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3"><i class="bi bi-grid-1x2-fill text-primary me-2"></i>Módulos más activos (30 días)</h5>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Módulo</th>
+                                        <th class="text-end">Eventos</th>
+                                        <th class="text-end">Peso</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var modulo in modulosActivos)
+                                    {
+                                        <tr>
+                                            <td>@modulo.Nombre</td>
+                                            <td class="text-end fw-semibold">@modulo.Total</td>
+                                            <td class="text-end"><span class="badge text-bg-light">@modulo.Peso%</span></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool cargando = true;
+    private string? errorCarga;
+
+    private List<MetricaResumen> metricas = [];
+    private List<SerieMes> tendenciaMensual = [];
+    private List<BarraOficina> cargaPorOficina = [];
+    private List<ModuloActivo> modulosActivos = [];
+
+    private string puntosTendencia = "";
+
+    private int semaforoVerde;
+    private int semaforoAmarillo;
+    private int semaforoRojo;
+
+    private decimal porcentajeVerde;
+    private decimal porcentajeAmarillo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await using var db = await DbContextFactory.CreateDbContextAsync();
+
+            var hoy = DateTime.Today;
+            var hace30Dias = hoy.AddDays(-30);
+            var inicioMesActual = new DateTime(hoy.Year, hoy.Month, 1);
+            var inicioRango = inicioMesActual.AddMonths(-5);
+
+            var totalDocumentos = await db.MaeDocumentos.CountAsync();
+            var totalMovimientos = await db.TraMovimientos.CountAsync();
+            var totalReclusos = await db.MaeReclusos.CountAsync();
+            var usuariosActivos = await db.CatUsuarios.CountAsync(x => x.Activo == true);
+
+            var docsUltimos30 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= hace30Dias);
+            var pendientesVencidos = await db.MaeDocumentos.CountAsync(d => d.FechaVencimiento != null && d.FechaVencimiento < hoy);
+
+            var promedioMovimientosPorDoc = totalDocumentos == 0
+                ? 0
+                : Math.Round((decimal)totalMovimientos / totalDocumentos, 2);
+
+            metricas =
+            [
+                new("Documentos registrados", totalDocumentos.ToString("N0"), "Total histórico", "bi bi-files", "bg-primary-subtle text-primary"),
+                new("Movimientos trazados", totalMovimientos.ToString("N0"), "Flujo acumulado", "bi bi-arrow-left-right", "bg-info-subtle text-info"),
+                new("Usuarios activos", usuariosActivos.ToString("N0"), "Con acceso vigente", "bi bi-person-check", "bg-success-subtle text-success"),
+                new("Reclusos en sistema", totalReclusos.ToString("N0"), "Base operativa", "bi bi-people", "bg-warning-subtle text-warning")
+            ];
+
+            metricas.Add(new("Creación últimos 30 días", docsUltimos30.ToString("N0"), "Pulso reciente", "bi bi-calendar2-week", "bg-secondary-subtle text-secondary"));
+            metricas.Add(new("Documentos vencidos", pendientesVencidos.ToString("N0"), "Requieren atención", "bi bi-alarm", "bg-danger-subtle text-danger"));
+            metricas.Add(new("Movimientos / documento", promedioMovimientosPorDoc.ToString("N2"), "Intensidad promedio", "bi bi-speedometer", "bg-dark-subtle text-dark"));
+
+            var semaforos = await db.MaeDocumentos
+                .GroupBy(x => x.EstadoSemaforo)
+                .Select(g => new { Estado = g.Key, Total = g.Count() })
+                .ToListAsync();
+
+            semaforoVerde = semaforos.Where(x => x.Estado == "EN_PLAZO").Sum(x => x.Total);
+            semaforoAmarillo = semaforos.Where(x => x.Estado == "POR_VENCER").Sum(x => x.Total);
+            semaforoRojo = semaforos.Where(x => x.Estado == "VENCIDO").Sum(x => x.Total);
+
+            var totalSemaforo = semaforoVerde + semaforoAmarillo + semaforoRojo;
+            porcentajeVerde = totalSemaforo == 0 ? 0 : Math.Round((decimal)semaforoVerde * 100 / totalSemaforo, 2);
+            porcentajeAmarillo = totalSemaforo == 0 ? 0 : Math.Round((decimal)semaforoAmarillo * 100 / totalSemaforo, 2);
+
+            var tendenciaRaw = await db.MaeDocumentos
+                .Where(d => d.FechaCreacion != null && d.FechaCreacion >= inicioRango)
+                .GroupBy(d => new { d.FechaCreacion!.Value.Year, d.FechaCreacion.Value.Month })
+                .Select(g => new { g.Key.Year, g.Key.Month, Total = g.Count() })
+                .ToListAsync();
+
+            var meses = Enumerable.Range(0, 6)
+                .Select(i => inicioRango.AddMonths(i))
+                .ToList();
+
+            tendenciaMensual = meses
+                .Select(m =>
+                {
+                    var valor = tendenciaRaw.FirstOrDefault(x => x.Year == m.Year && x.Month == m.Month)?.Total ?? 0;
+                    return new SerieMes(m.ToString("MMM").ToUpper(), valor);
+                })
+                .ToList();
+
+            puntosTendencia = GenerarPuntosSparkline(tendenciaMensual.Select(x => x.Valor).ToList(), 600, 130, 20);
+
+            var totalDocsOficinas = await db.MaeDocumentos.CountAsync();
+            cargaPorOficina = await db.MaeDocumentos
+                .Include(d => d.IdOficinaActualNavigation)
+                .GroupBy(d => d.IdOficinaActualNavigation.Nombre)
+                .Select(g => new BarraOficina
+                {
+                    Nombre = g.Key,
+                    Total = g.Count()
+                })
+                .OrderByDescending(x => x.Total)
+                .Take(6)
+                .ToListAsync();
+
+            foreach (var item in cargaPorOficina)
+            {
+                item.Porcentaje = totalDocsOficinas == 0 ? 0 : Math.Round((decimal)item.Total * 100 / totalDocsOficinas, 1);
+            }
+
+            var eventosTotales = await db.EventosSistemas.CountAsync(e => e.FechaEvento >= hace30Dias);
+            modulosActivos = await db.EventosSistemas
+                .Where(e => e.FechaEvento >= hace30Dias)
+                .GroupBy(e => e.Modulo ?? "Sin módulo")
+                .Select(g => new ModuloActivo
+                {
+                    Nombre = g.Key,
+                    Total = g.Count()
+                })
+                .OrderByDescending(x => x.Total)
+                .Take(6)
+                .ToListAsync();
+
+            foreach (var modulo in modulosActivos)
+            {
+                modulo.Peso = eventosTotales == 0 ? 0 : Math.Round((decimal)modulo.Total * 100 / eventosTotales, 1);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorCarga = $"Detalle técnico: {ex.Message}";
+        }
+        finally
+        {
+            cargando = false;
+        }
+    }
+
+    private static string GenerarPuntosSparkline(IReadOnlyList<int> valores, int width, int height, int margen)
+    {
+        if (valores.Count == 0)
+        {
+            return "";
+        }
+
+        var max = Math.Max(1, valores.Max());
+        var stepX = valores.Count == 1 ? 0 : (width - margen * 2m) / (valores.Count - 1);
+
+        return string.Join(" ", valores.Select((v, i) =>
+        {
+            var x = margen + (stepX * i);
+            var y = (height - margen) - ((height - margen * 2m) * v / max);
+            return $"{Math.Round(x, 2).ToString(System.Globalization.CultureInfo.InvariantCulture)},{Math.Round(y, 2).ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        }));
+    }
+
+    private record MetricaResumen(string Titulo, string Valor, string Subtitulo, string Icon, string IconBgClass);
+
+    private record SerieMes(string Etiqueta, int Valor);
+
+    private class BarraOficina
+    {
+        public string Nombre { get; init; } = string.Empty;
+        public int Total { get; init; }
+        public decimal Porcentaje { get; set; }
+    }
+
+    private class ModuloActivo
+    {
+        public string Nombre { get; init; } = string.Empty;
+        public int Total { get; init; }
+        public decimal Peso { get; set; }
+    }
+}
