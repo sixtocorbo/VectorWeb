@@ -19,10 +19,14 @@ builder.Services.AddRazorComponents()
 
 // Database
 builder.Services.AddDbContextFactory<SecretariaDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.EnableRetryOnFailure()));
 
 builder.Services.AddDbContext<SecretariaDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")),
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sqlOptions => sqlOptions.EnableRetryOnFailure()),
     contextLifetime: ServiceLifetime.Transient);
 
 // Generic repository
