@@ -66,8 +66,12 @@
                         {
                             <div class="input-group input-group-sm">
                                 <input type="text" class="form-control" @bind="nombreEdicion" />
-                                <button class="btn btn-success" @onclick="() => GuardarEdicion(oficina)"><i class="bi bi-check"></i></button>
-                                <button class="btn btn-outline-secondary" @onclick="CancelarEdicion"><i class="bi bi-x"></i></button>
+                                <button class="btn btn-success" @onclick="() => GuardarEdicion(oficina)">
+                                    <i class="bi bi-check me-1"></i>Guardar
+                                </button>
+                                <button class="btn btn-outline-secondary" @onclick="CancelarEdicion">
+                                    <i class="bi bi-x me-1"></i>Cancelar
+                                </button>
                             </div>
                         }
                         else
@@ -83,10 +87,10 @@
                     </td>
                     <td class="text-end">
                         <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => IniciarEdicion(oficina)">
-                            <i class="bi bi-pencil"></i>
+                            <i class="bi bi-pencil me-1"></i>Editar
                         </button>
                         <button class="btn btn-outline-danger btn-sm" @onclick="() => Eliminar(oficina.IdOficina)">
-                            <i class="bi bi-trash"></i>
+                            <i class="bi bi-trash me-1"></i>Eliminar
                         </button>
                     </td>
                 </tr>
