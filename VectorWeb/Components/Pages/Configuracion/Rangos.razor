@@ -5,6 +5,7 @@
 @using VectorWeb.Repositories
 @using VectorWeb.Services
 @using System.Text.RegularExpressions
+@using System.Globalization
 @inject NumeracionRangoService RangoService
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatOficina> RepoOficinas
@@ -307,7 +308,7 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Tipo de Documento</label>
-                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-select">
+                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-select" @onchange="OnParametrosSugerenciaRangoCambio">
                                     <option value="0">-- Seleccione --</option>
                                     @foreach (var tipo in tipos)
                                     {
@@ -348,25 +349,79 @@ else
 
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Año</label>
-                                <InputNumber @bind-Value="rangoActual.Anio" class="form-control" />
+                                <InputNumber @bind-Value="rangoActual.Anio" class="form-control" @oninput="OnParametrosSugerenciaRangoCambio" />
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label text-muted">Nombre de Serie (Auto-generado)</label>
                                 <input type="text" class="form-control bg-light" value="@rangoActual.NombreRango" readonly />
                             </div>
 
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label fw-bold">Desde</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroInicio" class="form-control" />
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
                                 <label class="form-label fw-bold">Hasta</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroFin" class="form-control" />
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Cantidad a Asignar</label>
+                                <InputNumber @bind-Value="cantidadSugeridaSolicitada" class="form-control" min="0" @oninput="OnParametrosSugerenciaRangoCambio" />
+                                <div class="form-text">Usada para calcular la sugerencia del rango.</div>
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label fw-bold">Último Utilizado</label>
                                 <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
                             </div>
+
+                            @if (rangoActual.IdTipo > 0 && rangoActual.Anio > 0)
+                            {
+                                <div class="col-12">
+                                    <div class="alert alert-info border mb-0">
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightbulb me-1"></i>Sugerencia de asignación para oficinas internas</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AplicarSugerenciaRango" disabled="@(!PuedeAplicarSugerencia)">
+                                                <i class="bi bi-magic me-1"></i>Aplicar sugerencia
+                                            </button>
+                                        </div>
+
+                                        @if (!string.IsNullOrWhiteSpace(mensajeErrorSugerenciaRango))
+                                        {
+                                            <div class="text-danger small mb-2">@mensajeErrorSugerenciaRango</div>
+                                        }
+
+                                        <div class="row g-2 small">
+                                            <div class="col-md-3"><span class="text-muted">Cupo total:</span> <strong>@sugerenciaRango.CupoTotal.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3"><span class="text-muted">Ya asignado (todas):</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3"><span class="text-muted">Usado por otras oficinas:</span> <strong>@sugerenciaRango.ConsumoOtrasOficinas.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3 text-success"><span class="text-muted">Saldo disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
+                                        </div>
+
+                                        <hr class="my-2" />
+
+                                        <div class="row g-2 small">
+                                            <div class="col-md-4"><span class="text-muted">Inicio sugerido:</span> <strong>@sugerenciaRango.NumeroInicioSugerido.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-4"><span class="text-muted">Cantidad sugerida:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
+                                        </div>
+
+                                        @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
+                                        {
+                                            <div class="small text-warning mt-2">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                La cantidad solicitada supera el saldo disponible y fue ajustada automáticamente.
+                                            </div>
+                                        }
+                                        else if (sugerenciaRango.SaldoDisponible == 0)
+                                        {
+                                            <div class="small text-danger mt-2">
+                                                <i class="bi bi-x-octagon me-1"></i>
+                                                No hay saldo disponible para este tipo y año.
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
                         </div>
 
                         <div class="mt-4 form-check form-switch">
@@ -494,6 +549,11 @@ else
     private int cupoCantidad;
     private int cupoConsumido;
 
+    private int? cantidadSugeridaSolicitada;
+    private SugerenciaRangoNumeracion sugerenciaRango = new();
+    private string mensajeErrorSugerenciaRango = string.Empty;
+    private static readonly CultureInfo CulturaUi = CultureInfo.GetCultureInfo("es-DO");
+
     private IEnumerable<MaeNumeracionRango> RangosFiltrados =>
         string.IsNullOrWhiteSpace(filtroTexto)
         ? listaRangos
@@ -561,6 +621,12 @@ else
         cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(cupoTipoSeleccionado, cupoAnio);
     }
 
+
+    private async Task OnParametrosSugerenciaRangoCambio(ChangeEventArgs _)
+    {
+        await RefrescarSugerenciaRangoAsync();
+    }
+
     private async Task OnCupoFiltroCambio(ChangeEventArgs e)
     {
         if (e.Value is string val && int.TryParse(val, out int id))
@@ -617,7 +683,11 @@ else
         oficinaBusquedaRango = string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
+        cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
+        sugerenciaRango = new SugerenciaRangoNumeracion();
+        mensajeErrorSugerenciaRango = string.Empty;
         mostrarModal = true;
+        _ = RefrescarSugerenciaRangoAsync();
     }
 
     private void Editar(MaeNumeracionRango rango)
@@ -638,13 +708,59 @@ else
         oficinaBusquedaRango = rango.IdOficinaNavigation?.Nombre ?? string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
+        cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
+        sugerenciaRango = new SugerenciaRangoNumeracion();
+        mensajeErrorSugerenciaRango = string.Empty;
         mostrarModal = true;
+        _ = RefrescarSugerenciaRangoAsync();
     }
 
+
+    private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
+
+    private async Task RefrescarSugerenciaRangoAsync()
+    {
+        mensajeErrorSugerenciaRango = string.Empty;
+
+        if (rangoActual.IdTipo <= 0 || rangoActual.Anio <= 0)
+        {
+            sugerenciaRango = new SugerenciaRangoNumeracion();
+            return;
+        }
+
+        sugerenciaRango = await RangoService.ObtenerSugerenciaRangoAsync(
+            rangoActual.IdTipo,
+            rangoActual.Anio,
+            rangoActual.IdOficina,
+            rangoActual.IdRango == 0 ? null : rangoActual.IdRango,
+            cantidadSugeridaSolicitada);
+
+        if (sugerenciaRango.CupoTotal == 0)
+        {
+            mensajeErrorSugerenciaRango = "No existe cupo configurado para este tipo y año. Configure el cupo para habilitar una sugerencia confiable.";
+        }
+    }
+
+    private async Task AplicarSugerenciaRango()
+    {
+        await RefrescarSugerenciaRangoAsync();
+        if (!PuedeAplicarSugerencia)
+        {
+            return;
+        }
+
+        rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
+        rangoActual.NumeroFin = sugerenciaRango.NumeroFinSugerido;
+
+        if (rangoActual.UltimoUtilizado < rangoActual.NumeroInicio - 1 || rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
+        {
+            rangoActual.UltimoUtilizado = rangoActual.NumeroInicio - 1;
+        }
+    }
     private void CerrarModal() { mostrarModal = false; oficinasRangoFiltradas.Clear(); indiceOficinaRangoSeleccionada = -1; }
     private void CerrarModalCupo() => mostrarModalCupo = false;
 
-    private Task FiltrarOficinasRango(ChangeEventArgs e)
+    private async Task FiltrarOficinasRango(ChangeEventArgs e)
     {
         oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
         rangoActual.IdOficina = null;
@@ -653,21 +769,22 @@ else
         if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
         {
             oficinasRangoFiltradas.Clear();
-            return Task.CompletedTask;
+            await RefrescarSugerenciaRangoAsync();
+            return;
         }
         oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango).Take(8).ToList();
         var coincidenciaExacta = oficinas.FirstOrDefault(oficina => string.Equals(oficina.Nombre, oficinaBusquedaRango, StringComparison.OrdinalIgnoreCase));
         if (coincidenciaExacta != null) rangoActual.IdOficina = coincidenciaExacta.IdOficina;
-        return Task.CompletedTask;
+        await RefrescarSugerenciaRangoAsync();
     }
 
-    private Task SeleccionarOficinaRango(CatOficina oficina)
+    private async Task SeleccionarOficinaRango(CatOficina oficina)
     {
         rangoActual.IdOficina = oficina.IdOficina;
         oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
-        return Task.CompletedTask;
+        await RefrescarSugerenciaRangoAsync();
     }
     private string MensajeOficinaRango
     {
