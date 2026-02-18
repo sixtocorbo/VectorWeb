@@ -232,8 +232,13 @@ public sealed class RenovacionesService
 
     public async Task<int> ObtenerDiasAlertaRenovacionesAsync()
     {
-        var parametros = await _repoParametros.FindAsync(p => p.Clave == ClaveDiasAlertaRenovaciones);
-        var valorParametro = parametros.FirstOrDefault()?.Valor;
+        // Leemos sin tracking para evitar devolver valores en caché cuando el parámetro
+        // fue actualizado desde otro DbContext (p.ej. pantalla de Configuración > Semáforos).
+        var valorParametro = await context.CfgSistemaParametros
+            .AsNoTracking()
+            .Where(p => p.Clave == ClaveDiasAlertaRenovaciones)
+            .Select(p => p.Valor)
+            .FirstOrDefaultAsync();
 
         return TryParseDiasAlerta(valorParametro, out var diasAlerta)
             ? diasAlerta
