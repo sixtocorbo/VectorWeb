@@ -187,9 +187,33 @@
         </div>
     </div>
 
-    <div class="d-flex gap-3 mb-3 small fw-bold">
-        <span class="text-danger"><i class="bi bi-circle-fill"></i> URGENTE</span>
-        <span class="text-info"><i class="bi bi-circle-fill"></i> EN PLAZO</span>
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+        @if (!string.IsNullOrWhiteSpace(filtroSemaforo))
+        {
+            <button class="btn btn-outline-secondary btn-sm rounded-pill"
+                    @onclick="() => FiltrarPorEstado(null)">
+                <i class="bi bi-arrow-counterclockwise"></i> Ver todos
+            </button>
+            <div class="vr mx-1"></div>
+        }
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("ROJO") ? "btn-danger shadow" : "btn-outline-danger")"
+                @onclick='() => FiltrarPorEstado("ROJO")'>
+            <i class="bi bi-exclamation-octagon-fill"></i> Urgente
+            <span class="badge bg-white text-danger ms-1 rounded-pill">@totalRojo</span>
+        </button>
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("AMARILLO") ? "btn-warning text-dark shadow" : "btn-outline-warning text-dark")"
+                @onclick='() => FiltrarPorEstado("AMARILLO")'>
+            <i class="bi bi-exclamation-triangle-fill"></i> Riesgo
+            <span class="badge bg-dark text-warning ms-1 rounded-pill">@totalAmarillo</span>
+        </button>
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("VERDE") ? "btn-success shadow" : "btn-outline-success")"
+                @onclick='() => FiltrarPorEstado("VERDE")'>
+            <i class="bi bi-check-circle-fill"></i> En plazo
+            <span class="badge bg-white text-success ms-1 rounded-pill">@totalVerde</span>
+        </button>
     </div>
 
     @if (listaDocs is null)
@@ -320,6 +344,10 @@
     private string nombreOficinaUsuario = "Mi Oficina";
     private int totalExpedientesPendientes;
     private bool verTodo;
+    private string? filtroSemaforo;
+    private int totalRojo;
+    private int totalAmarillo;
+    private int totalVerde;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
     private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
@@ -342,6 +370,15 @@
     }
 
     private Task OnTamanoPaginaChanged() => CargarDocumentos();
+
+    private bool EsSemaforoActivo(string estado) => string.Equals(filtroSemaforo, estado, StringComparison.OrdinalIgnoreCase);
+
+    private async Task FiltrarPorEstado(string? estado)
+    {
+        filtroSemaforo = estado;
+        paginaActual = 1;
+        await CargarDocumentos();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -372,7 +409,13 @@
 
         totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
 
-        var q = AplicarFiltroBusqueda(qBase);
+        var qConBusqueda = AplicarFiltroBusqueda(qBase);
+
+        totalRojo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "ROJO");
+        totalAmarillo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "AMARILLO");
+        totalVerde = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "VERDE");
+
+        var q = AplicarFiltroSemaforo(qConBusqueda);
 
         TotalRegistros = await q.CountAsync();
         if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
@@ -428,6 +471,12 @@
             q = q.Where(d => EF.Functions.Like(d.NumeroOficial ?? "", p) || EF.Functions.Like(d.Asunto ?? "", p) || EF.Functions.Like(d.IdTipoNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdOficinaActualNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdEstadoActualNavigation.Nombre ?? "", p));
         }
         return q;
+    }
+
+    private IQueryable<MaeDocumento> AplicarFiltroSemaforo(IQueryable<MaeDocumento> q)
+    {
+        if (string.IsNullOrWhiteSpace(filtroSemaforo)) return q;
+        return q.Where(d => d.EstadoSemaforo == filtroSemaforo);
     }
 
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
