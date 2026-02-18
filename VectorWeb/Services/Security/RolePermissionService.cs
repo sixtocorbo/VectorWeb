@@ -10,13 +10,20 @@ public class RolePermissionService
     private const string ParametroPermisos = "SEGURIDAD_PERMISOS_POR_ROL";
     private const string MatrizCacheKey = "security.permissions.matrix";
     private static readonly TimeSpan MatrizCacheTtl = TimeSpan.FromMinutes(5);
-    private static readonly IReadOnlyDictionary<string, int> PermisoAIndice = AppPermissions.Todos
+    private static readonly IReadOnlyList<string> PermisosOrdenados = AppPermissions.Todos
+        .OrderBy(permiso => permiso, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private static readonly IReadOnlyDictionary<string, int> PermisoAIndice = PermisosOrdenados
         .Select((permiso, indice) => new { permiso, indice })
         .ToDictionary(x => x.permiso, x => x.indice, StringComparer.OrdinalIgnoreCase);
 
-    private static readonly IReadOnlyDictionary<int, string> IndiceAPermiso = AppPermissions.Todos
+    private static readonly IReadOnlyDictionary<int, string> IndiceAPermiso = PermisosOrdenados
         .Select((permiso, indice) => new { permiso, indice })
         .ToDictionary(x => x.indice, x => x.permiso);
+
+    private static readonly IReadOnlyDictionary<string, string> PermisoCanonical = PermisosOrdenados
+        .ToDictionary(permiso => permiso, permiso => permiso, StringComparer.OrdinalIgnoreCase);
 
     private readonly IDbContextFactory<SecretariaDbContext> _dbContextFactory;
     private readonly IMemoryCache _cache;
@@ -29,24 +36,28 @@ public class RolePermissionService
 
     public async Task<Dictionary<string, HashSet<string>>> ObtenerMatrizAsync(bool forzarRefresco = false)
     {
-        if (forzarRefresco)
-        {
-            _cache.Remove(MatrizCacheKey);
-        }
-
-        if (_cache.TryGetValue(MatrizCacheKey, out Dictionary<string, HashSet<string>>? matrizCache)
+        if (!forzarRefresco
+            && _cache.TryGetValue(MatrizCacheKey, out Dictionary<string, HashSet<string>>? matrizCache)
             && matrizCache is not null)
         {
             return ClonarMatriz(matrizCache);
         }
 
-        var defaults = ObtenerMatrizDefault();
-        await using var context = await _dbContextFactory.CreateDbContextAsync();
-        var parametro = await context.CfgSistemaParametros
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Clave == ParametroPermisos);
+        if (forzarRefresco)
+        {
+            _cache.Remove(MatrizCacheKey);
+        }
 
-        if (parametro is null || string.IsNullOrWhiteSpace(parametro.Valor))
+        await using var context = await _dbContextFactory.CreateDbContextAsync();
+        var valorParametro = await context.CfgSistemaParametros
+            .AsNoTracking()
+            .Where(p => p.Clave == ParametroPermisos)
+            .Select(p => p.Valor)
+            .FirstOrDefaultAsync();
+
+        var defaults = ObtenerMatrizDefault();
+
+        if (string.IsNullOrWhiteSpace(valorParametro))
         {
             _cache.Set(MatrizCacheKey, ClonarMatriz(defaults), MatrizCacheTtl);
             return defaults;
@@ -54,7 +65,7 @@ public class RolePermissionService
 
         try
         {
-            var matriz = DeserializarMatriz(parametro.Valor);
+            var matriz = DeserializarMatriz(valorParametro);
 
             if (matriz.Count == 0)
             {
@@ -182,8 +193,8 @@ public class RolePermissionService
                     return rawJson.ToDictionary(
                         x => NormalizarRol(x.Key),
                         x => x.Value?
-                            .Where(p => AppPermissions.Todos.Contains(p, StringComparer.OrdinalIgnoreCase))
-                            .Select(p => p.Trim().ToLowerInvariant())
+                            .Where(p => PermisoCanonical.ContainsKey(p.Trim()))
+                            .Select(p => PermisoCanonical[p.Trim()])
                             .ToHashSet(StringComparer.OrdinalIgnoreCase)
                             ?? [],
                         StringComparer.OrdinalIgnoreCase);
