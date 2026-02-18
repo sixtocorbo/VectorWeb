@@ -164,6 +164,10 @@ public class RolePermissionService
                 AppPermissions.VinculacionGestionar,
                 AppPermissions.ReclusosGestionar,
                 AppPermissions.RenovacionesGestionar
+            },
+            ["FUNCIONARIO"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                AppPermissions.DocumentosVer
             }
         };
     }
