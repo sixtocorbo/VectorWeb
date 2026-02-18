@@ -3,7 +3,7 @@
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using System.Globalization
-@attribute [Authorize]
+@attribute [Authorize(Policy = "documentos.ver")]
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject NavigationManager NavManager
 @rendermode InteractiveServer

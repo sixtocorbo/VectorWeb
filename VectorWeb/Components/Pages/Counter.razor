@@ -1,4 +1,6 @@
-﻿@page "/counter"
+@page "/counter"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.ver")]
 @rendermode InteractiveServer
 
 <PageTitle>Counter</PageTitle>

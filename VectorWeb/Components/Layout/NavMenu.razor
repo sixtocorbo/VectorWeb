@@ -67,11 +67,13 @@
                     </div>
                 </AuthorizeView>
 
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="home">
-                        <span class="bi bi-dashboard-nav-menu" aria-hidden="true"></span> Dashboard
-                    </NavLink>
-                </div>
+                <AuthorizeView Policy="documentos.ver">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="home">
+                            <span class="bi bi-dashboard-nav-menu" aria-hidden="true"></span> Dashboard
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
 
 
                 <AuthorizeView Policy="configuracion.rangos">
@@ -115,11 +117,13 @@
 
 
 
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="about">
-                        <span class="bi bi-guia-nav-menu" aria-hidden="true"></span> Guía
-                    </NavLink>
-                </div>
+                <AuthorizeView Policy="documentos.ver">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="about">
+                            <span class="bi bi-guia-nav-menu" aria-hidden="true"></span> Guía
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
 
                 <div class="mt-auto p-3 border-top border-secondary border-opacity-25">
                     <div class="text-light small px-3 mb-2 opacity-75">
