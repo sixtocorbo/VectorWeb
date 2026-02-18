@@ -382,8 +382,12 @@ else
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Cantidad a Asignar</label>
-                                <InputNumber @bind-Value="cantidadSugeridaSolicitada" class="form-control" min="0" @oninput="OnParametrosSugerenciaRangoCambio" />
-                                <div class="form-text">Usada para sugerencia.</div>
+                                <input type="number"
+                                       class="form-control"
+                                       min="0"
+                                       value="@cantidadSugeridaSolicitada"
+                                       @oninput="OnCantidadSugeridaInput" />
+                                <div class="form-text">Usada para sugerencia en tiempo real.</div>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Último Utilizado</label>
@@ -551,6 +555,7 @@ else
     private string oficinaBusquedaRango = string.Empty;
     private List<CatOficina> oficinasRangoFiltradas = new();
     private int indiceOficinaRangoSeleccionada = -1;
+    private bool _busquedaOficinaPendiente = false;
 
     // Cupo
     private int cupoTipoSeleccionado;
@@ -584,7 +589,13 @@ else
         {
             await InvokeAsync(async () =>
             {
-                await EjecutarBusquedaOficina();
+                if (_busquedaOficinaPendiente)
+                {
+                    await EjecutarBusquedaOficina();
+                    _busquedaOficinaPendiente = false;
+                }
+
+                await RefrescarSugerenciaRangoAsync();
                 StateHasChanged();
             });
         };
@@ -737,9 +748,28 @@ else
     private void OnBusquedaOficinaInput(ChangeEventArgs e)
     {
         oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
+        _busquedaOficinaPendiente = true;
         // Reiniciamos el timer cada vez que el usuario escribe
         _debounceTimer.Stop();
         _debounceTimer.Start();
+    }
+
+    private void OnCantidadSugeridaInput(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int valor))
+        {
+            cantidadSugeridaSolicitada = valor;
+            _busquedaOficinaPendiente = false;
+            _debounceTimer.Stop();
+            _debounceTimer.Start();
+        }
+        else if (string.IsNullOrWhiteSpace(e.Value?.ToString()))
+        {
+            cantidadSugeridaSolicitada = null;
+            _busquedaOficinaPendiente = false;
+            _debounceTimer.Stop();
+            _debounceTimer.Start();
+        }
     }
 
     private async Task EjecutarBusquedaOficina()
@@ -758,7 +788,6 @@ else
             var exacta = oficinas.FirstOrDefault(o => string.Equals(o.Nombre, oficinaBusquedaRango, StringComparison.OrdinalIgnoreCase));
             if (exacta != null) rangoActual.IdOficina = exacta.IdOficina;
         }
-        await RefrescarSugerenciaRangoAsync();
     }
 
     private void ResetearBusquedaOficina()
