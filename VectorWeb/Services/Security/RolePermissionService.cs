@@ -170,28 +170,33 @@ public class RolePermissionService
             return new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         }
 
-        try
+        var valorNormalizado = valor.Trim();
+
+        if (PareceJson(valorNormalizado))
         {
-            var rawJson = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(valor);
-            if (rawJson is not null && rawJson.Count > 0)
+            try
             {
-                return rawJson.ToDictionary(
-                    x => NormalizarRol(x.Key),
-                    x => x.Value?
-                        .Where(p => AppPermissions.Todos.Contains(p, StringComparer.OrdinalIgnoreCase))
-                        .Select(p => p.Trim().ToLowerInvariant())
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase)
-                        ?? [],
-                    StringComparer.OrdinalIgnoreCase);
+                var rawJson = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(valorNormalizado);
+                if (rawJson is not null && rawJson.Count > 0)
+                {
+                    return rawJson.ToDictionary(
+                        x => NormalizarRol(x.Key),
+                        x => x.Value?
+                            .Where(p => AppPermissions.Todos.Contains(p, StringComparer.OrdinalIgnoreCase))
+                            .Select(p => p.Trim().ToLowerInvariant())
+                            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                            ?? [],
+                        StringComparer.OrdinalIgnoreCase);
+                }
             }
-        }
-        catch (JsonException)
-        {
-            // Intentamos formato compacto para mantener compatibilidad con valores nuevos.
+            catch (JsonException)
+            {
+                // Intentamos formato compacto para mantener compatibilidad con valores nuevos.
+            }
         }
 
         var matriz = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var segmento in valor.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var segmento in valorNormalizado.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var partes = segmento.Split(':', 2, StringSplitOptions.TrimEntries);
             if (partes.Length != 2)
@@ -215,4 +220,7 @@ public class RolePermissionService
 
         return matriz;
     }
+
+    private static bool PareceJson(string valor)
+        => valor.Length > 0 && (valor[0] == '{' || valor[0] == '[');
 }
