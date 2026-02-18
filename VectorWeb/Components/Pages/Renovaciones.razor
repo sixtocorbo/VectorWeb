@@ -132,7 +132,7 @@ else
                             <td>@item.LugarTrabajo</td>
                             <td class="text-center text-nowrap w-auto">
                                 <div>@item.FechaVencimiento.ToShortDateString()</div>
-                                <small class="@ObtenerClaseDias(item.DiasRestantes)">
+                                <small class="@ObtenerClaseTexto(item.Estado)">
                                     (@item.DiasRestantes días)
                                 </small>
                             </td>
@@ -275,12 +275,12 @@ else
         _ => estado.ToString()
     };
 
-    private static string ObtenerClaseDias(int dias)
+    private static string ObtenerClaseTexto(EstadoRenovacion estado) => estado switch
     {
-        if (dias < 0) return "text-danger fw-bold";
-        if (dias <= 30) return "text-warning fw-bold";
-        return "text-muted";
-    }
+        EstadoRenovacion.Vencida => "text-danger fw-bold",
+        EstadoRenovacion.Alerta => "text-warning fw-bold",
+        _ => "text-muted"
+    };
 
     private async Task Desactivar(SalidaGridDto item)
     {

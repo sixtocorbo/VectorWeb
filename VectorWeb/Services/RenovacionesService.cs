@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using System.Text.Json.Serialization; // Necesario para controlar nombres en JSON si se desea
 using VectorWeb.Models;
+using VectorWeb.Repositories;
 
 namespace VectorWeb.Services;
 
@@ -53,6 +54,7 @@ public sealed class DocumentoRespaldoDto
 public sealed class RenovacionesService
 {
     private readonly SecretariaDbContext context;
+    private readonly IRepository<CfgSistemaParametro> _repoParametros;
     private const string ClaveDiasAlertaRenovaciones = "RENOVACIONES_DIAS_ALERTA";
     private const int DiasAlertaDefecto = 30;
 
@@ -62,9 +64,10 @@ public sealed class RenovacionesService
         WriteIndented = false
     };
 
-    public RenovacionesService(SecretariaDbContext context)
+    public RenovacionesService(SecretariaDbContext context, IRepository<CfgSistemaParametro> repoParametros)
     {
         this.context = context;
+        _repoParametros = repoParametros;
     }
 
     public async Task<List<SalidaGridDto>> ObtenerSalidasAsync(bool soloActivas, string textoBuscar)
@@ -229,11 +232,8 @@ public sealed class RenovacionesService
 
     public async Task<int> ObtenerDiasAlertaRenovacionesAsync()
     {
-        var valorParametro = await context.CfgSistemaParametros
-            .AsNoTracking()
-            .Where(p => p.Clave == ClaveDiasAlertaRenovaciones)
-            .Select(p => p.Valor)
-            .FirstOrDefaultAsync();
+        var parametros = await _repoParametros.FindAsync(p => p.Clave == ClaveDiasAlertaRenovaciones);
+        var valorParametro = parametros.FirstOrDefault()?.Valor;
 
         return TryParseDiasAlerta(valorParametro, out var diasAlerta)
             ? diasAlerta
