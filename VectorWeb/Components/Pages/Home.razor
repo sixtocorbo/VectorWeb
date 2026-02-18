@@ -8,7 +8,7 @@
 @inject NavigationManager NavManager
 @rendermode InteractiveServer
 
-<PageTitle>Dashboard Ejecutivo - Vector</PageTitle>
+<PageTitle>Dashboard 2026 - Vector</PageTitle>
 
 <style>
     .dashboard-hero {
@@ -109,11 +109,11 @@
     <div class="dashboard-hero mb-4">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 position-relative" style="z-index: 2;">
             <div>
-                <h2 class="mb-1 fw-bold"><i class="bi bi-grid-fill me-2"></i>Centro de Comando</h2>
+                <h2 class="mb-1 fw-bold"><i class="bi bi-grid-fill me-2"></i>Centro de Comando 2026</h2>
                 <p class="mb-0 opacity-75">
-                    Estado operativo del sistema Vector.
+                    Estadísticas Documentales
                     <span class="d-none d-md-inline"> | </span>
-                    <span class="d-block d-md-inline mt-1 mt-md-0 fst-italic">"La información es poder bajo control."</span>
+                    <span class="d-block d-md-inline mt-1 mt-md-0 fst-italic">"Gestión eficiente del año en curso."</span>
                 </p>
             </div>
             <div class="d-flex gap-2">
@@ -139,7 +139,7 @@
         @* Renderizamos las métricas como enlaces para navegación rápida *@
         @foreach (var metric in metricas)
         {
-            <div class="col-12 col-sm-6 col-lg-3">
+            <div class="col-12 col-sm-6 col-lg-4">
                 <a href="@metric.Link" class="card metric-card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -165,7 +165,7 @@
         <div class="col-12 col-xl-8">
             <div class="card chart-card">
                 <div class="card-header bg-transparent border-0 pt-3 pb-0">
-                    <h5 class="card-title fw-bold text-primary"><i class="bi bi-graph-up me-2"></i>Ingreso Documental (6 Meses)</h5>
+                    <h5 class="card-title fw-bold text-primary"><i class="bi bi-calendar-range me-2"></i>Ingreso Documental (2026)</h5>
                 </div>
                 <div class="card-body">
                     @if (cargando)
@@ -181,7 +181,7 @@
                         <div class="d-flex justify-content-between mt-2 text-muted small text-uppercase fw-bold">
                             @foreach (var item in tendenciaMensual)
                             {
-                                <div class="text-center" style="width: 16%;">
+                                <div class="text-center" style="width: 8%;">
                                     <div>@item.Etiqueta</div>
                                     <div class="text-dark">@item.Valor</div>
                                 </div>
@@ -195,8 +195,8 @@
         <div class="col-12 col-xl-4">
             <div class="card chart-card">
                 <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between">
-                    <h5 class="card-title fw-bold text-dark"><i class="bi bi-shield-check me-2"></i>Estado Alertas</h5>
-                    <small class="text-muted">Art. 120 & Vencimientos</small>
+                    <h5 class="card-title fw-bold text-dark"><i class="bi bi-stoplights me-2"></i>Semáforo Documentos</h5>
+                    <small class="text-muted">Estado Plazos</small>
                 </div>
                 <div class="card-body d-flex flex-column justify-content-center">
                     @if (cargando)
@@ -213,10 +213,6 @@
                             <div class="semaphore-item border-start border-end">
                                 <div class="semaphore-value text-warning">@semaforoAmarillo</div>
                                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">Riesgo</span>
-                                <div class="small text-muted mt-1">
-                                    <div>@salidasAlertaSemaforo Renovaciones</div>
-                                    <div>@docsAmarilloSemaforo Documentos</div>
-                                </div>
                             </div>
                             <div class="semaphore-item">
                                 <div class="semaphore-value text-danger">@semaforoRojo</div>
@@ -224,8 +220,8 @@
                             </div>
                         </div>
                         <div class="mt-3 pt-3 border-top text-center">
-                            <a href="renovaciones" class="btn btn-outline-primary btn-sm rounded-pill w-75">
-                                Gestionar Renovaciones
+                            <a href="documentos" class="btn btn-outline-primary btn-sm rounded-pill w-75">
+                                Ver Todos los Documentos
                             </a>
                         </div>
                     }
@@ -238,7 +234,7 @@
         <div class="col-12 col-md-6">
             <div class="card chart-card">
                 <div class="card-header bg-transparent border-0 pt-3">
-                    <h6 class="fw-bold text-uppercase text-secondary mb-0">Oficinas con mayor carga</h6>
+                    <h6 class="fw-bold text-uppercase text-secondary mb-0">Oficinas con mayor carga (2026)</h6>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush rounded-bottom">
@@ -311,7 +307,6 @@
 
     // Semáforos consolidados
     private int semaforoVerde, semaforoAmarillo, semaforoRojo;
-    private int salidasAlertaSemaforo, docsAmarilloSemaforo;
 
     protected override async Task OnInitializedAsync()
     {
@@ -327,73 +322,78 @@
         try
         {
             await using var db = await DbContextFactory.CreateDbContextAsync();
-
             // Optimización de lectura
             db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
             var hoy = DateTime.Today;
-            var hace30Dias = hoy.AddDays(-30);
-            var inicioMesActual = new DateTime(hoy.Year, hoy.Month, 1);
-            var inicioRango = inicioMesActual.AddMonths(-5);
+            var inicio2026 = new DateTime(2026, 1, 1);
+            var fin2026 = new DateTime(2026, 12, 31);
 
-            // 1. MÉTRICAS GENERALES
-            var totalDocumentos = await db.MaeDocumentos.CountAsync();
-            var salidasActivas = await db.TraSalidasLaborales.CountAsync(s => s.Activo == true);
-            var salidasVencidas = await db.TraSalidasLaborales.CountAsync(s => s.Activo == true && s.FechaVencimiento < hoy);
-            var salidasAlerta = await db.TraSalidasLaborales.CountAsync(s => s.Activo == true && s.FechaVencimiento >= hoy && s.FechaVencimiento <= hoy.AddDays(30));
-            var reclusosTotales = await db.MaeReclusos.CountAsync(r => r.Activo == true);
+            // 1. MÉTRICAS GENERALES (Filtradas por 2026 o estado actual relevante para 2026)
+
+            // Total documentos creados en 2026
+            var docs2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026);
+
+            // Documentos Activos (No archivados, creados en 2026)
+            // Asumimos IdEstadoActual 5 = Archivado
+            var docsActivos2026 = await db.MaeDocumentos
+                                    .CountAsync(d => d.FechaCreacion >= inicio2026 &&
+                                                     d.FechaCreacion <= fin2026 &&
+                                                     d.IdEstadoActual != 5);
+
+            var docsArchivados2026 = await db.MaeDocumentos
+                                    .CountAsync(d => d.FechaCreacion >= inicio2026 &&
+                                                     d.FechaCreacion <= fin2026 &&
+                                                     d.IdEstadoActual == 5);
 
             metricas = new List<MetricaResumen>
             {
-                new("Documentos", totalDocumentos.ToString("N0"), "Archivo General", "bi bi-folder2-open", "bg-primary text-white", "documentos", "bi bi-database"),
-                new("Salidas Art. 120", salidasActivas.ToString("N0"), $"{salidasVencidas} vencidas hoy", "bi bi-person-walking", "bg-success text-white", "renovaciones", "bi bi-activity"),
-                new("Alertas Vencimiento", (salidasVencidas + salidasAlerta).ToString("N0"), "Requieren Acción", "bi bi-bell-fill", "bg-warning text-dark", "renovaciones?filtro=alertas", "bi bi-exclamation-circle"),
-                new("Población Activa", reclusosTotales.ToString("N0"), "Reclusos en sistema", "bi bi-people-fill", "bg-info text-white", "reclusos", "bi bi-person-vcard")
+                new("Ingresados 2026", docs2026.ToString("N0"), "Total Anual", "bi bi-folder-plus", "bg-primary text-white", "documentos", "bi bi-calendar-check"),
+                new("En Trámite", docsActivos2026.ToString("N0"), "Pendientes de cierre", "bi bi-hourglass-split", "bg-info text-white", "documentos?filtro=activos", "bi bi-activity"),
+                new("Archivados", docsArchivados2026.ToString("N0"), "Finalizados este año", "bi bi-archive-fill", "bg-secondary text-white", "documentos?filtro=archivados", "bi bi-check-circle")
             };
 
-            // 2. SEMÁFORO CONSOLIDADO
+            // 2. SEMÁFORO (Solo Documentos Activos, independientemente del año para alertas reales, o filtramos 2026 si se desea estricto)
+            // Nota: Para alertas de vencimiento, solemos querer ver todo lo activo.
+            // Pero dado el pedido "estadísticas para el año 2026", nos centraremos en documentos creados en 2026 o vigentes en 2026.
+            // Usaremos "Activos" generales para el semáforo para no perder alertas importantes, pero solo de tipo Documento.
+
             var docsSemaforo = await db.MaeDocumentos
                 .Where(x => x.FechaVencimiento != null && x.IdEstadoActual != 5) // Excluir Archivados
                 .GroupBy(x => x.EstadoSemaforo)
                 .Select(g => new { Estado = g.Key, Total = g.Count() })
                 .ToListAsync();
 
-            var docsVerde = docsSemaforo.Where(x => x.Estado == "VERDE").Sum(x => x.Total);
-            var docsAmarillo = docsSemaforo.Where(x => x.Estado == "AMARILLO").Sum(x => x.Total);
-            var docsRojo = docsSemaforo.Where(x => x.Estado == "ROJO").Sum(x => x.Total);
+            semaforoVerde = docsSemaforo.Where(x => x.Estado == "VERDE").Sum(x => x.Total);
+            semaforoAmarillo = docsSemaforo.Where(x => x.Estado == "AMARILLO").Sum(x => x.Total);
+            semaforoRojo = docsSemaforo.Where(x => x.Estado == "ROJO").Sum(x => x.Total);
 
-            docsAmarilloSemaforo = docsAmarillo;
-            salidasAlertaSemaforo = salidasAlerta;
-
-            semaforoVerde = docsVerde + (salidasActivas - salidasVencidas - salidasAlerta);
-            semaforoAmarillo = docsAmarillo + salidasAlerta;
-            semaforoRojo = docsRojo + salidasVencidas;
-
-            // 3. TENDENCIA (CORRECCIÓN APLICADA AQUÍ)
-            // Filtramos los nulos primero y seleccionamos el valor no nulo
+            // 3. TENDENCIA 2026 (Enero a Diciembre)
             var tendenciaRaw = await db.MaeDocumentos
-                .Where(d => d.FechaCreacion != null && d.FechaCreacion >= inicioRango)
-                .Select(d => d.FechaCreacion!.Value) // !.Value asegura que traemos DateTime, no DateTime?
+                .Where(d => d.FechaCreacion != null && d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
+                .Select(d => d.FechaCreacion!.Value)
                 .ToListAsync();
 
-            // Ahora podemos agrupar en memoria usando Year y Month sin errores
             var tendenciaAgrupada = tendenciaRaw
                 .GroupBy(d => new { d.Year, d.Month })
                 .Select(g => new { g.Key.Year, g.Key.Month, Total = g.Count() })
                 .ToList();
 
-            var meses = Enumerable.Range(0, 6).Select(i => inicioRango.AddMonths(i)).ToList();
+            // Generamos los 12 meses de 2026
+            var meses = Enumerable.Range(0, 12).Select(i => inicio2026.AddMonths(i)).ToList();
+
             tendenciaMensual = meses.Select(m =>
             {
                 var val = tendenciaAgrupada.FirstOrDefault(x => x.Year == m.Year && x.Month == m.Month)?.Total ?? 0;
+                // Usamos solo las primeras 3 letras del mes
                 return new SerieMes(m.ToString("MMM", CultureInfo.CurrentCulture).ToUpper(), val);
             }).ToList();
 
             puntosTendencia = GenerarPuntosSparkline(tendenciaMensual.Select(x => x.Valor).ToList(), 600, 120, 10);
 
-            // 4. CARGA POR OFICINA
+            // 4. CARGA POR OFICINA (Filtrado por documentos de 2026)
             cargaPorOficina = await db.MaeDocumentos
-                .Where(d => d.IdOficinaActualNavigation != null)
+                .Where(d => d.IdOficinaActualNavigation != null && d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
                 .GroupBy(d => d.IdOficinaActualNavigation.Nombre)
                 .Select(g => new BarraOficina { Nombre = g.Key, Total = g.Count() })
                 .OrderByDescending(x => x.Total)
@@ -403,7 +403,8 @@
             var maxDocs = cargaPorOficina.FirstOrDefault()?.Total ?? 1;
             cargaPorOficina.ForEach(c => c.Porcentaje = (decimal)c.Total * 100 / maxDocs);
 
-            // 5. MÓDULOS ACTIVOS
+            // 5. MÓDULOS ACTIVOS (Mantenemos auditoría reciente general o filtramos 2026, lo dejamos reciente "hace 30 días" para relevancia operativa)
+            var hace30Dias = hoy.AddDays(-30);
             modulosActivos = await db.EventosSistemas
                 .Where(e => e.FechaEvento >= hace30Dias)
                 .GroupBy(e => e.Modulo ?? "General")
@@ -414,7 +415,6 @@
 
             var totalEventos = modulosActivos.Sum(x => x.Total);
             modulosActivos.ForEach(m => m.Peso = totalEventos == 0 ? 0 : Math.Round((decimal)m.Total * 100 / totalEventos, 1));
-
         }
         catch (Exception ex)
         {
@@ -432,7 +432,7 @@
         var max = valores.Max();
         if (max == 0) max = 1;
 
-        var step = valores.Count == 1 ? 0 : (double)(w - 2 * m) / (valores.Count - 1);
+        var step = valores.Count <= 1 ? 0 : (double)(w - 2 * m) / (valores.Count - 1);
         var points = new List<string>();
 
         for (int i = 0; i < valores.Count; i++)

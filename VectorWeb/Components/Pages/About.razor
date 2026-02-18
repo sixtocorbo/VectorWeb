@@ -7,104 +7,195 @@
 
 <style>
     .about-section {
-        scroll-margin-top: 20px;
+        scroll-margin-top: 80px; /* Ajuste para el sticky header si existiera */
     }
 
     .nav-pills .nav-link {
         color: #495057;
         border-radius: 8px;
-        transition: all 0.3s ease;
+        transition: all 0.2s ease;
+        padding: 10px 15px;
+        font-size: 0.95rem;
     }
 
         .nav-pills .nav-link:hover {
             background-color: #e9ecef;
+            color: #0d6efd;
+            transform: translateX(5px);
         }
 
         .nav-pills .nav-link.active {
             background-color: #0d6efd;
-            font-weight: bold;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
         }
 
     .card {
         border-radius: 12px;
-    }
-
-    .step-badge {
-        width: 28px;
-        height: 28px;
-        background-color: #0d6efd;
-        color: white;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 10px;
-        font-weight: bold;
-        font-size: 0.9rem;
+        overflow: hidden;
     }
 
     .sticky-sidebar {
         position: sticky;
         top: 20px;
+        height: calc(100vh - 40px);
+        overflow-y: auto;
     }
 
     .timeline-item {
-        border-left: 2px solid #0d6efd;
-        padding-left: 20px;
+        border-left: 3px solid #dee2e6;
+        padding-left: 25px;
         position: relative;
-        padding-bottom: 20px;
+        padding-bottom: 30px;
     }
+
+        .timeline-item:last-child {
+            border-left: 3px solid transparent;
+        }
 
         .timeline-item::before {
             content: "";
             position: absolute;
-            left: -9px;
+            left: -11px;
             top: 0;
-            width: 16px;
-            height: 16px;
-            background: #0d6efd;
+            width: 19px;
+            height: 19px;
+            background: #fff;
+            border: 3px solid #0d6efd;
             border-radius: 50%;
         }
+
+    .feature-icon {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        margin-right: 15px;
+        font-size: 1.25rem;
+    }
 </style>
 
 <div class="container-fluid py-4">
     <div class="row g-4">
         <div class="col-lg-3 d-none d-lg-block">
-            <div class="sticky-sidebar">
-                <h5 class="mb-3 ps-2">Guía de Navegación</h5>
-                <nav class="nav nav-pills flex-column">
-                    <a class="nav-link mb-1" href="/about#flujo-documentos"><i class="bi bi-file-earmark-text me-2"></i>Gestión de Documentos</a>
-                    <a class="bi bi-link-45deg nav-link mb-1" href="/about#rangos-cupos"><i class="bi bi-hash me-2"></i>Rangos y Cupos</a>
-                    <a class="nav-link mb-1" href="/about#modulo-reclusos"><i class="bi bi-people me-2"></i>Gestión de Reclusos</a>
-                    <a class="nav-link mb-1" href="/about#renovaciones-120"><i class="bi bi-calendar-check me-2"></i>Permisos (Art. 120)</a>
-                    <a class="nav-link mb-1" href="/about#ejemplo-practico"><i class="bi bi-lightbulb me-2"></i>Escenario Real</a>
-                </nav>
+            <div class="sticky-sidebar pe-3">
+                <div class="p-3 bg-light rounded-4 mb-3">
+                    <h5 class="mb-3 fw-bold text-primary"><i class="bi bi-book-half me-2"></i>Contenido</h5>
+                    <nav class="nav nav-pills flex-column gap-1">
+                        <a class="nav-link active" href="/about#introduccion">Introducción</a>
+                        <a class="nav-link" href="/about#flujo-documentos"><i class="bi bi-file-earmark-text me-2"></i>Gestión Documental</a>
+                        <a class="nav-link" href="/about#sistema-semaforos"><i class="bi bi-stoplights me-2"></i>Semáforos y Plazos</a>
+                        <a class="nav-link" href="/about#seguridad-integridad"><i class="bi bi-shield-lock me-2"></i>Seguridad de Datos</a>
+                        <a class="nav-link" href="/about#rangos-cupos"><i class="bi bi-hash me-2"></i>Numeración</a>
+                        <a class="nav-link" href="/about#modulo-reclusos"><i class="bi bi-people me-2"></i>Reclusos</a>
+                        <a class="nav-link" href="/about#renovaciones-120"><i class="bi bi-calendar-check me-2"></i>Art. 120</a>
+                        <a class="nav-link" href="/about#ejemplo-practico"><i class="bi bi-diagram-3 me-2"></i>Flujo Real</a>
+                    </nav>
+                </div>
+
+                <div class="alert alert-info border-0 shadow-sm small">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <strong>Tip:</strong> Use <kbd>Ctrl + F</kbd> para buscar términos específicos en este manual.
+                </div>
             </div>
         </div>
 
         <div class="col-lg-9 col-12">
-            <header class="mb-5 text-center text-lg-start">
-                <h1 class="display-5 fw-bold text-primary">Manual Operativo Vector</h1>
-                <p class="lead text-muted">Estandarización de procesos para la gestión documental y control de permisos.</p>
-                <hr />
-            </header>
+
+            <section id="introduccion" class="mb-5">
+                <header class="text-center text-lg-start mb-4">
+                    <h1 class="display-6 fw-bold text-dark">Manual Operativo <span class="text-primary">Vector</span></h1>
+                    <p class="lead text-muted">Plataforma integral de gestión administrativa, seguimiento de expedientes y control penitenciario.</p>
+                </header>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-white shadow-sm h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="feature-icon bg-primary-subtle text-primary"><i class="bi bi-lightning-charge"></i></div>
+                                <h6 class="fw-bold mb-0">Eficiencia</h6>
+                            </div>
+                            <p class="small text-muted mb-0">Automatización de numeración y reducción de tiempos de búsqueda.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-white shadow-sm h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="feature-icon bg-success-subtle text-success"><i class="bi bi-eye"></i></div>
+                                <h6 class="fw-bold mb-0">Trazabilidad</h6>
+                            </div>
+                            <p class="small text-muted mb-0">Historial inmutable de cada movimiento y acción realizada.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded bg-white shadow-sm h-100">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="feature-icon bg-warning-subtle text-warning-emphasis"><i class="bi bi-shield-check"></i></div>
+                                <h6 class="fw-bold mb-0">Control</h6>
+                            </div>
+                            <p class="small text-muted mb-0">Sistema de alertas tempranas para evitar vencimientos legales.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <hr class="my-5 opacity-25" />
 
             <section id="flujo-documentos" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">1. Gestión de Documentos</h3>
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-body p-4">
+                        <p>El núcleo de Vector es la gestión de expedientes. Cada documento es único y rastreable.</p>
+
+                        <h5 class="fw-bold mt-4 text-dark"><i class="bi bi-link-45deg me-2"></i>Vinculación (Padre/Hijo)</h5>
+                        <p class="small text-muted">
+                            El sistema permite agrupar documentos relacionados para mantener el orden lógico de un expediente.
+                        </p>
+                        <div class="row g-0 border rounded overflow-hidden mb-3">
+                            <div class="col-md-6 bg-light p-3 border-end">
+                                <strong class="text-primary d-block mb-1">Documento Padre</strong>
+                                <span class="small">Es el documento principal (ej. Oficio del Juzgado). Contiene la carátula y el hilo conductor.</span>
+                            </div>
+                            <div class="col-md-6 bg-white p-3">
+                                <strong class="text-secondary d-block mb-1">Documentos Hijos</strong>
+                                <span class="small">Son respuestas, anexos o informes internos (ej. Memorándum Laboral) que dependen del padre.</span>
+                            </div>
+                        </div>
+                        <div class="alert alert-secondary small mb-0">
+                            <i class="bi bi-lightbulb-fill text-warning me-1"></i> <strong>Nota:</strong> Al "Dar Pase" a un documento Padre, opcionalmente puede arrastrar a todos sus Hijos para que la oficina receptora tenga el contexto completo.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="sistema-semaforos" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">2. Sistema de Semáforos y Plazos</h3>
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
-                        <h2 class="h4 mb-3 text-dark"><i class="bi bi-file-earmark-plus me-2 text-primary"></i>Ingreso de Documentación</h2>
-                        <p>El flujo comienza con el registro de un nuevo documento (Oficio, Memorándum, etc.).</p>
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <ul class="small">
-                                    <li><strong>Uniformidad:</strong> Use la herramienta "Insertar Recluso" en el asunto para normalizar nombres y facilitar auditorías.</li>
-                                    <li><strong>Oficinas:</strong> Si el origen es externo (ej. Juzgado), la numeración es manual. Si es interna, el sistema asigna el número automáticamente según el rango.</li>
-                                    <li><strong>Estados:</strong> Defina el estado inicial (Ingresado, En Trámite, etc.) para reflejar la situación real del expediente.</li>
-                                </ul>
+                        <p>Vector monitorea automáticamente los plazos de respuesta basándose en la fecha de creación y configuración del sistema.</p>
+
+                        <div class="row g-3 text-center mt-2">
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-success bg-success-subtle h-100">
+                                    <i class="bi bi-check-circle-fill text-success fs-2 mb-2"></i>
+                                    <h5 class="text-success fw-bold">EN PLAZO</h5>
+                                    <p class="small mb-0">El documento está dentro del tiempo óptimo de gestión. No requiere acción inmediata urgente.</p>
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="alert alert-warning small mb-0">
-                                    <strong>Nota sobre Adjuntos:</strong> Al crear un documento, puede buscar un "Documento Padre" para establecer una relación de jerarquía (Anexo/Adjunto) desde el inicio.
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-warning bg-warning-subtle h-100">
+                                    <i class="bi bi-exclamation-triangle-fill text-warning-emphasis fs-2 mb-2"></i>
+                                    <h5 class="text-warning-emphasis fw-bold">RIESGO</h5>
+                                    <p class="small mb-0">Se aproxima la fecha límite. Se recomienda priorizar estos documentos en la bandeja.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 rounded border border-danger bg-danger-subtle h-100">
+                                    <i class="bi bi-x-octagon-fill text-danger fs-2 mb-2"></i>
+                                    <h5 class="text-danger fw-bold">VENCIDO</h5>
+                                    <p class="small mb-0">El plazo legal u operativo ha expirado. Requiere justificación o resolución inmediata.</p>
                                 </div>
                             </div>
                         </div>
@@ -112,19 +203,53 @@
                 </div>
             </section>
 
-            <section id="rangos-cupos" class="about-section mb-5">
-                <div class="card shadow-sm border-0 border-start border-info border-4">
+            <section id="seguridad-integridad" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">3. Seguridad e Integridad</h3>
+                <div class="card shadow-sm border-0 border-start border-danger border-4">
                     <div class="card-body p-4">
-                        <h4 class="h5">Administración de Numeración</h4>
-                        <p class="small">El sistema gestiona repositorios de números provistos por la Secretaría General:</p>
-                        <div class="d-flex gap-3">
-                            <div class="p-2 bg-light rounded text-center flex-fill">
-                                <span class="fw-bold d-block">Cupos</span>
-                                <small>Repositorio global por tipo de documento.</small>
+                        <h5 class="fw-bold"><i class="bi bi-shield-lock-fill me-2"></i>¿Por qué no puedo editar todo?</h5>
+                        <p>Para garantizar la validez legal y administrativa, Vector implementa políticas estrictas de edición:</p>
+
+                        <ul class="list-group list-group-flush mb-3">
+                            <li class="list-group-item bg-transparent">
+                                <i class="bi bi-check-lg text-success me-2"></i><strong>Campos Editables:</strong> Asunto, Descripción y observaciones. Estos datos enriquecen el contenido.
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <i class="bi bi-x-lg text-danger me-2"></i><strong>Campos Protegidos:</strong> <span class="fw-bold">Número Oficial, Fecha de Creación, Oficina Actual, Historial.</span>
+                            </li>
+                        </ul>
+
+                        <p class="small text-muted mb-0">
+                            <strong>Justificación:</strong> Permitir cambiar una fecha o un número de oficio rompería la cadena de custodia documental. Si un documento debe cambiar de oficina, <strong>no se edita la oficina</strong>, sino que se ejecuta la acción de <a href="#ejemplo-practico" class="fw-bold">"Dar Pase"</a> para que quede registrado quién lo envió y cuándo.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="rangos-cupos" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">4. Numeración</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="d-flex gap-4 align-items-start">
+                            <div class="d-none d-md-block text-primary display-4">
+                                <i class="bi bi-123"></i>
                             </div>
-                            <div class="p-2 bg-light rounded text-center flex-fill">
-                                <span class="fw-bold d-block">Rangos</span>
-                                <small>Segmentos de números asignados a oficinas internas.</small>
+                            <div>
+                                <p>El sistema asigna números automáticamente para evitar duplicados. Existen dos modalidades:</p>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded">
+                                            <strong><i class="bi bi-globe me-2"></i>Cupos Globales</strong>
+                                            <p class="small text-muted mb-0 mt-1">Numeración consecutiva a nivel sistema para documentos generales.</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded">
+                                            <strong><i class="bi bi-building-lock me-2"></i>Rangos por Oficina</strong>
+                                            <p class="small text-muted mb-0 mt-1">Bloques de números asignados específicamente a una oficina (ej. Jurídica 100-500).</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -132,35 +257,42 @@
             </section>
 
             <section id="modulo-reclusos" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">5. Gestión de Internos</h3>
                 <div class="card shadow-sm border-0">
                     <div class="card-body p-4">
-                        <h2 class="h4 mb-3"><i class="bi bi-people me-2 text-primary"></i>Gestión de Internos</h2>
-                        <p>Para insertar un recluso desde el selector del sistema, debe existir y estar <strong>Activo</strong>; de lo contrario, no aparecerá en la búsqueda y no podrá seleccionarse automáticamente.</p>
-                        <ul class="small">
-                            <li>Si no existe o está inactivo, puede registrarlo/activarlo previamente en el módulo de Reclusos para habilitar su selección directa.</li>
-                            <li>Esto no bloquea el avance del documento: si es necesario, el nombre del recluso también puede escribirse manualmente en el contenido.</li>
-                            <li><strong>Integridad:</strong> Antes de activar un recluso inactivo, verifique su situación jurídica para asegurar que el registro sea coherente con su estado actual en la unidad.</li>
+                        <p>Integración directa entre expedientes y población reclusa.</p>
+                        <div class="alert alert-warning small">
+                            <i class="bi bi-exclamation-circle-fill me-1"></i>
+                            <strong>Requisito:</strong> Para vincular un interno a un documento (usando <code>@@Nombre</code> en el asunto), el interno debe estar en estado <strong>ACTIVO</strong> en el padrón.
+                        </div>
+                        <ul class="small text-muted mb-0">
+                            <li>Esto facilita búsquedas futuras: "¿Qué documentos tiene el interno X?".</li>
+                            <li>Asegura que no se generen trámites para personas ya liberadas sin reactivar su ficha.</li>
                         </ul>
                     </div>
                 </div>
             </section>
 
             <section id="renovaciones-120" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">6. Permisos (Art. 120)</h3>
                 <div class="card shadow-sm border-0 bg-dark text-white">
                     <div class="card-body p-4">
-                        <h2 class="h4 mb-3 text-warning"><i class="bi bi-shield-check me-2"></i>Permisos de Salida (Art. 120)</h2>
-                        <p class="small">Este módulo <strong>no renueva documentos</strong>, sino autorizaciones de trabajo/salida para reclusos.</p>
-                        <div class="row small">
-                            <div class="col-md-7">
-                                <ul>
-                                    <li>Registre la fuente: <strong>Resolución Judicial</strong> o <strong>Acta de Unidad</strong>.</li>
-                                    <li>Complete datos críticos: Destino, horario, tipo de custodia y vigencia.</li>
-                                    <li>Vincule el documento de respaldo (el Oficio cargado previamente en bandeja) para constancia legal.</li>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0 text-warning"><i class="bi bi-calendar-check me-2"></i>Salidas Laborales</h5>
+                        </div>
+                        <p class="opacity-75">Módulo especializado para el control de vencimientos de autorizaciones de salida.</p>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-6">
+                                <ul class="small mb-0">
+                                    <li>Requiere vincular el <strong>Oficio Judicial</strong> original.</li>
+                                    <li>Define días, horarios y custodias específicas.</li>
                                 </ul>
                             </div>
-                            <div class="col-md-5 border-start border-secondary">
-                                <p class="text-warning fw-bold mb-1">Control de Vencimientos</p>
-                                <p class="small mb-0">Es responsabilidad del usuario revisar este módulo semanalmente para gestionar prórrogas antes del vencimiento del permiso.</p>
+                            <div class="col-md-6">
+                                <div class="border border-warning rounded p-2 text-center text-warning">
+                                    <small class="fw-bold d-block">ALERTA AUTOMÁTICA</small>
+                                    <span style="font-size: 0.8rem;">El sistema notifica en Dashboard 30 días antes del vencimiento.</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -168,35 +300,34 @@
             </section>
 
             <section id="ejemplo-practico" class="about-section mb-5">
-                <h2 class="h4 mb-4 text-primary">Escenario: Respuesta a Oficio Judicial</h2>
+                <h3 class="fw-bold mb-4 text-primary">7. Flujo Real: "Respuesta a Oficio"</h3>
                 <div class="ms-3">
                     <div class="timeline-item">
-                        <small class="text-muted">PASO 1</small>
-                        <p class="mb-0"><strong>Ingreso:</strong> Se registra el Oficio (ej. 100/26) de un Juzgado. Se usa la herramienta para insertar al recluso en el asunto.</p>
+                        <span class="badge bg-primary mb-2">INICIO</span>
+                        <h6 class="fw-bold">Ingreso (Mesa de Entrada)</h6>
+                        <p class="small text-muted mb-0">Se registra el Oficio (ej. 100/26) del Juzgado. Se etiqueta como "Padre". Estado: <em>Ingresado</em>.</p>
                     </div>
                     <div class="timeline-item">
-                        <small class="text-muted">PASO 2</small>
-                        <p class="mb-0"><strong>Derivación:</strong> Se realiza el "Pase" al Área Laboral. Se crea una actuación (Memorándum interno) solicitando el informe de horas.</p>
+                        <span class="badge bg-secondary mb-2">PROCESO</span>
+                        <h6 class="fw-bold">Derivación y Actuación</h6>
+                        <p class="small text-muted mb-0">Se realiza el "Pase" al Área Laboral. Laboral crea un Memorándum ("Hijo") con la información solicitada y lo vincula al Oficio 100/26.</p>
                     </div>
                     <div class="timeline-item">
-                        <small class="text-muted">PASO 3</small>
-                        <p class="mb-0"><strong>Respuesta Interna:</strong> El área laboral devuelve el pase con el Memorándum de respuesta. El sistema unifica la "familia" de documentos bajo el Oficio padre.</p>
+                        <span class="badge bg-secondary mb-2">RETORNO</span>
+                        <h6 class="fw-bold">Unificación</h6>
+                        <p class="small text-muted mb-0">Laboral devuelve el expediente a Dirección. El sistema muestra ahora el Oficio 100/26 conteniendo dentro el Memo de respuesta.</p>
                     </div>
                     <div class="timeline-item">
-                        <small class="text-muted">PASO 4</small>
-                        <p class="mb-0"><strong>Cierre:</strong> Se eleva a Dirección para firma y se envía el Oficio final de respuesta al Juzgado. El historial permite auditar cada paso y tiempo de respuesta.</p>
+                        <span class="badge bg-success mb-2">FIN</span>
+                        <h6 class="fw-bold">Salida y Archivo</h6>
+                        <p class="small text-muted mb-0">Se firma la respuesta. Se cambia el estado a <em>Finalizado/Archivado</em>. El semáforo se detiene.</p>
                     </div>
                 </div>
             </section>
 
-            <footer class="alert alert-info border-0 shadow-sm p-4">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-check-all fs-1 me-3"></i>
-                    <div>
-                        <h4 class="h5 mb-1">Sistema Blindado</h4>
-                        <p class="mb-0 small">Siguiendo este flujo, Vector garantiza una bitácora institucional confiable, eliminando errores de numeración y facilitando la respuesta ante cualquier auditoría judicial o ministerial.</p>
-                    </div>
-                </div>
+            <footer class="text-center text-muted small py-4 border-top">
+                <p class="mb-0">Vector v2.0 &copy; 2026 - Departamento de Sistemas</p>
+                <p>Documentación actualizada automáticamente.</p>
             </footer>
         </div>
     </div>
