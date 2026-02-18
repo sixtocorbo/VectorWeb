@@ -8,11 +8,13 @@
 @using System.Security.Claims
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using VectorWeb.Utils
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatEstado> RepoEstados
 @inject IRepository<EventosSistema> RepoEventos
+@inject IRepository<CfgTiemposRespuestum> RepoPlazos
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @inject SecretariaDbContext DbContext
@@ -362,6 +364,7 @@
                 var ori = documentoActualizar.IdOficinaActual;
                 documentoActualizar.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
                 documentoActualizar.IdEstadoActual = nuevoEstadoId;
+                documentoActualizar.FechaVencimiento = await CalcularNuevoVencimientoAsync(documentoActualizar.IdTipo);
 
                 if (docPadre != null && documentoActualizar.IdDocumento == docPadre.IdDocumento)
                 {
@@ -394,6 +397,28 @@
         catch (Exception ex) { await trans.RollbackAsync(); mensajeError = ex.Message; }
     }
     private Task IgnorarSubmitRealizarPase(EditContext _) => Task.CompletedTask;
+
+    private async Task<DateTime?> CalcularNuevoVencimientoAsync(int idTipoDocumento)
+    {
+        if (idTipoDocumento <= 0)
+        {
+            return null;
+        }
+
+        var configuraciones = await RepoPlazos.FindAsync(c => c.IdTipoDocumento == idTipoDocumento);
+        if (!configuraciones.Any())
+        {
+            return null;
+        }
+
+        var configuracion = configuraciones.FirstOrDefault(c =>
+                               string.Equals((c.Prioridad ?? string.Empty).Trim(), "NORMAL", StringComparison.OrdinalIgnoreCase))
+                           ?? configuraciones.OrderBy(c => c.DiasMaximos).First();
+
+        return configuracion.DiasMaximos < 30
+            ? DateTime.Now.AgregarDiasHabiles(configuracion.DiasMaximos)
+            : DateTime.Now.AgregarDiasCorridos(configuracion.DiasMaximos);
+    }
 
     private static string FormatearNumeroConTipo(MaeDocumento documento)
     {
