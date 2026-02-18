@@ -2,9 +2,11 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Policy = "documentos.editar")]
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
+@inject IRepository<MaeRecluso> RepoReclusos
 @inject IJSRuntime JS
 @inject NavigationManager Navegador
 @rendermode InteractiveServer
@@ -151,6 +153,57 @@
                     </div>
 
                     <div class="col-12">
+                        <div class="search-panel p-3">
+                            <label class="label-custom mb-2"><i class="bi bi-people-fill me-1 text-primary"></i> Vincular PPL al Asunto</label>
+                            <div class="row g-2">
+                                <div class="col-md-7 position-relative">
+                                    <div class="input-group input-group-sm">
+                                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                                        <input type="text" class="form-control shadow-none" placeholder="Buscar por nombre o CI..."
+                                               value="@busquedaReclusoAsunto" autocomplete="off"
+                                               @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onkeydown="ManejarTecladoPPL" />
+                                    </div>
+
+                                    @if (reclusosFiltradosAsunto.Any())
+                                    {
+                                        <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="z-index: 1000;">
+                                            @for (var i = 0; i < reclusosFiltradosAsunto.Count; i++)
+                                            {
+                                                var recluso = reclusosFiltradosAsunto[i];
+                                                var activeClass = i == indicePPLSeleccionado ? "active" : "";
+                                                <button type="button" class="list-group-item list-group-item-action @activeClass small py-2" @onclick="() => AgregarReclusoAsunto(recluso)">
+                                                    <strong>@recluso.NombreCompleto</strong> <span class="opacity-75">· @recluso.Documento</span>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="col-md-5 d-flex gap-2">
+                                    <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="InsertarReclusosEnAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                        <i class="bi bi-pencil-square me-1"></i> Insertar
+                                    </button>
+                                    <button type="button" class="btn btn-light btn-sm px-3 border" @onclick="LimpiarReclusosAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
+                                        Limpiar
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if (reclusosSeleccionadosAsunto.Any())
+                            {
+                                <div class="mt-3 d-flex flex-wrap gap-1">
+                                    @foreach (var recluso in reclusosSeleccionadosAsunto)
+                                    {
+                                        <span class="badge bg-white text-primary border border-primary-subtle d-inline-flex align-items-center gap-2 py-2 px-3 shadow-sm">
+                                            @recluso.NombreCompleto
+                                            <i class="bi bi-x-circle-fill text-danger cursor-pointer" style="cursor:pointer" @onclick="() => QuitarReclusoAsunto(recluso.IdRecluso)"></i>
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="col-12">
                         <span class="label-info">Descripción Detallada</span>
                         <InputTextArea class="form-control" style="min-height: 120px;"
                                        @bind-Value="documento.Descripcion"
@@ -196,10 +249,20 @@
     private bool guardando;
     private string? mensajeError;
     private string? mensajeExito;
+    private List<MaeRecluso> reclusosActivos = new();
+    private string busquedaReclusoAsunto = string.Empty;
+    private List<MaeRecluso> reclusosFiltradosAsunto = new();
+    private List<MaeRecluso> reclusosSeleccionadosAsunto = new();
+    private int indicePPLSeleccionado = -1;
 
     protected override async Task OnParametersSetAsync()
     {
         cargando = true;
+        reclusosActivos = (await RepoReclusos.GetAllAsync())
+            .Where(r => r.Activo == true)
+            .OrderBy(r => r.NombreCompleto)
+            .ToList();
+
         documento = await RepoDocs
             .GetQueryable("IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation")
             .FirstOrDefaultAsync(d => d.IdDocumento == Id);
@@ -243,6 +306,59 @@
     {
         // Llama a la función de impresión nativa del navegador
         await JS.InvokeVoidAsync("window.print");
+    }
+
+    private void FiltrarReclusosAsunto(ChangeEventArgs e)
+    {
+        busquedaReclusoAsunto = e.Value?.ToString() ?? "";
+        reclusosFiltradosAsunto = reclusosActivos
+            .Where(r =>
+                r.NombreCompleto.Contains(busquedaReclusoAsunto, StringComparison.OrdinalIgnoreCase) ||
+                (r.Documento ?? string.Empty).Contains(busquedaReclusoAsunto, StringComparison.OrdinalIgnoreCase))
+            .Take(8)
+            .ToList();
+        indicePPLSeleccionado = -1;
+    }
+
+    private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
+
+    private Task ManejarTecladoPPL(KeyboardEventArgs e)
+    {
+        if (!reclusosFiltradosAsunto.Any()) return Task.CompletedTask;
+
+        if (e.Key == "ArrowDown") indicePPLSeleccionado = Math.Min(indicePPLSeleccionado + 1, reclusosFiltradosAsunto.Count - 1);
+        else if (e.Key == "ArrowUp") indicePPLSeleccionado = Math.Max(indicePPLSeleccionado - 1, 0);
+        else if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
+
+        return Task.CompletedTask;
+    }
+
+    private void AgregarReclusoAsunto(MaeRecluso recluso)
+    {
+        if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == recluso.IdRecluso))
+        {
+            reclusosSeleccionadosAsunto.Add(recluso);
+        }
+
+        busquedaReclusoAsunto = "";
+        reclusosFiltradosAsunto.Clear();
+        indicePPLSeleccionado = -1;
+    }
+
+    private void QuitarReclusoAsunto(int idRecluso) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == idRecluso);
+
+    private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
+
+    private void InsertarReclusosEnAsunto()
+    {
+        if (documento is null || !reclusosSeleccionadosAsunto.Any()) return;
+
+        var listaNombres = string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto));
+        var sufijo = $"PPL(s): {listaNombres}";
+
+        documento.Asunto = string.IsNullOrWhiteSpace(documento.Asunto)
+            ? sufijo
+            : $"{documento.Asunto} | {sufijo}";
     }
 
     private void VolverABandeja() => Navegador.NavigateTo("documentos");

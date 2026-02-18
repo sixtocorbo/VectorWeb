@@ -9,7 +9,6 @@
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
-@inject IJSRuntime JS
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -309,9 +308,6 @@
                                         <button class="btn btn-primary btn-sm btn-action-text" @onclick="() => IrAEditar(doc.IdDocumento)" title="Editar">
                                             <i class="bi bi-pencil-square"></i> Editar
                                         </button>
-                                        <button class="btn btn-danger btn-sm btn-action-text" @onclick="() => EliminarDocumento(doc.IdDocumento)" title="Eliminar">
-                                            <i class="bi bi-trash"></i> Borrar
-                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -480,33 +476,6 @@
     }
 
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
-
-    private async Task EliminarDocumento(long id)
-    {
-        bool conf = await JS.InvokeAsync<bool>("confirm", "¿Confirmar eliminación permanente?");
-        if (!conf) return;
-
-        await using var db = await DbContextFactory.CreateDbContextAsync();
-
-        var doc = await db.MaeDocumentos.FindAsync(id);
-        if (doc is null) return;
-
-        // Evita excepciones de clave foránea y muestra una validación amigable.
-        var tieneMovimientos = await db.TraMovimientos.AsNoTracking().AnyAsync(m => m.IdDocumento == id);
-        var tieneAdjuntos = await db.TraAdjuntoDocumentos.AsNoTracking().AnyAsync(a => a.IdDocumento == id);
-        var esPadre = await db.MaeDocumentos.AsNoTracking().AnyAsync(d => d.IdDocumentoPadre == id);
-        var esRespaldoSalida = await db.TraSalidasLaboralesDocumentoRespaldos.AsNoTracking().AnyAsync(r => r.IdDocumento == id);
-
-        if (tieneMovimientos || tieneAdjuntos || esPadre || esRespaldoSalida)
-        {
-            await JS.InvokeVoidAsync("alert", "No se puede eliminar el documento porque tiene información relacionada (historial, adjuntos, vínculos o respaldos).");
-            return;
-        }
-
-        db.MaeDocumentos.Remove(doc);
-        await db.SaveChangesAsync();
-        await CargarDocumentos();
-    }
 
     private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
     private async Task PaginaSiguiente() { if (PaginaActualEfectiva < TotalPaginas) { paginaActual++; await CargarDocumentos(); } }
