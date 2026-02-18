@@ -1,16 +1,17 @@
 using Microsoft.Extensions.Logging;
 using VectorWeb.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace VectorWeb.Services.Security.Audit;
 
 public sealed class PermissionAuditService
 {
-    private readonly SecretariaDbContext _context;
+    private readonly IDbContextFactory<SecretariaDbContext> _dbContextFactory;
     private readonly ILogger<PermissionAuditService> _logger;
 
-    public PermissionAuditService(SecretariaDbContext context, ILogger<PermissionAuditService> logger)
+    public PermissionAuditService(IDbContextFactory<SecretariaDbContext> dbContextFactory, ILogger<PermissionAuditService> logger)
     {
-        _context = context;
+        _dbContextFactory = dbContextFactory;
         _logger = logger;
     }
 
@@ -29,8 +30,9 @@ public sealed class PermissionAuditService
                 FechaEvento = DateTime.UtcNow
             };
 
-            _context.SegAuditoriaPermisos.Add(evento);
-            await _context.SaveChangesAsync();
+            await using var context = await _dbContextFactory.CreateDbContextAsync();
+            context.SegAuditoriaPermisos.Add(evento);
+            await context.SaveChangesAsync();
         }
         catch (Exception ex)
         {
