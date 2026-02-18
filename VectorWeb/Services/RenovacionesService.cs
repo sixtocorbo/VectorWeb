@@ -53,6 +53,7 @@ public sealed class DocumentoRespaldoDto
 public sealed class RenovacionesService
 {
     private readonly SecretariaDbContext context;
+    private const string ClaveDiasAlertaRenovaciones = "RENOVACIONES_DIAS_ALERTA";
     private const int DiasAlertaDefecto = 30;
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
@@ -69,6 +70,7 @@ public sealed class RenovacionesService
     public async Task<List<SalidaGridDto>> ObtenerSalidasAsync(bool soloActivas, string textoBuscar)
     {
         var hoy = DateTime.Today;
+        var diasAlerta = await ObtenerDiasAlertaRenovacionesAsync();
 
         var query = context.TraSalidasLaborales
             .AsNoTracking()
@@ -110,7 +112,7 @@ public sealed class RenovacionesService
         {
             var dias = (x.Salida.FechaVencimiento.Date - hoy).Days;
             var activa = x.Salida.Activo ?? true;
-            var estado = CalcularEstado(activa, dias);
+            var estado = CalcularEstado(activa, dias, diasAlerta);
 
             // Ahora devuelve el objeto DTO con las propiedades correctas
             var autorizacionDto = ParsearObservaciones(x.Salida.Observaciones);
@@ -225,11 +227,36 @@ public sealed class RenovacionesService
         await context.SaveChangesAsync();
     }
 
-    private static EstadoRenovacion CalcularEstado(bool activa, int diasRestantes)
+    public async Task<int> ObtenerDiasAlertaRenovacionesAsync()
+    {
+        var valorParametro = await context.CfgSistemaParametros
+            .AsNoTracking()
+            .Where(p => p.Clave == ClaveDiasAlertaRenovaciones)
+            .Select(p => p.Valor)
+            .FirstOrDefaultAsync();
+
+        return TryParseDiasAlerta(valorParametro, out var diasAlerta)
+            ? diasAlerta
+            : DiasAlertaDefecto;
+    }
+
+    private static bool TryParseDiasAlerta(string? valor, out int diasAlerta)
+    {
+        if (int.TryParse(valor, out var parsed) && parsed >= 0)
+        {
+            diasAlerta = parsed;
+            return true;
+        }
+
+        diasAlerta = DiasAlertaDefecto;
+        return false;
+    }
+
+    private static EstadoRenovacion CalcularEstado(bool activa, int diasRestantes, int diasAlerta)
     {
         if (!activa) return EstadoRenovacion.Inactiva;
         if (diasRestantes < 0) return EstadoRenovacion.Vencida;
-        if (diasRestantes <= DiasAlertaDefecto) return EstadoRenovacion.Alerta;
+        if (diasRestantes <= diasAlerta) return EstadoRenovacion.Alerta;
         return EstadoRenovacion.Ok;
     }
 

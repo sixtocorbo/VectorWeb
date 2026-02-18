@@ -1,0 +1,151 @@
+@page "/configuracion/semaforos"
+@attribute [Authorize(Policy = "configuracion.rangos")]
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@using VectorWeb.Services
+@inject IRepository<CfgSistemaParametro> RepoParametros
+@inject RenovacionesService RenovacionesService
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-stoplights"></i> Configuración de Semáforos</h3>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <p class="text-muted mb-4">
+            Personaliza cuántos días antes del vencimiento se mostrará en <strong>amarillo</strong> el semáforo de
+            <strong>Renovaciones Art. 120</strong>.
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(mensajeError))
+        {
+            <div class="alert alert-warning" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(mensajeExito))
+        {
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle-fill me-2"></i>@mensajeExito
+            </div>
+        }
+
+        <EditForm Model="this" OnValidSubmit="GuardarAsync">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Días de alerta (amarillo)</label>
+                    <InputNumber class="form-control"
+                                 @bind-Value="diasAlertaRenovaciones"
+                                 min="0" />
+                    <div class="form-text">Usa 0 para mostrar amarillo solo el día de vencimiento.</div>
+                </div>
+                <div class="col-md-8">
+                    <div class="bg-light border rounded p-3">
+                        <div class="small text-muted">Vista previa</div>
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                            <span class="badge bg-danger">Rojo: días restantes &lt; 0</span>
+                            <span class="badge bg-warning text-dark">Amarillo: días restantes &lt;= @diasAlertaRenovaciones</span>
+                            <span class="badge bg-success">Verde: días restantes &gt; @diasAlertaRenovaciones</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button class="btn btn-primary" type="submit" disabled="@guardando">
+                    @if (guardando)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    <i class="bi bi-save me-1"></i> Guardar configuración
+                </button>
+                <button class="btn btn-outline-secondary" type="button" @onclick="CargarAsync" disabled="@guardando">
+                    <i class="bi bi-arrow-clockwise me-1"></i> Recargar
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private const string ClaveDiasAlertaRenovaciones = "RENOVACIONES_DIAS_ALERTA";
+
+    private int diasAlertaRenovaciones = 30;
+    private bool guardando;
+    private string mensajeError = string.Empty;
+    private string mensajeExito = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        mensajeError = string.Empty;
+        mensajeExito = string.Empty;
+
+        diasAlertaRenovaciones = await RenovacionesService.ObtenerDiasAlertaRenovacionesAsync();
+    }
+
+    private async Task GuardarAsync()
+    {
+        mensajeError = string.Empty;
+        mensajeExito = string.Empty;
+
+        if (diasAlertaRenovaciones < 0)
+        {
+            mensajeError = "El valor no puede ser negativo.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var usuarioActual = auth.User?.Identity?.Name
+                ?? auth.User?.FindFirst(ClaimTypes.Name)?.Value
+                ?? "sistema";
+
+            var parametro = (await RepoParametros.FindAsync(p => p.Clave == ClaveDiasAlertaRenovaciones)).FirstOrDefault();
+
+            if (parametro is null)
+            {
+                await RepoParametros.AddAsync(new CfgSistemaParametro
+                {
+                    Clave = ClaveDiasAlertaRenovaciones,
+                    Valor = diasAlertaRenovaciones.ToString(),
+                    Descripcion = "Cantidad de días para marcar en alerta (amarillo) las renovaciones Art. 120.",
+                    UsuarioActualizacion = usuarioActual,
+                    FechaActualizacion = DateTime.Now
+                });
+            }
+            else
+            {
+                parametro.Valor = diasAlertaRenovaciones.ToString();
+                parametro.Descripcion = "Cantidad de días para marcar en alerta (amarillo) las renovaciones Art. 120.";
+                parametro.UsuarioActualizacion = usuarioActual;
+                parametro.FechaActualizacion = DateTime.Now;
+                await RepoParametros.UpdateAsync(parametro);
+            }
+
+            mensajeExito = "Configuración guardada correctamente.";
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"No se pudo guardar la configuración: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+}
