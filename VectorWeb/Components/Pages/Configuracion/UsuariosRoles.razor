@@ -237,6 +237,20 @@
                                             <label class="form-check-label" for="perm_@rol.Replace(" ", "_")_@permiso.Valor.Replace(".", "_")">
                                                 @permiso.Etiqueta
                                             </label>
+
+                                            @if (AppPermissions.PaginasPorPermiso.TryGetValue(permiso.Valor, out var paginas) && paginas.Length > 0)
+                                            {
+                                                <div class="small text-muted ms-4 mt-1">
+                                                    <span class="fw-semibold">Páginas:</span>
+                                                    @for (var i = 0; i < paginas.Length; i++)
+                                                    {
+                                                        var pagina = paginas[i];
+                                                        <span>
+                                                            @pagina.Nombre <code>@pagina.Ruta</code>@(i < paginas.Length - 1 ? "; " : string.Empty)
+                                                        </span>
+                                                    }
+                                                </div>
+                                            }
                                         </div>
                                     </div>
                                 }

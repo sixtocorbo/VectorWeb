@@ -12,6 +12,7 @@ public static class AppPermissions
     }
 
     public sealed record PermisoDefinicion(string Valor, string Etiqueta, string Grupo);
+    public sealed record PaginaDefinicion(string Nombre, string Ruta);
 
     public const string DocumentosVer = "documentos.ver";
     public const string DocumentosEditar = "documentos.editar";
@@ -38,4 +39,55 @@ public static class AppPermissions
 
     public static readonly IReadOnlyDictionary<string, string> Etiquetas = Listado
         .ToDictionary(x => x.Valor, x => x.Etiqueta, StringComparer.OrdinalIgnoreCase);
+
+    public static readonly IReadOnlyDictionary<string, PaginaDefinicion[]> PaginasPorPermiso =
+        new Dictionary<string, PaginaDefinicion[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            [DocumentosVer] =
+            [
+                new("Dashboard", "/home"),
+                new("Documentos", "/documentos"),
+                new("Historial de documento", "/documentos/historial/{id}"),
+                new("Recorrido de expediente", "/documentos/recorrido/{id}"),
+                new("Guía", "/about")
+            ],
+            [DocumentosEditar] =
+            [
+                new("Nuevo documento", "/documentos/nuevo"),
+                new("Editar documento", "/documentos/editar/{id}"),
+                new("Realizar pase", "/documentos/pase/{id}")
+            ],
+            [VinculacionGestionar] =
+            [
+                new("Vinculación", "/documentos/vinculacion"),
+                new("Vínculos de documento", "/documentos/vinculos/{idDocumento}")
+            ],
+            [ReclusosGestionar] =
+            [
+                new("Reclusos", "/reclusos"),
+                new("Nuevo/editar recluso", "/reclusos/nuevo y /reclusos/editar/{id}")
+            ],
+            [RenovacionesGestionar] =
+            [
+                new("Art. 120", "/renovaciones"),
+                new("Editar renovación", "/renovaciones/editar/{id}")
+            ],
+            [ConfiguracionCatalogos] =
+            [
+                new("Oficinas", "/configuracion/oficinas"),
+                new("Tipos de documento", "/configuracion/tipos-documento"),
+                new("Estados", "/configuracion/estados")
+            ],
+            [ConfiguracionRangos] =
+            [
+                new("Rangos", "/configuracion/rangos"),
+                new("Semáforos", "/configuracion/semaforos"),
+                new("Plazos documentos", "/configuracion/plazos-documentos")
+            ],
+            [SeguridadUsuariosRoles] =
+            [
+                new("Usuarios y roles", "/configuracion/usuarios"),
+                new("Auditoría de permisos", "/configuracion/auditoria-permisos")
+            ]
+        };
 }
