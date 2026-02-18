@@ -1,5 +1,6 @@
 using VectorWeb.Models;
 using VectorWeb.Repositories;
+using VectorWeb.Utils;
 
 namespace VectorWeb.Services;
 
@@ -47,6 +48,13 @@ public class DocumentoPlazosService
     public async Task<DateTime?> CalcularFechaVencimientoAsync(int idTipoDocumento, DateTime fechaBase, string prioridad = "NORMAL")
     {
         var dias = await ObtenerDiasPlazoAsync(idTipoDocumento, prioridad);
-        return dias.HasValue ? fechaBase.Date.AddDays(dias.Value) : null;
+        if (!dias.HasValue)
+        {
+            return null;
+        }
+
+        return dias.Value < 30
+            ? fechaBase.AgregarDiasHabiles(dias.Value)
+            : fechaBase.AgregarDiasCorridos(dias.Value);
     }
 }
