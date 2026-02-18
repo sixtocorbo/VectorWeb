@@ -448,6 +448,8 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.UsuarioId, e.FechaEvento }, "IX_Seg_AuditoriaPermisos_Usuario_Fecha").IsDescending(false, true);
 
+            entity.Property(e => e.IdAuditoria)
+                .ValueGeneratedOnAdd();
             entity.Property(e => e.FechaEvento)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysdatetime())");
