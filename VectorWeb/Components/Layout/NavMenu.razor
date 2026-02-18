@@ -17,8 +17,6 @@
     <nav class="flex-column d-flex min-vh-100">
         <AuthorizeView>
             <Authorized Context="authContext">
-                <div class="nav-section-title px-4 mt-2">OPERACIONES</div>
-
                 <AuthorizeView Policy="documentos.ver">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="documentos">
@@ -52,8 +50,6 @@
                 </AuthorizeView>
 
                 <AuthorizeView Policy="configuracion.catalogos">
-                    <div class="nav-section-title px-4 mt-3">CATÁLOGOS</div>
-
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="configuracion/oficinas">
                             <span class="bi bi-oficinas-nav-menu" aria-hidden="true"></span> Oficinas
@@ -71,10 +67,9 @@
                     </div>
                 </AuthorizeView>
 
-                <div class="nav-section-title px-4 mt-3">SISTEMA</div>
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="home">
-                        <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
+                        <span class="bi bi-dashboard-nav-menu" aria-hidden="true"></span> Dashboard
                     </NavLink>
                 </div>
 
@@ -90,7 +85,7 @@
                 <AuthorizeView Policy="configuracion.rangos">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="configuracion/semaforos">
-                            <span class="bi bi-stoplights" aria-hidden="true"></span> Semáforos
+                            <span class="bi bi-semaforos-nav-menu" aria-hidden="true"></span> Semáforos
                         </NavLink>
                     </div>
                 </AuthorizeView>
@@ -98,7 +93,7 @@
                 <AuthorizeView Policy="configuracion.rangos">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="configuracion/plazos-documentos">
-                            <span class="bi bi-hourglass-split" aria-hidden="true"></span> Plazos documentos
+                            <span class="bi bi-plazos-documentos-nav-menu" aria-hidden="true"></span> Plazos documentos
                         </NavLink>
                     </div>
                 </AuthorizeView>
@@ -113,7 +108,7 @@
                 <AuthorizeView Policy="seguridad.usuarios_roles">
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="configuracion/auditoria-permisos">
-                            <span class="bi bi-shield-exclamation" aria-hidden="true"></span> Auditoría Permisos
+                            <span class="bi bi-auditoria-permisos-nav-menu" aria-hidden="true"></span> Auditoría Permisos
                         </NavLink>
                     </div>
                 </AuthorizeView>
