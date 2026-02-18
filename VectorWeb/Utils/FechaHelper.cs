@@ -15,6 +15,8 @@ public static class FechaHelper
         (12, 25)  // Navidad
     ];
 
+    private static readonly Dictionary<int, HashSet<DateOnly>> FeriadosMovilesPorAnio = [];
+
     public static DateTime AgregarDiasHabiles(this DateTime fechaInicio, int dias, ISet<DateOnly>? feriados = null)
     {
         if (dias <= 0)
@@ -54,16 +56,69 @@ public static class FechaHelper
 
         var fechaOnly = DateOnly.FromDateTime(fecha);
 
-        if (feriados is not null)
-        {
-            return !feriados.Contains(fechaOnly);
-        }
-
-        return !FeriadosFijosUy.Contains((fechaOnly.Month, fechaOnly.Day));
+        return !EsFeriado(fechaOnly, feriados);
     }
 
     private static DateTime AjustarFinDia(DateTime fecha)
     {
         return fecha.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+    }
+
+    private static bool EsFeriado(DateOnly fecha, ISet<DateOnly>? feriados)
+    {
+        if (feriados is not null && feriados.Contains(fecha))
+        {
+            return true;
+        }
+
+        if (FeriadosFijosUy.Contains((fecha.Month, fecha.Day)))
+        {
+            return true;
+        }
+
+        return ObtenerFeriadosMoviles(fecha.Year).Contains(fecha);
+    }
+
+    private static HashSet<DateOnly> ObtenerFeriadosMoviles(int anio)
+    {
+        if (FeriadosMovilesPorAnio.TryGetValue(anio, out var feriados))
+        {
+            return feriados;
+        }
+
+        var domingoPascua = CalcularDomingoPascua(anio);
+        var nuevosFeriados = new HashSet<DateOnly>
+        {
+            domingoPascua.AddDays(-48), // Carnaval (lunes)
+            domingoPascua.AddDays(-47), // Carnaval (martes)
+            domingoPascua.AddDays(-7),  // Semana de Turismo (lunes)
+            domingoPascua.AddDays(-6),  // Semana de Turismo (martes)
+            domingoPascua.AddDays(-5),  // Semana de Turismo (miércoles)
+            domingoPascua.AddDays(-4),  // Semana de Turismo (jueves)
+            domingoPascua.AddDays(-2)   // Viernes Santo
+        };
+
+        FeriadosMovilesPorAnio[anio] = nuevosFeriados;
+        return nuevosFeriados;
+    }
+
+    private static DateOnly CalcularDomingoPascua(int anio)
+    {
+        var a = anio % 19;
+        var b = anio / 100;
+        var c = anio % 100;
+        var d = b / 4;
+        var e = b % 4;
+        var f = (b + 8) / 25;
+        var g = (b - f + 1) / 3;
+        var h = (19 * a + b - d - g + 15) % 30;
+        var i = c / 4;
+        var k = c % 4;
+        var l = (32 + 2 * e + 2 * i - h - k) % 7;
+        var m = (a + 11 * h + 22 * l) / 451;
+        var mes = (h + l - 7 * m + 114) / 31;
+        var dia = ((h + l - 7 * m + 114) % 31) + 1;
+
+        return new DateOnly(anio, mes, dia);
     }
 }
