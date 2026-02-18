@@ -10,95 +10,169 @@
 
 <PageTitle>Plazos por Tipo de Documento - Vector</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h3><i class="bi bi-hourglass-split me-2"></i>Plazos por tipo de documento</h3>
-</div>
-
-<div class="card shadow-sm border-0 mb-3">
-    <div class="card-body">
-        <p class="text-muted mb-3">
-            Define los plazos (en días) por <strong>Tipo de Documento</strong> y <strong>Prioridad</strong>.
-            Estos valores se usan al crear nuevos documentos para calcular <code>FechaVencimiento</code>.
-        </p>
-
-        @if (!string.IsNullOrWhiteSpace(mensajeExito))
-        {
-            <div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i>@mensajeExito</div>
-        }
-
-        @if (!string.IsNullOrWhiteSpace(mensajeError))
-        {
-            <div class="alert alert-warning"><i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError</div>
-        }
-
-        <EditForm Model="nuevoPlazo" OnValidSubmit="AgregarAsync">
-            <div class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold">Tipo de documento</label>
-                    <InputSelect class="form-select" @bind-Value="nuevoPlazo.IdTipoDocumento">
-                        <option value="0">-- Seleccione --</option>
-                        @foreach (var tipo in tipos)
-                        {
-                            <option value="@tipo.IdTipo">@tipo.Nombre</option>
-                        }
-                    </InputSelect>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Prioridad</label>
-                    <InputText class="form-control" @bind-Value="nuevoPlazo.Prioridad" placeholder="NORMAL" />
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Días máximos</label>
-                    <InputNumber class="form-control" @bind-Value="nuevoPlazo.DiasMaximos" min="0" />
-                </div>
-                <div class="col-md-2 d-grid">
-                    <button class="btn btn-primary" type="submit" disabled="@guardando">
-                        <i class="bi bi-plus-circle me-1"></i>Agregar
-                    </button>
-                </div>
-            </div>
-        </EditForm>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h3 class="mb-1 fw-bold"><i class="bi bi-hourglass-split text-primary me-2"></i>Plazos por Tipo de Documento</h3>
+        <p class="text-muted mb-0 small">Configura los tiempos de vencimiento automático para la generación de documentos.</p>
     </div>
 </div>
 
+@if (!string.IsNullOrWhiteSpace(mensajeExito))
+{
+    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i>@mensajeExito
+        <button type="button" class="btn-close" @onclick="LimpiarMensajes" aria-label="Close"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(mensajeError))
+{
+    <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError
+        <button type="button" class="btn-close" @onclick="LimpiarMensajes" aria-label="Close"></button>
+    </div>
+}
+
+@if (idFilaEnEdicion == 0)
+{
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body">
+            <h6 class="card-title fw-bold text-secondary mb-3"><i class="bi bi-plus-circle-dotted me-2"></i>Agregar Nueva Regla</h6>
+
+            <EditForm Model="nuevoPlazo" OnValidSubmit="AgregarAsync">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Tipo de documento</label>
+                        <InputSelect class="form-select" @bind-Value="nuevoPlazo.IdTipoDocumento">
+                            <option value="0">-- Seleccione --</option>
+                            @foreach (var tipo in tipos)
+                            {
+                                <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Prioridad</label>
+                        <InputText class="form-control" @bind-Value="nuevoPlazo.Prioridad" placeholder="Ej: URGENTE" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-uppercase text-muted">Días máximos</label>
+                        <InputNumber class="form-control" @bind-Value="nuevoPlazo.DiasMaximos" min="0" />
+                    </div>
+                    <div class="col-md-2 d-grid">
+                        <button class="btn btn-primary" type="submit" disabled="@guardando">
+                            @if (guardando)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                <span>Guardando...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-plus-lg me-1"></i>
+                                <span>Agregar</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
 <div class="card shadow-sm border-0">
+    <div class="card-header bg-white py-3">
+        <h6 class="mb-0 fw-bold"><i class="bi bi-list-check me-2"></i>Reglas Existentes</h6>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-sm align-middle mb-0">
-                <thead class="table-light">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light text-uppercase small">
                     <tr>
-                        <th>Tipo</th>
-                        <th style="width:220px">Prioridad</th>
-                        <th style="width:180px">Días máximos</th>
-                        <th style="width:140px" class="text-end">Acciones</th>
+                        <th class="ps-4">Tipo de Documento</th>
+                        <th style="width:250px">Prioridad</th>
+                        <th style="width:180px">Días Máximos</th>
+                        <th style="width:220px" class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (!plazos.Any())
                     {
-                        <tr><td colspan="4" class="text-center text-muted py-4">Sin configuraciones.</td></tr>
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                No hay plazos configurados aún.
+                            </td>
+                        </tr>
                     }
                     else
                     {
                         @foreach (var p in plazos)
                         {
-                            <tr>
-                                <td>@NombreTipo(p.IdTipoDocumento)</td>
-                                <td>
-                                    <input class="form-control form-control-sm" @bind="p.Prioridad" />
-                                </td>
-                                <td>
-                                    <InputNumber class="form-control form-control-sm" @bind-Value="p.DiasMaximos" min="0" />
-                                </td>
-                                <td class="text-end">
-                                    <button class="btn btn-success btn-sm me-1" @onclick="() => GuardarFilaAsync(p)" disabled="@guardando">
-                                        <i class="bi bi-save"></i>
-                                    </button>
-                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => EliminarAsync(p)" disabled="@guardando">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
+                            // MODO EDICIÓN
+                            @if (idFilaEnEdicion == p.IdConfig)
+                            {
+                                <tr class="table-active border-start border-primary border-4">
+                                    <td class="ps-4">
+                                        <select class="form-select form-select-sm" @bind="filaEdicion.IdTipoDocumento">
+                                            @foreach (var t in tipos)
+                                            {
+                                                <option value="@t.IdTipo">@t.Nombre</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm"
+                                               @bind="filaEdicion.Prioridad" placeholder="Prioridad" />
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm"
+                                               @bind="filaEdicion.DiasMaximos" min="0" />
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <button class="btn btn-success btn-sm d-flex align-items-center"
+                                                    @onclick="GuardarEdicionAsync" disabled="@guardando">
+                                                <i class="bi bi-check-lg me-1"></i> Guardar
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm d-flex align-items-center"
+                                                    @onclick="CancelarEdicion" disabled="@guardando">
+                                                <i class="bi bi-x-lg me-1"></i> Cancelar
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            // MODO LECTURA
+                            else
+                            {
+                                <tr>
+                                    <td class="ps-4 fw-medium text-primary">
+                                        @NombreTipo(p.IdTipoDocumento)
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">@p.Prioridad</span>
+                                    </td>
+                                    <td>
+                                        <span class="fw-bold">@p.DiasMaximos</span> <span class="text-muted small">días</span>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <button class="btn btn-outline-primary btn-sm d-flex align-items-center"
+                                                    @onclick="() => IniciarEdicion(p)"
+                                                    disabled="@(idFilaEnEdicion != 0 || guardando)">
+                                                <i class="bi bi-pencil-square me-1"></i> Editar
+                                            </button>
+                                            <button class="btn btn-outline-danger btn-sm d-flex align-items-center"
+                                                    @onclick="() => EliminarAsync(p)"
+                                                    disabled="@(idFilaEnEdicion != 0 || guardando)">
+                                                <i class="bi bi-trash me-1"></i> Borrar
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
                         }
                     }
                 </tbody>
@@ -108,9 +182,16 @@
 </div>
 
 @code {
-    private List<CfgTiemposRespuestum> plazos = [];
-    private List<CatTipoDocumento> tipos = [];
+    private List<CfgTiemposRespuestum> plazos = new();
+    private List<CatTipoDocumento> tipos = new();
+
+    // Modelo para crear nuevo
     private CfgTiemposRespuestum nuevoPlazo = new() { Prioridad = "NORMAL", DiasMaximos = 5 };
+
+    // Variables para control de edición de fila
+    private int idFilaEnEdicion = 0; // 0 significa ninguna
+    private CfgTiemposRespuestum filaEdicion = new(); // Copia temporal para editar
+
     private bool guardando;
     private string mensajeError = string.Empty;
     private string mensajeExito = string.Empty;
@@ -122,42 +203,35 @@
 
     private async Task CargarAsync()
     {
-        tipos = (await RepoTipos.GetAllAsync()).OrderBy(t => t.Nombre).ToList();
-        plazos = (await RepoPlazos.GetQueryable("IdTipoDocumentoNavigation")
-            .OrderBy(x => x.IdTipoDocumento)
-            .ThenBy(x => x.Prioridad)
-            .ToListAsync());
+        try
+        {
+            var tiposTask = RepoTipos.GetAllAsync();
+            var plazosTask = RepoPlazos.GetQueryable("IdTipoDocumentoNavigation")
+                .OrderBy(x => x.IdTipoDocumento)
+                .ThenBy(x => x.Prioridad)
+                .ToListAsync();
+
+            await Task.WhenAll(tiposTask, plazosTask);
+
+            tipos = (await tiposTask).OrderBy(t => t.Nombre).ToList();
+            plazos = await plazosTask;
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"Error al cargar datos: {ex.Message}";
+        }
     }
 
     private string NombreTipo(int idTipo)
-        => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"Tipo {idTipo}";
+        => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"ID: {idTipo}";
 
+    // --- LÓGICA DE AGREGAR ---
     private async Task AgregarAsync()
     {
         LimpiarMensajes();
 
-        if (nuevoPlazo.IdTipoDocumento <= 0)
-        {
-            mensajeError = "Seleccione un tipo de documento.";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(nuevoPlazo.Prioridad))
-        {
-            mensajeError = "La prioridad es obligatoria.";
-            return;
-        }
-
-        if (nuevoPlazo.DiasMaximos < 0)
-        {
-            mensajeError = "Los días máximos no pueden ser negativos.";
-            return;
-        }
-
-        var prioridad = nuevoPlazo.Prioridad.Trim().ToUpperInvariant();
-        var yaExiste = plazos.Any(x => x.IdTipoDocumento == nuevoPlazo.IdTipoDocumento &&
-                                       string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
-        if (yaExiste)
+        if (!ValidarModelo(nuevoPlazo)) return;
+        if (EsDuplicado(nuevoPlazo))
         {
             mensajeError = "Ya existe una configuración para ese tipo y prioridad.";
             return;
@@ -166,17 +240,19 @@
         guardando = true;
         try
         {
-            await RepoPlazos.AddAsync(new CfgTiemposRespuestum
+            var entidad = new CfgTiemposRespuestum
             {
                 IdTipoDocumento = nuevoPlazo.IdTipoDocumento,
-                Prioridad = prioridad,
+                Prioridad = nuevoPlazo.Prioridad.Trim().ToUpperInvariant(),
                 DiasMaximos = nuevoPlazo.DiasMaximos,
                 HorasMaximas = nuevoPlazo.HorasMaximas
-            });
+            };
+
+            await RepoPlazos.AddAsync(entidad);
 
             nuevoPlazo = new CfgTiemposRespuestum { Prioridad = "NORMAL", DiasMaximos = 5 };
             await CargarAsync();
-            mensajeExito = "Plazo agregado correctamente.";
+            mensajeExito = "Regla agregada correctamente.";
         }
         catch (Exception ex)
         {
@@ -188,42 +264,59 @@
         }
     }
 
-    private async Task GuardarFilaAsync(CfgTiemposRespuestum fila)
+    // --- LÓGICA DE EDICIÓN ---
+    private void IniciarEdicion(CfgTiemposRespuestum item)
+    {
+        LimpiarMensajes();
+        idFilaEnEdicion = item.IdConfig;
+
+        // Creamos una COPIA para editar, así no afectamos la lista visual hasta guardar
+        filaEdicion = new CfgTiemposRespuestum
+        {
+            IdConfig = item.IdConfig,
+            IdTipoDocumento = item.IdTipoDocumento,
+            Prioridad = item.Prioridad,
+            DiasMaximos = item.DiasMaximos,
+            HorasMaximas = item.HorasMaximas
+        };
+    }
+
+    private void CancelarEdicion()
+    {
+        idFilaEnEdicion = 0;
+        filaEdicion = new();
+        LimpiarMensajes();
+    }
+
+    private async Task GuardarEdicionAsync()
     {
         LimpiarMensajes();
 
-        if (string.IsNullOrWhiteSpace(fila.Prioridad))
-        {
-            mensajeError = "La prioridad es obligatoria.";
-            return;
-        }
+        if (!ValidarModelo(filaEdicion)) return;
 
-        if (fila.DiasMaximos < 0)
+        // Verificamos duplicados excluyendo el propio ID que estamos editando
+        if (EsDuplicado(filaEdicion, excluirId: filaEdicion.IdConfig))
         {
-            mensajeError = "Los días máximos no pueden ser negativos.";
-            return;
-        }
-
-        var prioridad = fila.Prioridad.Trim().ToUpperInvariant();
-        var colision = plazos.Any(x => x.IdConfig != fila.IdConfig && x.IdTipoDocumento == fila.IdTipoDocumento &&
-                                       string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
-        if (colision)
-        {
-            mensajeError = "Ya existe otra fila con esa prioridad para este tipo.";
+            mensajeError = "Conflicto: Ya existe otra regla con este tipo y prioridad.";
             return;
         }
 
         guardando = true;
         try
         {
-            fila.Prioridad = prioridad;
-            await RepoPlazos.UpdateAsync(fila);
-            mensajeExito = "Plazo actualizado.";
-            await CargarAsync();
+            // Buscamos la entidad original (o usamos Repo para update directo)
+            // Aquí enviamos la copia con los datos nuevos
+            filaEdicion.Prioridad = filaEdicion.Prioridad.Trim().ToUpperInvariant();
+
+            await RepoPlazos.UpdateAsync(filaEdicion);
+
+            mensajeExito = "Cambios guardados exitosamente.";
+            idFilaEnEdicion = 0; // Salir de edición
+            await CargarAsync(); // Recargar lista
         }
         catch (Exception ex)
         {
-            mensajeError = $"No se pudo actualizar: {ex.Message}";
+            mensajeError = $"Error al guardar: {ex.Message}";
         }
         finally
         {
@@ -231,16 +324,19 @@
         }
     }
 
+    // --- LÓGICA DE ELIMINAR ---
     private async Task EliminarAsync(CfgTiemposRespuestum fila)
     {
         LimpiarMensajes();
+
+        // Aquí podrías agregar un JS Confirm si lo deseas
 
         guardando = true;
         try
         {
             await RepoPlazos.DeleteAsync(fila.IdConfig);
-            plazos.RemoveAll(x => x.IdConfig == fila.IdConfig);
-            mensajeExito = "Plazo eliminado.";
+            plazos.Remove(fila);
+            mensajeExito = "Regla eliminada correctamente.";
         }
         catch (Exception ex)
         {
@@ -250,6 +346,35 @@
         {
             guardando = false;
         }
+    }
+
+    // --- VALIDACIONES COMUNES ---
+    private bool ValidarModelo(CfgTiemposRespuestum modelo)
+    {
+        if (modelo.IdTipoDocumento <= 0)
+        {
+            mensajeError = "Seleccione un tipo de documento.";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(modelo.Prioridad))
+        {
+            mensajeError = "La prioridad es obligatoria.";
+            return false;
+        }
+        if (modelo.DiasMaximos < 0)
+        {
+            mensajeError = "Los días máximos no pueden ser negativos.";
+            return false;
+        }
+        return true;
+    }
+
+    private bool EsDuplicado(CfgTiemposRespuestum modelo, int excluirId = 0)
+    {
+        var prioridad = modelo.Prioridad?.Trim();
+        return plazos.Any(x => x.IdConfig != excluirId &&
+                               x.IdTipoDocumento == modelo.IdTipoDocumento &&
+                               string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
     }
 
     private void LimpiarMensajes()
