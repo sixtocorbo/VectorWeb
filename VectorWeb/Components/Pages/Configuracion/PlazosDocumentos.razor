@@ -60,6 +60,17 @@
                     <div class="col-md-3">
                         <label class="form-label small fw-bold text-uppercase text-muted">Días máximos</label>
                         <InputNumber class="form-control" @bind-Value="nuevoPlazo.DiasMaximos" min="0" />
+
+                        @* --- AVISO DINÁMICO (NUEVO) --- *@
+                        @{
+                            var aviso = ObtenerLeyendaPlazo(nuevoPlazo.DiasMaximos);
+                        }
+                        @if (!string.IsNullOrEmpty(aviso.Texto))
+                        {
+                            <small class="d-block mt-1 @aviso.ClaseColor" style="font-size: 0.75rem;">
+                                <i class="bi bi-info-circle me-1"></i>@aviso.Texto
+                            </small>
+                        }
                     </div>
                     <div class="col-md-2 d-grid">
                         <button class="btn btn-primary" type="submit" disabled="@guardando">
@@ -92,7 +103,7 @@
                     <tr>
                         <th class="ps-4">Tipo de Documento</th>
                         <th style="width:250px">Prioridad</th>
-                        <th style="width:180px">Días Máximos</th>
+                        <th style="width:250px">Días Máximos</th>
                         <th style="width:220px" class="text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
@@ -129,6 +140,17 @@
                                     <td>
                                         <input type="number" class="form-control form-control-sm"
                                                @bind="filaEdicion.DiasMaximos" min="0" />
+
+                                        @* --- AVISO DINÁMICO EN EDICIÓN --- *@
+                                        @{
+                                            var avisoEdit = ObtenerLeyendaPlazo(filaEdicion.DiasMaximos);
+                                        }
+                                        @if (!string.IsNullOrEmpty(avisoEdit.Texto))
+                                        {
+                                            <div class="@avisoEdit.ClaseColor small mt-1" style="font-size: 0.7rem;">
+                                                @avisoEdit.Texto
+                                            </div>
+                                        }
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="d-flex justify-content-end gap-2">
@@ -156,6 +178,16 @@
                                     </td>
                                     <td>
                                         <span class="fw-bold">@p.DiasMaximos</span> <span class="text-muted small">días</span>
+
+                                        @* --- BADGE INFORMATIVO --- *@
+                                        @if (p.DiasMaximos < 30)
+                                        {
+                                            <span class="badge bg-info bg-opacity-10 text-info border border-info ms-2" style="font-size: 0.65rem;">HÁBILES</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning bg-opacity-10 text-dark border border-warning ms-2" style="font-size: 0.65rem;">CORRIDOS</span>
+                                        }
                                     </td>
                                     <td class="text-end pe-4">
                                         <div class="d-flex justify-content-end gap-2">
@@ -381,5 +413,20 @@
     {
         mensajeError = string.Empty;
         mensajeExito = string.Empty;
+    }
+
+    // --- NUEVO: MÉTODO AUXILIAR PARA LA LEYENDA DEL DECRETO 500 ---
+    private (string Texto, string ClaseColor) ObtenerLeyendaPlazo(int dias)
+    {
+        if (dias <= 0) return ("", "");
+
+        if (dias < 30)
+        {
+            return ($"Se contarán como DÍAS HÁBILES (Decreto 500).", "text-info");
+        }
+        else
+        {
+            return ($"Se contarán como DÍAS CORRIDOS (Decreto 500).", "text-warning fw-bold");
+        }
     }
 }
