@@ -343,10 +343,33 @@ public class NumeracionRangoService
             var saldoDisponible = Math.Max(0, cupoTotal - consumoTotalAsignado);
             var desdeSugerido = Math.Max(1, maximoNumeroAsignado + 1);
 
+            MaeNumeracionRango? rangoActivoOficina = null;
+            if (idOficina.HasValue)
+            {
+                rangoActivoOficina = await _context.MaeNumeracionRangos
+                    .AsNoTracking()
+                    .Where(r =>
+                        r.IdTipo == idTipo &&
+                        r.Anio == anio &&
+                        r.IdOficina == idOficina.Value &&
+                        r.Activo &&
+                        (!idRangoActual.HasValue || r.IdRango != idRangoActual.Value))
+                    .OrderByDescending(r => r.IdRango)
+                    .FirstOrDefaultAsync();
+            }
+
+            var oficinaTieneRangoActivo = rangoActivoOficina is not null;
+            var rangoActivoAgotado = rangoActivoOficina is not null && rangoActivoOficina.UltimoUtilizado >= rangoActivoOficina.NumeroFin;
+
             var cantidadAProponer = cantidadSolicitada.GetValueOrDefault();
             if (cantidadAProponer <= 0)
             {
                 cantidadAProponer = saldoDisponible > 0 ? Math.Min(200, saldoDisponible) : 0;
+            }
+
+            if (oficinaTieneRangoActivo && !rangoActivoAgotado)
+            {
+                cantidadAProponer = 0;
             }
 
             var cantidadAprobada = Math.Min(cantidadAProponer, saldoDisponible);
@@ -363,7 +386,12 @@ public class NumeracionRangoService
                 NumeroInicioSugerido = desdeSugerido,
                 NumeroFinSugerido = hastaSugerido,
                 CantidadSugerida = cantidadAprobada,
-                SugerenciaRecortadaPorSaldo = cantidadAprobada < cantidadAProponer
+                SugerenciaRecortadaPorSaldo = cantidadAprobada < cantidadAProponer,
+                OficinaTieneRangoActivo = oficinaTieneRangoActivo,
+                RangoActivoAgotado = rangoActivoAgotado,
+                RangoActivoNumeroInicio = rangoActivoOficina?.NumeroInicio,
+                RangoActivoNumeroFin = rangoActivoOficina?.NumeroFin,
+                RangoActivoUltimoUtilizado = rangoActivoOficina?.UltimoUtilizado
             };
         },
             fallback: new SugerenciaRangoNumeracion(),
@@ -931,6 +959,11 @@ public sealed class SugerenciaRangoNumeracion
     public int NumeroFinSugerido { get; set; }
     public int CantidadSugerida { get; set; }
     public bool SugerenciaRecortadaPorSaldo { get; set; }
+    public bool OficinaTieneRangoActivo { get; set; }
+    public bool RangoActivoAgotado { get; set; }
+    public int? RangoActivoNumeroInicio { get; set; }
+    public int? RangoActivoNumeroFin { get; set; }
+    public int? RangoActivoUltimoUtilizado { get; set; }
 }
 
 public sealed class CupoLibroMayorItem

@@ -145,11 +145,15 @@ else
                                         <td class="text-center">
                                             @if (rango.Activo)
                                             {
-                                                <i class="bi bi-check-circle-fill text-success fs-5" title="Activo"></i>
+                                                <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">
+                                                    <i class="bi bi-check-circle-fill me-1"></i>Activo
+                                                </span>
                                             }
                                             else
                                             {
-                                                <i class="bi bi-dash-circle text-muted fs-5" title="Inactivo"></i>
+                                                <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">
+                                                    <i class="bi bi-dash-circle me-1"></i>Inactivo
+                                                </span>
                                             }
                                         </td>
                                         <td class="text-end">
@@ -404,6 +408,24 @@ else
                                             <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
                                             <div class="col-md-4"><span class="text-muted">Cantidad sugerida:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
                                         </div>
+
+                                        @if (MostrarAvisoExisteRangoActivo)
+                                        {
+                                            <div class="small text-primary mt-2">
+                                                <i class="bi bi-info-circle me-1"></i>
+                                                Esta oficina ya tiene un rango activo (@(sugerenciaRango.RangoActivoNumeroInicio ?? 0)-@(sugerenciaRango.RangoActivoNumeroFin ?? 0)).
+                                                Solo se sugiere crear un nuevo rango cuando el actual se agote.
+                                            </div>
+                                        }
+
+                                        @if (MostrarAvisoRangoAgotado)
+                                        {
+                                            <div class="small text-warning mt-2">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                                El rango activo de esta oficina ya está agotado (@(sugerenciaRango.RangoActivoUltimoUtilizado ?? 0) usados de @(sugerenciaRango.RangoActivoNumeroFin ?? 0)).
+                                                Debe crear un nuevo rango para continuar emitiendo documentos de este tipo.
+                                            </div>
+                                        }
 
                                         @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
                                         {
@@ -717,6 +739,8 @@ else
 
 
     private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
+    private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
+    private bool MostrarAvisoRangoAgotado => sugerenciaRango.OficinaTieneRangoActivo && sugerenciaRango.RangoActivoAgotado;
 
     private async Task RefrescarSugerenciaRangoAsync()
     {
