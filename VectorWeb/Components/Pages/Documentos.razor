@@ -85,6 +85,10 @@
         width: 160px;
     }
 
+    .col-descripcion {
+        width: 220px;
+    }
+
     .col-acciones {
         width: 350px;
     }
@@ -98,6 +102,12 @@
         overflow: hidden;
         word-break: break-word;
         line-height: 1.4;
+    }
+
+    .descripcion-cell {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .search-input-wrapper {
@@ -234,6 +244,7 @@
                             <th class="col-id">Identificación</th>
                             <th class="col-vinculo">Vinculación</th>
                             <th>Asunto</th>
+                            <th class="col-descripcion">Descripción</th>
                             <th class="col-ubicacion">Ubicación</th>
                             <th class="col-acciones text-end">Acciones</th>
                         </tr>
@@ -281,6 +292,9 @@
                                 </td>
                                 <td>
                                     <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
+                                </td>
+                                <td>
+                                    <div class="descripcion-cell" title="@doc.Descripcion">@doc.Descripcion</div>
                                 </td>
                                 <td>
                                     @if (doc.IdOficinaActual == idOficinaUsuario)
