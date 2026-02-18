@@ -104,6 +104,11 @@ public class NumeracionRangoService
             return OperacionResultado.Fail("Debe seleccionar un tipo de documento válido.");
         }
 
+        if (!rango.IdOficina.HasValue)
+        {
+            return OperacionResultado.Fail("Debe seleccionar una oficina para el rango.");
+        }
+
         if (rango.NumeroInicio <= 0 || rango.NumeroFin <= 0 || rango.NumeroInicio > rango.NumeroFin)
         {
             return OperacionResultado.Fail("El rango ingresado no es válido.");
@@ -418,16 +423,12 @@ public class NumeracionRangoService
                 baseQuery = baseQuery.Where(r => r.Activo);
             }
 
-            if (idOficina.HasValue)
+            if (!idOficina.HasValue)
             {
-                var existeRangoOficina = await baseQuery.AnyAsync(r => r.IdOficina == idOficina);
-                if (existeRangoOficina)
-                {
-                    return true;
-                }
+                return false;
             }
 
-            return await baseQuery.AnyAsync(r => r.IdOficina == null);
+            return await baseQuery.AnyAsync(r => r.IdOficina == idOficina);
         }, fallback: false, operacion: "verificar existencia de rango configurado");
     }
 
@@ -534,24 +535,16 @@ public class NumeracionRangoService
             baseQuery = baseQuery.Where(r => r.UltimoUtilizado < r.NumeroFin);
         }
 
-        if (idOficina.HasValue)
+        if (!idOficina.HasValue)
         {
-            var queryOficina = baseQuery.Where(r => r.IdOficina == idOficina);
-
-            var rangoOficina = esHistorico
-                ? await queryOficina.OrderByDescending(r => r.IdRango).ThenByDescending(r => r.NumeroInicio).FirstOrDefaultAsync()
-                : await queryOficina.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
-
-            if (rangoOficina is not null)
-            {
-                return rangoOficina;
-            }
+            return null;
         }
 
-        var queryGlobal = baseQuery.Where(r => r.IdOficina == null);
+        var queryOficina = baseQuery.Where(r => r.IdOficina == idOficina);
+
         return esHistorico
-            ? await queryGlobal.OrderByDescending(r => r.IdRango).ThenByDescending(r => r.NumeroInicio).FirstOrDefaultAsync()
-            : await queryGlobal.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
+            ? await queryOficina.OrderByDescending(r => r.IdRango).ThenByDescending(r => r.NumeroInicio).FirstOrDefaultAsync()
+            : await queryOficina.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
     }
 
     private async Task<string?> ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)
@@ -570,7 +563,7 @@ public class NumeracionRangoService
 
         if (existeActivo)
         {
-            var oficinaTexto = "el ámbito global";
+            var oficinaTexto = "la oficina seleccionada";
 
             if (rango.IdOficina.HasValue)
             {

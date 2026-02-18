@@ -130,7 +130,7 @@ else
                                             }
                                             else
                                             {
-                                                <span class="badge bg-secondary"><i class="bi bi-globe me-1"></i>Global</span>
+                                                <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Sin oficina</span>
                                             }
                                         </td>
                                         <td class="text-center">@rango.Anio</td>
@@ -316,7 +316,7 @@ else
                                 </InputSelect>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Oficina (Opcional)</label>
+                                <label class="form-label fw-bold">Oficina</label>
                                 <div class="position-relative">
                                     <div class="input-group">
                                         <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
@@ -327,7 +327,6 @@ else
                                                @oninput="FiltrarOficinasRango"
                                                @onfocus="MostrarSugerenciasOficinaRango"
                                                @onkeydown="ManejarTecladoOficinasRango" />
-                                        <button type="button" class="btn @ClaseBotonGlobalRango" @onclick="SeleccionarGlobal">Global</button>
                                     </div>
 
                                     @if (oficinasRangoFiltradas.Any())
@@ -344,7 +343,7 @@ else
                                         </div>
                                     }
                                 </div>
-                                <div class="form-text @ClaseMensajeOficinaRango">@MensajeOficinaRango</div>
+                                <div class="form-text text-muted">@MensajeOficinaRango</div>
                             </div>
 
                             <div class="col-md-4">
@@ -489,7 +488,6 @@ else
     private string oficinaBusquedaRango = string.Empty;
     private List<CatOficina> oficinasRangoFiltradas = new();
     private int indiceOficinaRangoSeleccionada = -1;
-    private bool globalSeleccionadoRango = true;
 
     private int cupoTipoSeleccionado;
     private int cupoAnio = DateTime.Now.Year;
@@ -616,7 +614,6 @@ else
             Activo = true,
             Anio = DateTime.Now.Year
         };
-        globalSeleccionadoRango = true;
         oficinaBusquedaRango = string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
@@ -639,7 +636,6 @@ else
             Anio = rango.Anio
         };
         oficinaBusquedaRango = rango.IdOficinaNavigation?.Nombre ?? string.Empty;
-        globalSeleccionadoRango = rango.IdOficina is null;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         mostrarModal = true;
@@ -652,7 +648,6 @@ else
     {
         oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
         rangoActual.IdOficina = null;
-        globalSeleccionadoRango = false;
         indiceOficinaRangoSeleccionada = -1;
 
         if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
@@ -669,31 +664,17 @@ else
     private Task SeleccionarOficinaRango(CatOficina oficina)
     {
         rangoActual.IdOficina = oficina.IdOficina;
-        globalSeleccionadoRango = false;
         oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         return Task.CompletedTask;
     }
-
-    private void SeleccionarGlobal()
-    {
-        rangoActual.IdOficina = null;
-        globalSeleccionadoRango = true;
-        oficinaBusquedaRango = string.Empty;
-        oficinasRangoFiltradas.Clear();
-        indiceOficinaRangoSeleccionada = -1;
-    }
-
-    private string ClaseBotonGlobalRango => globalSeleccionadoRango ? "btn-success" : "btn-outline-secondary";
-    private string ClaseMensajeOficinaRango => globalSeleccionadoRango ? "text-success fw-semibold" : "text-muted";
     private string MensajeOficinaRango
     {
         get
         {
-            if (globalSeleccionadoRango) return "Global seleccionado: este rango aplica a todas las oficinas.";
             if (rangoActual.IdOficina is not null) return "La numeración se aplicará únicamente a la oficina seleccionada.";
-            return "Seleccione una oficina específica o pulse Global.";
+            return "Seleccione una oficina específica para este rango.";
         }
     }
 
@@ -726,6 +707,7 @@ else
         try
         {
             if (rangoActual.IdTipo <= 0) { mensajeErrorModalRango = "Seleccione un tipo."; return; }
+            if (!rangoActual.IdOficina.HasValue) { mensajeErrorModalRango = "Seleccione una oficina."; return; }
             if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { mensajeErrorModalRango = "Rango inválido (Inicio > Fin)."; return; }
 
             var resultado = await RangoService.GuardarRangoAsync(rangoActual);
