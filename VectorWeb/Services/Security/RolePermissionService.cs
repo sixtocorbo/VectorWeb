@@ -10,6 +10,13 @@ public class RolePermissionService
     private const string ParametroPermisos = "SEGURIDAD_PERMISOS_POR_ROL";
     private const string MatrizCacheKey = "security.permissions.matrix";
     private static readonly TimeSpan MatrizCacheTtl = TimeSpan.FromMinutes(5);
+    private static readonly IReadOnlyDictionary<string, int> PermisoAIndice = AppPermissions.Todos
+        .Select((permiso, indice) => new { permiso, indice })
+        .ToDictionary(x => x.permiso, x => x.indice, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly IReadOnlyDictionary<int, string> IndiceAPermiso = AppPermissions.Todos
+        .Select((permiso, indice) => new { permiso, indice })
+        .ToDictionary(x => x.indice, x => x.permiso);
 
     private readonly IDbContextFactory<SecretariaDbContext> _dbContextFactory;
     private readonly IMemoryCache _cache;
@@ -47,29 +54,12 @@ public class RolePermissionService
 
         try
         {
-            var raw = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(parametro.Valor);
-            if (raw is null || raw.Count == 0)
+            var matriz = DeserializarMatriz(parametro.Valor);
+
+            if (matriz.Count == 0)
             {
                 _cache.Set(MatrizCacheKey, ClonarMatriz(defaults), MatrizCacheTtl);
                 return defaults;
-            }
-
-            var matriz = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (rol, permisos) in raw)
-            {
-                var rolNormalizado = NormalizarRol(rol);
-                if (string.IsNullOrWhiteSpace(rolNormalizado))
-                {
-                    continue;
-                }
-
-                var permisosValidos = permisos?
-                    .Where(p => AppPermissions.Todos.Contains(p, StringComparer.OrdinalIgnoreCase))
-                    .Select(p => p.Trim().ToLowerInvariant())
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase)
-                    ?? [];
-
-                matriz[rolNormalizado] = permisosValidos;
             }
 
             foreach (var (rolDefault, permisosDefault) in defaults)
@@ -139,10 +129,14 @@ public class RolePermissionService
             .OrderBy(x => x.Key)
             .ToDictionary(
                 x => x.Key,
-                x => x.Value.OrderBy(v => v).ToArray(),
+                x => x.Value
+                    .Where(p => PermisoAIndice.ContainsKey(p))
+                    .OrderBy(p => PermisoAIndice[p])
+                    .Select(p => PermisoAIndice[p].ToString())
+                    .ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
-        return JsonSerializer.Serialize(payload);
+        return string.Join('|', payload.Select(x => $"{x.Key}:{string.Join(',', x.Value)}"));
     }
 
     public static Dictionary<string, HashSet<string>> ObtenerMatrizDefault()
@@ -168,4 +162,57 @@ public class RolePermissionService
             x => x.Key,
             x => new HashSet<string>(x.Value, StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, HashSet<string>> DeserializarMatriz(string valor)
+    {
+        if (string.IsNullOrWhiteSpace(valor))
+        {
+            return new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        try
+        {
+            var rawJson = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(valor);
+            if (rawJson is not null && rawJson.Count > 0)
+            {
+                return rawJson.ToDictionary(
+                    x => NormalizarRol(x.Key),
+                    x => x.Value?
+                        .Where(p => AppPermissions.Todos.Contains(p, StringComparer.OrdinalIgnoreCase))
+                        .Select(p => p.Trim().ToLowerInvariant())
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase)
+                        ?? [],
+                    StringComparer.OrdinalIgnoreCase);
+            }
+        }
+        catch (JsonException)
+        {
+            // Intentamos formato compacto para mantener compatibilidad con valores nuevos.
+        }
+
+        var matriz = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var segmento in valor.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var partes = segmento.Split(':', 2, StringSplitOptions.TrimEntries);
+            if (partes.Length != 2)
+            {
+                continue;
+            }
+
+            var rolNormalizado = NormalizarRol(partes[0]);
+            var permisos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var indiceRaw in partes[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (int.TryParse(indiceRaw, out var indicePermiso) && IndiceAPermiso.TryGetValue(indicePermiso, out var permiso))
+                {
+                    permisos.Add(permiso);
+                }
+            }
+
+            matriz[rolNormalizado] = permisos;
+        }
+
+        return matriz;
+    }
 }
