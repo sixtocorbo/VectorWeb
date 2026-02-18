@@ -15,6 +15,480 @@
 <PageTitle>Bandeja de Documentos - Vector</PageTitle>
 
 <style>
+    /* Estructura mejorada */
+    .page-header {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        border-left: 6px solid #0d6efd;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
+    }
+
+    .table-container {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden; /* Para que el radio se aplique a la tabla */
+    }
+
+    /* Control de tabla - Quitamos fixed para evitar que se encimen */
+    .table {
+        margin-bottom: 0;
+        font-size: 0.88rem;
+    }
+
+        .table thead th {
+            background-color: #f1f4f8;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            letter-spacing: 0.03em;
+            padding: 1rem 0.75rem;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+    /* Celdas de texto con control de desbordamiento */
+    .asunto-cell {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-width: 200px;
+        max-width: 300px;
+        line-height: 1.4;
+        white-space: normal; /* Permite el quiebre de línea */
+    }
+
+    .descripcion-cell {
+        max-width: 220px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #6c757d;
+    }
+
+    /* Buscador estilizado */
+    .search-input-wrapper {
+        position: relative;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #adb5bd;
+    }
+
+    .search-input {
+        padding-left: 45px !important;
+        height: 45px;
+        border-radius: 10px;
+        border: 1px solid #dee2e6;
+        transition: all 0.2s;
+    }
+
+        .search-input:focus {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+        }
+
+    /* Badges de estado */
+    .badge-status {
+        padding: 0.5em 0.8em;
+        border-radius: 50rem; /* Pill style */
+        font-weight: 600;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+    }
+
+    /* Botones de acción compactos */
+    .btn-action {
+        padding: 0.35rem 0.6rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item small"><a href="#">Sistema</a></li>
+                    <li class="breadcrumb-item active small" aria-current="page">Documentos</li>
+                </ol>
+            </nav>
+            <h3 class="mb-0 fw-bold text-dark">
+                <i class="bi bi-inbox-fill text-primary me-2"></i>
+                @nombreOficinaUsuario
+            </h3>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="card border-0 bg-white shadow-sm px-3 py-2 rounded-4">
+                <div class="small text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Pendientes</div>
+                <div class="h5 mb-0 fw-bold text-primary">@totalExpedientesPendientes</div>
+            </div>
+            <a href="documentos/nuevo" class="btn btn-primary btn-lg shadow px-4 rounded-pill fw-bold">
+                <i class="bi bi-plus-lg me-1"></i> Nuevo Ingreso
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4 rounded-4">
+        <div class="card-body p-4">
+            <div class="row g-4 align-items-end">
+                <div class="col-lg-6">
+                    <label class="form-label fw-bold small text-muted">Buscador inteligente</label>
+                    <div class="search-input-wrapper">
+                        <i class="bi bi-search search-icon"></i>
+                        <input class="form-control search-input shadow-none"
+                               placeholder="Buscar por número, asunto o descripción..."
+                               @bind="FiltroBusqueda"
+                               @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small text-muted">Registros</label>
+                    <select class="form-select border-light bg-light fw-bold" @bind="TamanoPagina" @bind:after="OnTamanoPaginaChanged">
+                        @foreach (var opcion in opcionesTamanoPagina)
+                        {
+                            <option value="@opcion">Mostrar @opcion</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-center justify-content-md-end pb-2">
+                    <div class="form-check form-switch custom-switch">
+                        <input class="form-check-input" type="checkbox" id="swGlobal" @bind="verTodo" @bind:after="CargarDocumentos">
+                        <label class="form-check-label fw-bold small" for="swGlobal">Vista Global</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-4 flex-wrap">
+        <button class="btn btn-sm rounded-pill @(string.IsNullOrEmpty(filtroSemaforo) ? "btn-dark shadow" : "btn-outline-secondary")"
+                @onclick="() => FiltrarPorEstado(null)">
+            <i class="bi bi-list-task me-1"></i> Todos
+        </button>
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("ROJO") ? "btn-danger shadow" : "btn-outline-danger")"
+                @onclick='() => FiltrarPorEstado("ROJO")'>
+            <i class="bi bi-fire me-1"></i> Urgentes
+            <span class="badge bg-white text-danger ms-1">@totalRojo</span>
+        </button>
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("AMARILLO") ? "btn-warning shadow" : "btn-outline-warning text-dark")"
+                @onclick='() => FiltrarPorEstado("AMARILLO")'>
+            <i class="bi bi-clock-history me-1"></i> En Riesgo
+            <span class="badge bg-dark text-warning ms-1">@totalAmarillo</span>
+        </button>
+
+        <button class="btn btn-sm rounded-pill @(EsSemaforoActivo("VERDE") ? "btn-success shadow" : "btn-outline-success")"
+                @onclick='() => FiltrarPorEstado("VERDE")'>
+            <i class="bi bi-check-all me-1"></i> En Plazo
+            <span class="badge bg-white text-success ms-1">@totalVerde</span>
+        </button>
+    </div>
+
+    @if (listaDocs is null)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-grow text-primary" role="status"></div>
+            <p class="mt-3 text-muted fw-bold">Organizando tus documentos...</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-container shadow-sm border">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 130px;">Estado</th>
+                            <th style="width: 100px;">Fecha</th>
+                            <th style="width: 160px;">Identificación</th>
+                            <th style="width: 140px;">Vinculación</th>
+                            <th>Asunto</th>
+                            <th>Descripción</th>
+                            <th style="width: 150px;">Ubicación</th>
+                            <th class="text-end" style="width: 200px;">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in DocumentosPaginados)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="badge badge-status @ObtenerClaseSemaforo(doc.EstadoSemaforo)" title="@doc.IdEstadoActualNavigation?.Nombre">
+                                        @doc.IdEstadoActualNavigation?.Nombre
+                                    </span>
+                                </td>
+                                <td class="text-muted fw-medium">@doc.FechaCreacion?.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    <div class="fw-bold text-primary mb-0">@doc.NumeroOficial</div>
+                                    <div class="text-muted" style="font-size: 0.75rem;">@doc.IdTipoNavigation?.Nombre</div>
+                                </td>
+                                <td>
+                                    @if (doc.IdDocumentoPadre.HasValue)
+                                    {
+                                        <div class="badge bg-light text-dark border fw-normal py-1 px-2" title="Hijo de: @ObtenerReferenciaPadre(doc.IdDocumentoPadre.Value)">
+                                            <i class="bi bi-link-45deg"></i> Vinculado
+                                        </div>
+                                    }
+                                    @if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantHijos) && cantHijos > 0)
+                                    {
+                                        <div class="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2 mt-1">
+                                            <i class="bi bi-diagram-2"></i> @cantHijos derivados
+                                        </div>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
+                                </td>
+                                <td>
+                                    <div class="descripcion-cell" title="@doc.Descripcion">@doc.Descripcion</div>
+                                </td>
+                                <td>
+                                    @if (doc.IdOficinaActual == idOficinaUsuario)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2">MI BANDEJA</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-truncate small fw-medium" style="max-width: 140px;" title="@doc.IdOficinaActualNavigation?.Nombre">
+                                            <i class="bi bi-building text-muted"></i> @doc.IdOficinaActualNavigation?.Nombre
+                                        </div>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    <div class="dropdown">
+                                        <button class="btn btn-light btn-sm border shadow-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Acciones
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0">
+                                            <li><button class="dropdown-item py-2" @onclick="() => IrAPase(doc)"><i class="bi bi-send text-warning me-2"></i> Dar Pase</button></li>
+                                            <li><a class="dropdown-item py-2" href="documentos/historial/@doc.IdDocumento"><i class="bi bi-clock-history text-info me-2"></i> Historial</a></li>
+                                            <li><a class="dropdown-item py-2" href="documentos/recorrido/@doc.IdDocumento"><i class="bi bi-geo-alt text-secondary me-2"></i> Recorrido</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><button class="dropdown-item py-2" @onclick="() => IrAEditar(doc.IdDocumento)"><i class="bi bi-pencil-square text-primary me-2"></i> Editar</button></li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-3 bg-light border-top d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="text-muted small">
+                    Mostrando <strong>@DesdeRegistro</strong> a <strong>@HastaRegistro</strong> de <strong>@TotalRegistros</strong> resultados
+                </div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0 shadow-sm">
+                        <li class="page-item @(PaginaActualEfectiva == 1 ? "disabled" : "")">
+                            <button class="page-link" @onclick="PaginaAnterior">Anterior</button>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link bg-white text-dark fw-bold">@PaginaActualEfectiva / @TotalPaginas</span>
+                        </li>
+                        <li class="page-item @(PaginaActualEfectiva >= TotalPaginas ? "disabled" : "")">
+                            <button class="page-link" @onclick="PaginaSiguiente">Siguiente</button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // ... (El bloque @code se mantiene igual, no hay cambios en la lógica)
+    private List<MaeDocumento>? listaDocs;
+    private Dictionary<long, int> cantidadHijosPorPadre = [];
+    private Dictionary<long, string> referenciasPadrePorId = [];
+    private Timer? timerBusqueda;
+    private string filtroBusqueda = string.Empty;
+    private int paginaActual = 1;
+    private int tamanoPagina = 10;
+    private int idOficinaUsuario;
+    private string nombreOficinaUsuario = "Mi Oficina";
+    private int totalExpedientesPendientes;
+    private bool verTodo;
+    private string? filtroSemaforo;
+    private int totalRojo;
+    private int totalAmarillo;
+    private int totalVerde;
+    private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
+
+    private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
+    private int TotalRegistros { get; set; }
+    private int TotalPaginas => Math.Max(1, (int)Math.Ceiling(TotalRegistros / (double)tamanoPagina));
+    private int PaginaActualEfectiva => Math.Max(1, Math.Min(paginaActual, TotalPaginas));
+    private int DesdeRegistro => TotalRegistros == 0 ? 0 : ((PaginaActualEfectiva - 1) * tamanoPagina) + 1;
+    private int HastaRegistro => Math.Min(PaginaActualEfectiva * tamanoPagina, TotalRegistros);
+
+    private string FiltroBusqueda
+    {
+        get => filtroBusqueda;
+        set { if (filtroBusqueda == value) return; filtroBusqueda = value; paginaActual = 1; ReiniciarTemporizadorBusqueda(); }
+    }
+
+    private int TamanoPagina
+    {
+        get => tamanoPagina;
+        set { if (tamanoPagina == value) return; tamanoPagina = value; paginaActual = 1; }
+    }
+
+    private Task OnTamanoPaginaChanged() => CargarDocumentos();
+
+    private bool EsSemaforoActivo(string estado) => string.Equals(filtroSemaforo, estado, StringComparison.OrdinalIgnoreCase);
+
+    private async Task FiltrarPorEstado(string? estado)
+    {
+        filtroSemaforo = estado;
+        paginaActual = 1;
+        await CargarDocumentos();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var claimOficina = user.FindFirst("IdOficina")?.Value;
+            if (int.TryParse(claimOficina, out var ofId))
+            {
+                idOficinaUsuario = ofId;
+                await using var db = await DbContextFactory.CreateDbContextAsync();
+                var of = await db.CatOficinas.AsNoTracking().FirstOrDefaultAsync(o => o.IdOficina == idOficinaUsuario);
+                nombreOficinaUsuario = of?.Nombre ?? $"Oficina {idOficinaUsuario}";
+                if (idOficinaUsuario <= 0) verTodo = true;
+            }
+        }
+        await CargarDocumentos();
+    }
+
+    private async Task CargarDocumentos()
+    {
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+        var qBase = db.MaeDocumentos.AsNoTracking()
+            .Include(d => d.IdTipoNavigation).Include(d => d.IdOficinaActualNavigation).Include(d => d.IdEstadoActualNavigation).AsQueryable();
+
+        if (!verTodo && idOficinaUsuario > 0) qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
+
+        totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
+
+        var qConBusqueda = AplicarFiltroBusqueda(qBase);
+
+        totalRojo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "ROJO");
+        totalAmarillo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "AMARILLO");
+        totalVerde = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "VERDE");
+
+        var q = AplicarFiltroSemaforo(qConBusqueda);
+
+        TotalRegistros = await q.CountAsync();
+        if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
+
+        listaDocs = await q.OrderByDescending(d => d.FechaCreacion).Skip((PaginaActualEfectiva - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
+
+        var idsPadre = listaDocs.Where(d => d.IdDocumentoPadre.HasValue).Select(d => d.IdDocumentoPadre!.Value).Distinct().ToList();
+        if (idsPadre.Any())
+        {
+            referenciasPadrePorId = await db.MaeDocumentos.AsNoTracking().Where(d => idsPadre.Contains(d.IdDocumento)).Include(d => d.IdTipoNavigation)
+                .Select(d => new { d.IdDocumento, n = d.NumeroOficial, t = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null })
+                .ToDictionaryAsync(x => x.IdDocumento, x => (x.t + " " + x.n).Trim());
+        }
+        else
+        {
+            referenciasPadrePorId.Clear();
+        }
+
+        var idsVisibles = listaDocs.Select(d => d.IdDocumento).ToList();
+        if (idsVisibles.Any())
+        {
+            var conteos = await db.MaeDocumentos.AsNoTracking()
+                .Where(d => d.IdDocumentoPadre.HasValue && idsVisibles.Contains(d.IdDocumentoPadre.Value))
+                .GroupBy(d => d.IdDocumentoPadre!.Value)
+                .Select(g => new { IdPadre = g.Key, Cantidad = g.Count() })
+                .ToListAsync();
+
+            cantidadHijosPorPadre = conteos.ToDictionary(k => k.IdPadre, v => v.Cantidad);
+        }
+        else
+        {
+            cantidadHijosPorPadre.Clear();
+        }
+
+        StateHasChanged();
+    }
+
+    private void ReiniciarTemporizadorBusqueda()
+    {
+        timerBusqueda?.Stop(); timerBusqueda?.Dispose();
+        var nT = new Timer(500) { AutoReset = false };
+        nT.Elapsed += (_, _) => { _ = InvokeAsync(async () => { await CargarDocumentos(); }); };
+        timerBusqueda = nT; nT.Start();
+    }
+
+    private IQueryable<MaeDocumento> AplicarFiltroBusqueda(IQueryable<MaeDocumento> q)
+    {
+        if (string.IsNullOrWhiteSpace(filtroBusqueda)) return q;
+        var tms = filtroBusqueda.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var t in tms)
+        {
+            var p = $"%{t}%";
+            q = q.Where(d => EF.Functions.Like(d.NumeroOficial ?? "", p) || EF.Functions.Like(d.Asunto ?? "", p) || EF.Functions.Like(d.Descripcion ?? "", p) || EF.Functions.Like(d.IdTipoNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdOficinaActualNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdEstadoActualNavigation.Nombre ?? "", p));
+        }
+        return q;
+    }
+
+    private IQueryable<MaeDocumento> AplicarFiltroSemaforo(IQueryable<MaeDocumento> q)
+    {
+        if (string.IsNullOrWhiteSpace(filtroSemaforo)) return q;
+        return q.Where(d => d.EstadoSemaforo == filtroSemaforo);
+    }
+
+    private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
+
+    private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
+    private async Task PaginaSiguiente() { if (PaginaActualEfectiva < TotalPaginas) { paginaActual++; await CargarDocumentos(); } }
+    private static string ObtenerClaseSemaforo(string? estado) => (estado ?? string.Empty).ToUpperInvariant() switch
+    {
+        "ROJO" => "bg-danger text-white",
+        "AMARILLO" => "bg-warning text-dark",
+        "VERDE" => "bg-success text-white",
+        _ => "bg-secondary text-white"
+    };
+    private string ObtenerReferenciaPadre(long id) => referenciasPadrePorId.TryGetValue(id, out var r) ? r : $"#{id}";
+    private void IrAPase(MaeDocumento d) => Navegador.NavigateTo($"documentos/pase/{d.IdDocumento}");
+    public void Dispose() => timerBusqueda?.Dispose();
+}
+@* @page "/documentos"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.ver")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using System.Timers
+@using VectorWeb.Models
+@inject IDbContextFactory<SecretariaDbContext> DbContextFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navegador
+@rendermode InteractiveServer
+@implements IDisposable
+
+<PageTitle>Bandeja de Documentos - Vector</PageTitle>
+
+<style>
     /* 1. Estructura y contenedores */
     .page-header {
         background: #f8f9fa;
@@ -504,3 +978,4 @@
     private void IrAPase(MaeDocumento d) => Navegador.NavigateTo($"documentos/pase/{d.IdDocumento}");
     public void Dispose() => timerBusqueda?.Dispose();
 }
+ *@
