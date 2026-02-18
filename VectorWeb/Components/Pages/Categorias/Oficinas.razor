@@ -9,117 +9,146 @@
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
-<h3>Gestión de Oficinas</h3>
-
-@if (!string.IsNullOrWhiteSpace(mensajeError))
-{
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        @mensajeError
-        <button type="button" class="btn-close" @onclick="() => mensajeError = string.Empty"></button>
-    </div>
-}
-
-@if (!string.IsNullOrWhiteSpace(mensajeExito))
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @mensajeExito
-        <button type="button" class="btn-close" @onclick="() => mensajeExito = string.Empty"></button>
-    </div>
-}
-
-<div class="row mb-3 g-2 align-items-center">
-    <div class="col-md-4">
-        <input type="text" class="form-control" placeholder="Buscar oficina..." @bind="busquedaOficina" @bind:event="oninput" />
-    </div>
-    <div class="col-md-4">
-        <input type="text" class="form-control" placeholder="Nombre de nueva oficina..." @bind="nuevaOficinaNombre" />
-    </div>
-    <div class="col-auto">
-        <button class="btn btn-success" @onclick="AgregarOficina">
-            <i class="bi bi-plus-lg"></i> Agregar
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1 text-primary fw-bold">Gestión de Oficinas</h3>
+            <p class="text-muted small mb-0">Administre el catálogo de oficinas y resuelva duplicados.</p>
+        </div>
+        <button class="btn btn-primary shadow-sm" @onclick="AbrirModalUnificacion">
+            <i class="bi bi-intersect me-2"></i>Unificar Duplicados
         </button>
     </div>
-    <div class="col-auto ms-auto">
-        <button class="btn btn-primary" @onclick="AbrirModalUnificacion">
-            <i class="bi bi-intersect"></i> Unificar Duplicados
-        </button>
-    </div>
-</div>
 
-<div class="table-responsive">
-    <table class="table table-striped table-hover align-middle">
-        <thead class="table-light">
-            <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Tipo</th>
-                <th class="text-end">Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var oficina in OficinasFiltradas)
-            {
-                <tr>
-                    <td><span class="badge bg-secondary">@oficina.IdOficina</span></td>
-                    <td>
-                        @if (oficinaEditandoId == oficina.IdOficina)
-                        {
-                            <div class="input-group input-group-sm">
-                                <input type="text" class="form-control" @bind="nombreEdicion" />
-                                <button class="btn btn-success" @onclick="() => GuardarEdicion(oficina)">
-                                    <i class="bi bi-check me-1"></i>Guardar
-                                </button>
-                                <button class="btn btn-outline-secondary" @onclick="CancelarEdicion">
-                                    <i class="bi bi-x me-1"></i>Cancelar
-                                </button>
-                            </div>
-                        }
-                        else
-                        {
-                            @oficina.Nombre
-                        }
-                    </td>
-                    <td>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" checked="@(oficina.EsExterna == true)" @onchange="(e) => CambiarTipoOficina(oficina, e)" />
-                            <label class="form-check-label small text-muted">@(oficina.EsExterna == true ? "Externa" : "Interna")</label>
-                        </div>
-                    </td>
-                    <td class="text-end">
-                        <button class="btn btn-outline-primary btn-sm me-1" @onclick="() => IniciarEdicion(oficina)">
-                            <i class="bi bi-pencil me-1"></i>Editar
-                        </button>
-                        <button class="btn btn-outline-danger btn-sm" @onclick="() => Eliminar(oficina.IdOficina)">
-                            <i class="bi bi-trash me-1"></i>Eliminar
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    @* --- SECCIÓN DE MENSAJES --- *@
+    @if (!string.IsNullOrWhiteSpace(mensajeError))
+    {
+        <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i> @mensajeError
+            <button type="button" class="btn-close" @onclick="() => mensajeError = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(mensajeExito))
+    {
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> @mensajeExito
+            <button type="button" class="btn-close" @onclick="() => mensajeExito = string.Empty"></button>
+        </div>
+    }
+
+    @* --- FILTROS Y ALTA --- *@
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small text-uppercase text-muted">Buscar</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" class="form-control border-start-0 shadow-none" placeholder="Filtrar lista..." @bind="busquedaOficina" @bind:event="oninput" />
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold small text-uppercase text-muted">Nombre de nueva oficina</label>
+                    <input type="text" class="form-control shadow-none" placeholder="Ej. Dirección de Finanzas" @bind="nuevaOficinaNombre" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-success w-100 fw-bold shadow-sm" @onclick="AgregarOficina">
+                        <i class="bi bi-plus-lg me-2"></i>Agregar Oficina
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* --- TABLA PRINCIPAL --- *@
+    <div class="card shadow-sm border-0 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width: 80px;" class="text-center">ID</th>
+                        <th>Nombre de la Oficina</th>
+                        <th style="width: 160px;">Tipo</th>
+                        <th style="width: 280px;" class="text-end px-4">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var oficina in OficinasFiltradas)
+                    {
+                        <tr class="@(oficinaEditandoId == oficina.IdOficina ? "table-primary table-opacity-10" : "")">
+                            <td class="text-center">
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border">@oficina.IdOficina</span>
+                            </td>
+                            <td>
+                                @if (oficinaEditandoId == oficina.IdOficina)
+                                {
+                                    <div class="input-group input-group-sm w-100 shadow-sm">
+                                        <input type="text" class="form-control border-primary" @bind="nombreEdicion" @onkeyup="@(e => e.Key == "Enter" ? GuardarEdicion(oficina) : null)" />
+                                        <button class="btn btn-success px-3" @onclick="() => GuardarEdicion(oficina)">
+                                            <i class="bi bi-check-lg me-1"></i> Guardar
+                                        </button>
+                                        <button class="btn btn-light border px-3" @onclick="CancelarEdicion">
+                                            <i class="bi bi-x me-1"></i> Cancelar
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span class="fw-medium">@oficina.Nombre</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="sw_@oficina.IdOficina"
+                                           checked="@(oficina.EsExterna == true)" @onchange="(e) => CambiarTipoOficina(oficina, e)" />
+                                    <label class="form-check-label small text-muted" for="sw_@oficina.IdOficina">
+                                        @(oficina.EsExterna == true ? "Externa" : "Interna")
+                                    </label>
+                                </div>
+                            </td>
+                            <td class="text-end px-4">
+                                @if (oficinaEditandoId != oficina.IdOficina)
+                                {
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button class="btn btn-outline-primary btn-sm px-3" @onclick="() => IniciarEdicion(oficina)">
+                                            <i class="bi bi-pencil me-1"></i> Editar
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm px-3" @onclick="() => Eliminar(oficina.IdOficina)">
+                                            <i class="bi bi-trash me-1"></i> Eliminar
+                                        </button>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 @* --- MODAL DE UNIFICACIÓN --- *@
 @if (mostrarModalUnificacion)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
         <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
+            <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Unificar Oficinas Duplicadas</h5>
+                    <h5 class="modal-title fw-bold"><i class="bi bi-intersect me-2"></i>Unificar Oficinas</h5>
                     <button type="button" class="btn-close btn-close-white" @onclick="CerrarModal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="alert alert-info small">
-                        <i class="bi bi-info-circle-fill me-1"></i>
-                        Esta acción moverá todos los documentos, movimientos y usuarios de las oficinas "A Eliminar" hacia la "Oficina Principal".
-                        <strong>Las oficinas duplicadas serán borradas permanentemente.</strong>
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 shadow-sm small mb-4">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        Esta acción moverá documentos, movimientos y usuarios a la oficina principal.
+                        <strong>Los duplicados se eliminarán permanentemente.</strong>
                     </div>
 
-                    <div class="mb-4">
-                        <label class="form-label fw-bold text-success">1. Seleccione la Oficina Principal (La que quedará)</label>
-                        <select class="form-select border-success" @bind="idOficinaMaestra">
-                            <option value="0">-- Seleccione la correcta --</option>
+                    <div class="mb-4 text-start">
+                        <label class="form-label fw-bold text-success">1. Oficina Principal (La que prevalece)</label>
+                        <select class="form-select border-success shadow-none" @bind="idOficinaMaestra">
+                            <option value="0">-- Seleccione la oficina correcta --</option>
                             @foreach (var ofi in listaOficinas.OrderBy(o => o.Nombre))
                             {
                                 <option value="@ofi.IdOficina">@ofi.Nombre (ID: @ofi.IdOficina)</option>
@@ -129,40 +158,44 @@
 
                     @if (idOficinaMaestra > 0)
                     {
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-danger">2. Seleccione las oficinas duplicadas (Se eliminarán)</label>
-                            <input type="text" class="form-control mb-2 form-control-sm" placeholder="Filtrar lista..." @bind="filtroModal" @bind:event="oninput" />
+                        <div class="mb-3 text-start animate__animated animate__fadeIn">
+                            <label class="form-label fw-bold text-danger">2. Seleccione duplicados a eliminar</label>
+                            <input type="text" class="form-control form-control-sm mb-2 shadow-none" placeholder="Filtrar por nombre..." @bind="filtroModal" @bind:event="oninput" />
 
-                            <div class="border rounded p-2 bg-light" style="max-height: 250px; overflow-y: auto;">
+                            <div class="border rounded bg-white p-2" style="max-height: 200px; overflow-y: auto;">
                                 @foreach (var ofi in listaOficinas.Where(o => o.IdOficina != idOficinaMaestra && (string.IsNullOrEmpty(filtroModal) || o.Nombre.Contains(filtroModal, StringComparison.OrdinalIgnoreCase))))
                                 {
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox"
-                                               id="chk_@ofi.IdOficina"
+                                    <div class="form-check py-1 border-bottom border-light">
+                                        <input class="form-check-input" type="checkbox" id="chk_@ofi.IdOficina"
                                                checked="@idsDuplicados.Contains(ofi.IdOficina)"
                                                @onchange="(e) => ToggleDuplicado(ofi.IdOficina, e)">
-                                        <label class="form-check-label" for="chk_@ofi.IdOficina">
-                                            @ofi.Nombre <span class="text-muted small">(ID: @ofi.IdOficina)</span>
+                                        <label class="form-check-label d-flex justify-content-between pe-2" for="chk_@ofi.IdOficina">
+                                            <span>@ofi.Nombre</span>
+                                            <span class="text-muted small">ID: @ofi.IdOficina</span>
                                         </label>
                                     </div>
                                 }
                             </div>
-                            <div class="form-text mt-1">
-                                Seleccionadas para borrar: <strong>@idsDuplicados.Count</strong>
+                            <div class="form-text mt-2 text-end">
+                                Seleccionadas para borrar: <span class="badge bg-danger">@idsDuplicados.Count</span>
                             </div>
                         </div>
                     }
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
-                    <button type="button" class="btn btn-danger"
+                <div class="modal-footer bg-light border-0">
+                    <button type="button" class="btn btn-secondary px-4" @onclick="CerrarModal">Cancelar</button>
+                    <button type="button" class="btn btn-danger px-4 shadow-sm"
                             disabled="@(idOficinaMaestra == 0 || idsDuplicados.Count == 0 || procesandoUnificacion)"
                             @onclick="EjecutarUnificacion">
                         @if (procesandoUnificacion)
                         {
-                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span class="spinner-border spinner-border-sm me-2"></span>
                         }
-                        <i class="bi bi-intersect me-1"></i> Confirmar Unificación
+                        else
+                        {
+                            <i class="bi bi-intersect me-2"></i>
+                        }
+                        Confirmar Unificación
                     </button>
                 </div>
             </div>
@@ -177,7 +210,7 @@
     private string mensajeError = string.Empty;
     private string mensajeExito = string.Empty;
 
-    // Estado Edición Rápida
+    // Estado Edición
     private int oficinaEditandoId = 0;
     private string nombreEdicion = string.Empty;
 
@@ -214,10 +247,9 @@
         if (!string.IsNullOrWhiteSpace(nuevaOficinaNombre))
         {
             mensajeError = string.Empty;
-            // CORREGIDO: Eliminada la propiedad 'Activo'
             await RepoOficina.AddAsync(new CatOficina { Nombre = nuevaOficinaNombre.Trim(), EsExterna = false });
             nuevaOficinaNombre = string.Empty;
-            mensajeExito = "Oficina agregada.";
+            mensajeExito = "Oficina agregada correctamente.";
             await Cargar();
         }
     }
@@ -227,14 +259,14 @@
         if (oficina is null) return;
         oficina.EsExterna = (e.Value is bool b && b);
         await RepoOficina.UpdateAsync(oficina);
-        // No recargamos todo para mantener el estado visual suave
     }
 
-    // --- EDICIÓN DE NOMBRE ---
     private void IniciarEdicion(CatOficina oficina)
     {
         oficinaEditandoId = oficina.IdOficina;
         nombreEdicion = oficina.Nombre;
+        mensajeError = string.Empty;
+        mensajeExito = string.Empty;
     }
 
     private void CancelarEdicion()
@@ -247,32 +279,29 @@
     {
         if (!string.IsNullOrWhiteSpace(nombreEdicion))
         {
-            oficina.Nombre = nombreEdicion;
+            oficina.Nombre = nombreEdicion.Trim();
             await RepoOficina.UpdateAsync(oficina);
             oficinaEditandoId = 0;
-            mensajeExito = "Nombre actualizado.";
+            mensajeExito = "Cambios guardados exitosamente.";
         }
     }
 
-    // --- ELIMINACIÓN SEGURA ---
     private async Task Eliminar(int id)
     {
         var oficina = listaOficinas.FirstOrDefault(o => o.IdOficina == id);
         if (oficina is null) return;
 
-        // Validaciones Manuales para dar feedback claro
         var tieneDocumentos = await DbContext.MaeDocumentos.AsNoTracking().AnyAsync(d => d.IdOficinaActual == id);
         var tieneMovs = await DbContext.TraMovimientos.AsNoTracking().AnyAsync(m => m.IdOficinaOrigen == id || m.IdOficinaDestino == id);
         var tieneUsers = await DbContext.CatUsuarios.AsNoTracking().AnyAsync(u => u.IdOficina == id);
-        var tieneRangos = await DbContext.MaeNumeracionRangos.AsNoTracking().AnyAsync(n => n.IdOficina == id);
 
-        if (tieneDocumentos || tieneMovs || tieneUsers || tieneRangos)
+        if (tieneDocumentos || tieneMovs || tieneUsers)
         {
-            mensajeError = $"No se puede eliminar '{oficina.Nombre}'. Tiene datos asociados. Use la función 'Unificar' si es un duplicado.";
+            mensajeError = $"No se puede eliminar '{oficina.Nombre}'. Contiene registros vinculados. Intente 'Unificar'.";
             return;
         }
 
-        if (await JS.InvokeAsync<bool>("confirm", $"¿Eliminar '{oficina.Nombre}'?"))
+        if (await JS.InvokeAsync<bool>("confirm", $"¿Eliminar definitivamente '{oficina.Nombre}'?"))
         {
             await RepoOficina.DeleteAsync(id);
             mensajeExito = "Oficina eliminada.";
@@ -280,15 +309,12 @@
         }
     }
 
-    // --- LÓGICA DE UNIFICACIÓN (SQL PURO) ---
     private void AbrirModalUnificacion()
     {
         idOficinaMaestra = 0;
         idsDuplicados.Clear();
         filtroModal = string.Empty;
         mostrarModalUnificacion = true;
-        mensajeError = string.Empty;
-        mensajeExito = string.Empty;
     }
 
     private void CerrarModal() => mostrarModalUnificacion = false;
@@ -302,7 +328,6 @@
     private async Task EjecutarUnificacion()
     {
         if (idOficinaMaestra == 0 || idsDuplicados.Count == 0) return;
-
         procesandoUnificacion = true;
 
         using var transaccion = await DbContext.Database.BeginTransactionAsync();
@@ -310,40 +335,22 @@
         {
             var idsString = string.Join(",", idsDuplicados);
 
-            // 1. Mover Documentos (Ubicación Actual)
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"UPDATE Mae_Documento SET IdOficinaActual = {idOficinaMaestra} WHERE IdOficinaActual IN ({idsString})");
-
-            // 2. Mover Historial (Origen)
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"UPDATE Tra_Movimiento SET IdOficinaOrigen = {idOficinaMaestra} WHERE IdOficinaOrigen IN ({idsString})");
-
-            // 3. Mover Historial (Destino)
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"UPDATE Tra_Movimiento SET IdOficinaDestino = {idOficinaMaestra} WHERE IdOficinaDestino IN ({idsString})");
-
-            // 4. Mover Usuarios
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"UPDATE Cat_Usuario SET IdOficina = {idOficinaMaestra} WHERE IdOficina IN ({idsString})");
-
-            // 5. Mover Rangos de Numeración (CORREGIDO: Nombre en Plural)
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"UPDATE Mae_NumeracionRangos SET IdOficina = {idOficinaMaestra} WHERE IdOficina IN ({idsString})");
-
-            // 6. Finalmente, eliminar las duplicadas
-            await DbContext.Database.ExecuteSqlRawAsync(
-                $"DELETE FROM Cat_Oficina WHERE IdOficina IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"UPDATE Mae_Documento SET IdOficinaActual = {idOficinaMaestra} WHERE IdOficinaActual IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"UPDATE Tra_Movimiento SET IdOficinaOrigen = {idOficinaMaestra} WHERE IdOficinaOrigen IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"UPDATE Tra_Movimiento SET IdOficinaDestino = {idOficinaMaestra} WHERE IdOficinaDestino IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"UPDATE Cat_Usuario SET IdOficina = {idOficinaMaestra} WHERE IdOficina IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"UPDATE Mae_NumeracionRangos SET IdOficina = {idOficinaMaestra} WHERE IdOficina IN ({idsString})");
+            await DbContext.Database.ExecuteSqlRawAsync($"DELETE FROM Cat_Oficina WHERE IdOficina IN ({idsString})");
 
             await transaccion.CommitAsync();
-
-            mensajeExito = "Unificación completada correctamente.";
+            mensajeExito = "Unificación completada con éxito.";
             mostrarModalUnificacion = false;
             await Cargar();
         }
         catch (Exception ex)
         {
             await transaccion.RollbackAsync();
-            mensajeError = $"Error al unificar: {ex.Message}";
+            mensajeError = $"Error: {ex.Message}";
         }
         finally
         {
