@@ -528,7 +528,7 @@ else
     // --- VARIABLES DE ESTADO ---
     private enum TabConfig { Rangos, Cupos, Bitacora }
     private TabConfig tabActiva = TabConfig.Rangos;
-    private Timer _debounceTimer; // Timer para el debounce
+    private Timer _debounceTimer = null!; // Timer para el debounce
 
     private List<MaeNumeracionRango> listaRangos = new();
     private List<CatTipoDocumento> tipos = new();
@@ -591,7 +591,7 @@ else
             {
                 if (_busquedaOficinaPendiente)
                 {
-                    await EjecutarBusquedaOficina();
+                    EjecutarBusquedaOficina();
                     _busquedaOficinaPendiente = false;
                 }
 
@@ -772,7 +772,7 @@ else
         }
     }
 
-    private async Task EjecutarBusquedaOficina()
+    private void EjecutarBusquedaOficina()
     {
         rangoActual.IdOficina = null;
         indiceOficinaRangoSeleccionada = -1;
