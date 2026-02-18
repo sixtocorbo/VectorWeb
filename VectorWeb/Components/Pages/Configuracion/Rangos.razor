@@ -6,17 +6,19 @@
 @using VectorWeb.Services
 @using System.Text.RegularExpressions
 @using System.Globalization
+@using System.Timers
 @inject NumeracionRangoService RangoService
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IJSRuntime JS
+@implements IDisposable
 @rendermode InteractiveServer
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3><i class="bi bi-sliders"></i> Gestión de Rangos y Cupos</h3>
 </div>
 
-@* --- MENSAJES GLOBALES --- *@
+@* --- MENSAJES DE ALERTA (Sin Toast, integrados) --- *@
 @if (!string.IsNullOrWhiteSpace(mensajeError))
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
@@ -175,7 +177,7 @@ else
     }
 
     /* =================================================================================
-       PESTAÑA 2: CUPOS (LIBRO MAYOR)
+       PESTAÑA 2: CUPOS (LIBRO MAYOR) - MEJORADA
        ================================================================================= */
     @if (tabActiva == TabConfig.Cupos)
     {
@@ -201,7 +203,7 @@ else
                                 <th class="text-center">Año</th>
                                 <th class="text-end">Cupo Total</th>
                                 <th class="text-end">Consumido</th>
-                                <th class="text-end" style="width: 25%;">Disponibilidad</th>
+                                <th class="text-end" style="width: 30%;">Disponibilidad</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -214,7 +216,13 @@ else
                                 @foreach (var item in libroMayorCupos)
                                 {
                                     var porcentaje = item.Cantidad > 0 ? (double)item.Consumido / item.Cantidad * 100 : 0;
-                                    var colorBarra = porcentaje > 90 ? "bg-danger" : (porcentaje > 75 ? "bg-warning" : "bg-success");
+                                    // MEJORA: Lógica de semáforo más estricta
+                                    var claseBarra = porcentaje > 95 ? "bg-danger animate__animated animate__pulse animate__infinite"
+                                    : (porcentaje > 80 ? "bg-warning"
+                                    : "bg-success");
+                                    var claseTexto = porcentaje > 95 ? "text-danger fw-bold"
+                                    : (porcentaje > 80 ? "text-warning fw-bold"
+                                    : "text-muted");
 
                                     <tr>
                                         <td class="fw-bold text-dark">@item.Tipo</td>
@@ -222,13 +230,14 @@ else
                                         <td class="text-end fw-bold">@item.Cantidad</td>
                                         <td class="text-end">@item.Consumido</td>
                                         <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="flex-grow-1 me-2">
-                                                    <div class="progress" style="height: 8px;">
-                                                        <div class="progress-bar @colorBarra" role="progressbar" style="width: @porcentaje%"></div>
-                                                    </div>
+                                            <div class="d-flex flex-column">
+                                                <div class="progress" style="height: 10px;">
+                                                    <div class="progress-bar @claseBarra" role="progressbar" style="width: @porcentaje%"></div>
                                                 </div>
-                                                <span class="small fw-bold text-muted">@item.Disponible disp.</span>
+                                                <div class="d-flex justify-content-between mt-1 small">
+                                                    <span>@porcentaje.ToString("F1")% usado</span>
+                                                    <span class="@claseTexto">@item.Disponible disp.</span>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -242,7 +251,7 @@ else
     }
 
     /* =================================================================================
-       PESTAÑA 3: BITÁCORA (AUDITORÍA)
+       PESTAÑA 3: BITÁCORA
        ================================================================================= */
     @if (tabActiva == TabConfig.Bitacora)
     {
@@ -290,7 +299,7 @@ else
     }
 }
 
-@* --- MODAL RANGO --- *@
+@* --- MODAL RANGO (EDICIÓN/NUEVO) --- *@
 @if (mostrarModal)
 {
     <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
@@ -320,6 +329,8 @@ else
                                     }
                                 </InputSelect>
                             </div>
+
+                            @* --- BUSCADOR DE OFICINA CON DEBOUNCE --- *@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Oficina</label>
                                 <div class="position-relative">
@@ -329,9 +340,10 @@ else
                                                class="form-control"
                                                placeholder="Escriba para buscar oficina..."
                                                value="@oficinaBusquedaRango"
-                                               @oninput="FiltrarOficinasRango"
+                                               @oninput="OnBusquedaOficinaInput"
                                                @onfocus="MostrarSugerenciasOficinaRango"
                                                @onkeydown="ManejarTecladoOficinasRango" />
+                                        @* MEJORA: Usamos oninput para el debounce *@
                                     </div>
 
                                     @if (oficinasRangoFiltradas.Any())
@@ -371,7 +383,7 @@ else
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Cantidad a Asignar</label>
                                 <InputNumber @bind-Value="cantidadSugeridaSolicitada" class="form-control" min="0" @oninput="OnParametrosSugerenciaRangoCambio" />
-                                <div class="form-text">Usada para calcular la sugerencia del rango.</div>
+                                <div class="form-text">Usada para sugerencia.</div>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold">Último Utilizado</label>
@@ -383,7 +395,7 @@ else
                                 <div class="col-12">
                                     <div class="alert alert-info border mb-0">
                                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightbulb me-1"></i>Sugerencia de asignación para oficinas internas</h6>
+                                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightbulb me-1"></i>Sugerencia de asignación</h6>
                                             <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AplicarSugerenciaRango" disabled="@(!PuedeAplicarSugerencia)">
                                                 <i class="bi bi-magic me-1"></i>Aplicar sugerencia
                                             </button>
@@ -396,9 +408,8 @@ else
 
                                         <div class="row g-2 small">
                                             <div class="col-md-3"><span class="text-muted">Cupo total:</span> <strong>@sugerenciaRango.CupoTotal.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-3"><span class="text-muted">Ya asignado (todas):</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-3"><span class="text-muted">Usado por otras oficinas:</span> <strong>@sugerenciaRango.ConsumoOtrasOficinas.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-3 text-success"><span class="text-muted">Saldo disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3"><span class="text-muted">Asignado:</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3 text-success"><span class="text-muted">Disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
                                         </div>
 
                                         <hr class="my-2" />
@@ -406,40 +417,16 @@ else
                                         <div class="row g-2 small">
                                             <div class="col-md-4"><span class="text-muted">Inicio sugerido:</span> <strong>@sugerenciaRango.NumeroInicioSugerido.ToString("N0", CulturaUi)</strong></div>
                                             <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-4"><span class="text-muted">Cantidad sugerida:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-4"><span class="text-muted">Cantidad:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
                                         </div>
-
+                                        @* Avisos varios de lógica de negocio *@
                                         @if (MostrarAvisoExisteRangoActivo)
                                         {
-                                            <div class="small text-primary mt-2">
-                                                <i class="bi bi-info-circle me-1"></i>
-                                                Esta oficina ya tiene un rango activo (@(sugerenciaRango.RangoActivoNumeroInicio ?? 0)-@(sugerenciaRango.RangoActivoNumeroFin ?? 0)).
-                                                Solo se sugiere crear un nuevo rango cuando el actual se agote.
-                                            </div>
+                                            <div class="small text-primary mt-2"><i class="bi bi-info-circle me-1"></i>Oficina ya tiene rango activo.</div>
                                         }
-
-                                        @if (MostrarAvisoRangoAgotado)
-                                        {
-                                            <div class="small text-warning mt-2">
-                                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                                El rango activo de esta oficina ya está agotado (@(sugerenciaRango.RangoActivoUltimoUtilizado ?? 0) usados de @(sugerenciaRango.RangoActivoNumeroFin ?? 0)).
-                                                Debe crear un nuevo rango para continuar emitiendo documentos de este tipo.
-                                            </div>
-                                        }
-
                                         @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
                                         {
-                                            <div class="small text-warning mt-2">
-                                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                                La cantidad solicitada supera el saldo disponible y fue ajustada automáticamente.
-                                            </div>
-                                        }
-                                        else if (sugerenciaRango.SaldoDisponible == 0)
-                                        {
-                                            <div class="small text-danger mt-2">
-                                                <i class="bi bi-x-octagon me-1"></i>
-                                                No hay saldo disponible para este tipo y año.
-                                            </div>
+                                            <div class="small text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>Ajustado por saldo disponible.</div>
                                         }
                                     </div>
                                 </div>
@@ -534,18 +521,11 @@ else
 }
 
 @code {
-    // --- VARIABLES DE ESTADO PARA TABS ---
+    // --- VARIABLES DE ESTADO ---
     private enum TabConfig { Rangos, Cupos, Bitacora }
     private TabConfig tabActiva = TabConfig.Rangos;
+    private Timer _debounceTimer; // Timer para el debounce
 
-    private void CambiarTab(TabConfig tab)
-    {
-        tabActiva = tab;
-        // Limpiar mensajes al cambiar para no confundir
-        LimpiarMensajes();
-    }
-
-    // --- VARIABLES GENERALES ---
     private List<MaeNumeracionRango> listaRangos = new();
     private List<CatTipoDocumento> tipos = new();
     private List<CatOficina> oficinas = new();
@@ -557,25 +537,34 @@ else
     private bool mostrarModalCupo;
     private bool procesando = false;
     private bool cargandoInicial = true;
+
+    // Mensajes
     private string mensajeError = string.Empty;
     private string mensajeOk = string.Empty;
     private string mensajeErrorModalRango = string.Empty;
     private string mensajeErrorModalCupo = string.Empty;
+
+    // Filtros
     private string filtroTexto = string.Empty;
+
+    // Búsqueda Oficina (Rango)
     private string oficinaBusquedaRango = string.Empty;
     private List<CatOficina> oficinasRangoFiltradas = new();
     private int indiceOficinaRangoSeleccionada = -1;
 
+    // Cupo
     private int cupoTipoSeleccionado;
     private int cupoAnio = DateTime.Now.Year;
     private int cupoCantidad;
     private int cupoConsumido;
 
+    // Sugerencias
     private int? cantidadSugeridaSolicitada;
     private SugerenciaRangoNumeracion sugerenciaRango = new();
     private string mensajeErrorSugerenciaRango = string.Empty;
     private static readonly CultureInfo CulturaUi = CultureInfo.GetCultureInfo("es-DO");
 
+    // Lógica de filtrado en memoria para la tabla de rangos
     private IEnumerable<MaeNumeracionRango> RangosFiltrados =>
         string.IsNullOrWhiteSpace(filtroTexto)
         ? listaRangos
@@ -585,15 +574,21 @@ else
             CoincideOficinaSinImportarOrden(r.IdOficinaNavigation?.Nombre, filtroTexto)
           );
 
-    private static bool CoincideOficinaSinImportarOrden(string? nombreOficina, string? busqueda)
-    {
-        if (string.IsNullOrWhiteSpace(nombreOficina) || string.IsNullOrWhiteSpace(busqueda)) return false;
-        var tokensBusqueda = Regex.Split(busqueda.Trim(), @"\s+").Where(token => !string.IsNullOrWhiteSpace(token));
-        return tokensBusqueda.All(token => nombreOficina.Contains(token, StringComparison.OrdinalIgnoreCase));
-    }
-
+    // --- INICIALIZACIÓN Y DISPOSE ---
     protected override async Task OnInitializedAsync()
     {
+        // Configurar Debounce (300ms espera)
+        _debounceTimer = new Timer(300);
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Elapsed += async (sender, e) =>
+        {
+            await InvokeAsync(async () =>
+            {
+                await EjecutarBusquedaOficina();
+                StateHasChanged();
+            });
+        };
+
         try
         {
             await CargarCatalogos();
@@ -605,6 +600,27 @@ else
         }
     }
 
+    public void Dispose()
+    {
+        _debounceTimer?.Dispose();
+    }
+
+    // --- LÓGICA DE NAVEGACIÓN ---
+    private void CambiarTab(TabConfig tab)
+    {
+        tabActiva = tab;
+        LimpiarMensajes();
+    }
+
+    private void LimpiarMensajes()
+    {
+        mensajeError = string.Empty;
+        mensajeOk = string.Empty;
+        mensajeErrorModalRango = string.Empty;
+        mensajeErrorModalCupo = string.Empty;
+    }
+
+    // --- CARGA DE DATOS ---
     private async Task CargarTodo()
     {
         procesando = true;
@@ -620,8 +636,6 @@ else
         }
     }
 
-    private async Task CargarLibroMayorCuposAsync() => libroMayorCupos = await RangoService.ObtenerLibroMayorCuposAsync();
-
     private async Task CargarCatalogos()
     {
         tipos = (await RepoTipos.GetAllAsync()).OrderBy(t => t.Nombre).ToList();
@@ -629,67 +643,10 @@ else
     }
 
     private async Task CargarRangos() => listaRangos = await RangoService.ObtenerRangosAsync();
+    private async Task CargarLibroMayorCuposAsync() => libroMayorCupos = await RangoService.ObtenerLibroMayorCuposAsync();
     private async Task RecargarBitacora() => bitacora = await RangoService.ObtenerBitacoraAsync();
 
-    private async Task CargarDatosCupoAsync()
-    {
-        if (cupoTipoSeleccionado <= 0 || cupoAnio <= 0)
-        {
-            cupoCantidad = 0;
-            cupoConsumido = 0;
-            return;
-        }
-        cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(cupoTipoSeleccionado, cupoAnio) ?? 0;
-        cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(cupoTipoSeleccionado, cupoAnio);
-    }
-
-
-    private async Task OnParametrosSugerenciaRangoCambio(ChangeEventArgs _)
-    {
-        await RefrescarSugerenciaRangoAsync();
-    }
-
-    private async Task OnCupoFiltroCambio(ChangeEventArgs e)
-    {
-        if (e.Value is string val && int.TryParse(val, out int id))
-        {
-            cupoTipoSeleccionado = id;
-            await CargarDatosCupoAsync();
-        }
-    }
-
-    private async Task GuardarCupo()
-    {
-        mensajeErrorModalCupo = string.Empty;
-        procesando = true;
-        try
-        {
-            if (cupoTipoSeleccionado <= 0) { mensajeErrorModalCupo = "Seleccione un tipo."; return; }
-            if (cupoAnio < 2000) { mensajeErrorModalCupo = "Año inválido."; return; }
-            if (cupoCantidad < cupoConsumido) { mensajeErrorModalCupo = $"El cupo no puede ser menor a lo ya consumido ({cupoConsumido})."; return; }
-
-            var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
-            if (!resultado.Exitoso)
-            {
-                mensajeErrorModalCupo = resultado.Mensaje;
-                return;
-            }
-            mensajeOk = "Cupo guardado correctamente.";
-            mostrarModalCupo = false;
-            await CargarTodo();
-        }
-        finally { procesando = false; }
-    }
-
-    private void AbrirNuevoCupo()
-    {
-        LimpiarMensajes();
-        cupoTipoSeleccionado = 0;
-        cupoCantidad = 0;
-        cupoConsumido = 0;
-        mostrarModalCupo = true;
-    }
-
+    // --- GESTIÓN DE RANGOS ---
     private void AbrirNuevoRango()
     {
         LimpiarMensajes();
@@ -702,12 +659,9 @@ else
             Activo = true,
             Anio = DateTime.Now.Year
         };
-        oficinaBusquedaRango = string.Empty;
-        oficinasRangoFiltradas.Clear();
-        indiceOficinaRangoSeleccionada = -1;
-        cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
+        ResetearBusquedaOficina();
+        cantidadSugeridaSolicitada = 1000;
         sugerenciaRango = new SugerenciaRangoNumeracion();
-        mensajeErrorSugerenciaRango = string.Empty;
         mostrarModal = true;
         _ = RefrescarSugerenciaRangoAsync();
     }
@@ -731,114 +685,8 @@ else
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
-        sugerenciaRango = new SugerenciaRangoNumeracion();
-        mensajeErrorSugerenciaRango = string.Empty;
         mostrarModal = true;
         _ = RefrescarSugerenciaRangoAsync();
-    }
-
-
-    private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
-    private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
-    private bool MostrarAvisoRangoAgotado => sugerenciaRango.OficinaTieneRangoActivo && sugerenciaRango.RangoActivoAgotado;
-
-    private async Task RefrescarSugerenciaRangoAsync()
-    {
-        mensajeErrorSugerenciaRango = string.Empty;
-
-        if (rangoActual.IdTipo <= 0 || rangoActual.Anio <= 0)
-        {
-            sugerenciaRango = new SugerenciaRangoNumeracion();
-            return;
-        }
-
-        sugerenciaRango = await RangoService.ObtenerSugerenciaRangoAsync(
-            rangoActual.IdTipo,
-            rangoActual.Anio,
-            rangoActual.IdOficina,
-            rangoActual.IdRango == 0 ? null : rangoActual.IdRango,
-            cantidadSugeridaSolicitada);
-
-        if (sugerenciaRango.CupoTotal == 0)
-        {
-            mensajeErrorSugerenciaRango = "No existe cupo configurado para este tipo y año. Configure el cupo para habilitar una sugerencia confiable.";
-        }
-    }
-
-    private async Task AplicarSugerenciaRango()
-    {
-        await RefrescarSugerenciaRangoAsync();
-        if (!PuedeAplicarSugerencia)
-        {
-            return;
-        }
-
-        rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
-        rangoActual.NumeroFin = sugerenciaRango.NumeroFinSugerido;
-
-        if (rangoActual.UltimoUtilizado < rangoActual.NumeroInicio - 1 || rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
-        {
-            rangoActual.UltimoUtilizado = rangoActual.NumeroInicio - 1;
-        }
-    }
-    private void CerrarModal() { mostrarModal = false; oficinasRangoFiltradas.Clear(); indiceOficinaRangoSeleccionada = -1; }
-    private void CerrarModalCupo() => mostrarModalCupo = false;
-
-    private async Task FiltrarOficinasRango(ChangeEventArgs e)
-    {
-        oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
-        rangoActual.IdOficina = null;
-        indiceOficinaRangoSeleccionada = -1;
-
-        if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
-        {
-            oficinasRangoFiltradas.Clear();
-            await RefrescarSugerenciaRangoAsync();
-            return;
-        }
-        oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango).Take(8).ToList();
-        var coincidenciaExacta = oficinas.FirstOrDefault(oficina => string.Equals(oficina.Nombre, oficinaBusquedaRango, StringComparison.OrdinalIgnoreCase));
-        if (coincidenciaExacta != null) rangoActual.IdOficina = coincidenciaExacta.IdOficina;
-        await RefrescarSugerenciaRangoAsync();
-    }
-
-    private async Task SeleccionarOficinaRango(CatOficina oficina)
-    {
-        rangoActual.IdOficina = oficina.IdOficina;
-        oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
-        oficinasRangoFiltradas.Clear();
-        indiceOficinaRangoSeleccionada = -1;
-        await RefrescarSugerenciaRangoAsync();
-    }
-    private string MensajeOficinaRango
-    {
-        get
-        {
-            if (rangoActual.IdOficina is not null) return "La numeración se aplicará únicamente a la oficina seleccionada.";
-            return "Seleccione una oficina específica para este rango.";
-        }
-    }
-
-    private void MostrarSugerenciasOficinaRango()
-    {
-        if (!string.IsNullOrWhiteSpace(oficinaBusquedaRango))
-            oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango).Take(8).ToList();
-    }
-
-    private async Task ManejarTecladoOficinasRango(KeyboardEventArgs e)
-    {
-        if (!oficinasRangoFiltradas.Any()) return;
-        if (e.Key == "ArrowDown") { indiceOficinaRangoSeleccionada = Math.Min(indiceOficinaRangoSeleccionada + 1, oficinasRangoFiltradas.Count - 1); return; }
-        if (e.Key == "ArrowUp") { indiceOficinaRangoSeleccionada = Math.Max(indiceOficinaRangoSeleccionada - 1, 0); return; }
-        if (e.Key == "Enter" && indiceOficinaRangoSeleccionada >= 0) { await SeleccionarOficinaRango(oficinasRangoFiltradas[indiceOficinaRangoSeleccionada]); return; }
-        if (e.Key == "Escape") { oficinasRangoFiltradas.Clear(); indiceOficinaRangoSeleccionada = -1; }
-    }
-
-    private IEnumerable<CatOficina> BuscarOficinasRango(string terminoBusqueda)
-    {
-        var palabras = terminoBusqueda.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (palabras.Length == 0) return Enumerable.Empty<CatOficina>();
-        return oficinas.Where(oficina => palabras.All(palabra => (oficina.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false))).OrderBy(oficina => oficina.Nombre);
     }
 
     private async Task Guardar()
@@ -851,8 +699,14 @@ else
             if (!rangoActual.IdOficina.HasValue) { mensajeErrorModalRango = "Seleccione una oficina."; return; }
             if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { mensajeErrorModalRango = "Rango inválido (Inicio > Fin)."; return; }
 
+            // IMPORTANTE: Aquí se espera que el servicio valide si hay otro rango activo y devuelva Fail si es necesario.
             var resultado = await RangoService.GuardarRangoAsync(rangoActual);
-            if (!resultado.Exitoso) { mensajeErrorModalRango = resultado.Mensaje; return; }
+
+            if (!resultado.Exitoso)
+            {
+                mensajeErrorModalRango = resultado.Mensaje;
+                return;
+            }
 
             mostrarModal = false;
             mensajeOk = "Rango guardado correctamente.";
@@ -861,31 +715,183 @@ else
         finally { procesando = false; }
     }
 
-    private Task IgnorarSubmitRango(EditContext _) => Task.CompletedTask;
-
     private async Task EliminarRango(MaeNumeracionRango rango)
     {
-        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Está seguro de eliminar el rango '{rango.NombreRango}'? Esta acción es irreversible.");
+        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Está seguro de eliminar el rango '{rango.NombreRango}'?");
         if (!confirmado) return;
+
         procesando = true;
         LimpiarMensajes();
         try
         {
             var resultado = await RangoService.EliminarRangoAsync(rango.IdRango);
             if (!resultado.Exitoso) { mensajeError = resultado.Mensaje; return; }
+
             mensajeOk = "Rango eliminado correctamente.";
             await CargarTodo();
         }
         finally { procesando = false; }
     }
 
-    private void LimpiarMensajes()
+    // --- LÓGICA DE BÚSQUEDA DE OFICINA (DEBOUNCE) ---
+    private void OnBusquedaOficinaInput(ChangeEventArgs e)
     {
-        mensajeError = string.Empty;
-        mensajeOk = string.Empty;
-        mensajeErrorModalRango = string.Empty;
-        mensajeErrorModalCupo = string.Empty;
+        oficinaBusquedaRango = e.Value?.ToString() ?? string.Empty;
+        // Reiniciamos el timer cada vez que el usuario escribe
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
     }
+
+    private async Task EjecutarBusquedaOficina()
+    {
+        rangoActual.IdOficina = null;
+        indiceOficinaRangoSeleccionada = -1;
+
+        if (string.IsNullOrWhiteSpace(oficinaBusquedaRango))
+        {
+            oficinasRangoFiltradas.Clear();
+        }
+        else
+        {
+            oficinasRangoFiltradas = BuscarOficinasRango(oficinaBusquedaRango).Take(8).ToList();
+            // Si hay coincidencia exacta, auto-seleccionar ID (opcional)
+            var exacta = oficinas.FirstOrDefault(o => string.Equals(o.Nombre, oficinaBusquedaRango, StringComparison.OrdinalIgnoreCase));
+            if (exacta != null) rangoActual.IdOficina = exacta.IdOficina;
+        }
+        await RefrescarSugerenciaRangoAsync();
+    }
+
+    private void ResetearBusquedaOficina()
+    {
+        oficinaBusquedaRango = string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+    }
+
+    private async Task SeleccionarOficinaRango(CatOficina oficina)
+    {
+        rangoActual.IdOficina = oficina.IdOficina;
+        oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+        await RefrescarSugerenciaRangoAsync();
+    }
+
+    private void MostrarSugerenciasOficinaRango()
+    {
+        if (!string.IsNullOrWhiteSpace(oficinaBusquedaRango) && !oficinasRangoFiltradas.Any())
+            _debounceTimer.Start(); // Forzar búsqueda si hace foco y hay texto
+    }
+
+    private async Task ManejarTecladoOficinasRango(KeyboardEventArgs e)
+    {
+        if (!oficinasRangoFiltradas.Any()) return;
+        if (e.Key == "ArrowDown") { indiceOficinaRangoSeleccionada = Math.Min(indiceOficinaRangoSeleccionada + 1, oficinasRangoFiltradas.Count - 1); return; }
+        if (e.Key == "ArrowUp") { indiceOficinaRangoSeleccionada = Math.Max(indiceOficinaRangoSeleccionada - 1, 0); return; }
+        if (e.Key == "Enter" && indiceOficinaRangoSeleccionada >= 0) { await SeleccionarOficinaRango(oficinasRangoFiltradas[indiceOficinaRangoSeleccionada]); return; }
+        if (e.Key == "Escape") { oficinasRangoFiltradas.Clear(); indiceOficinaRangoSeleccionada = -1; }
+    }
+
+    // --- SUGERENCIAS ---
+    private async Task RefrescarSugerenciaRangoAsync()
+    {
+        mensajeErrorSugerenciaRango = string.Empty;
+        if (rangoActual.IdTipo <= 0 || rangoActual.Anio <= 0)
+        {
+            sugerenciaRango = new SugerenciaRangoNumeracion();
+            return;
+        }
+
+        sugerenciaRango = await RangoService.ObtenerSugerenciaRangoAsync(
+            rangoActual.IdTipo, rangoActual.Anio, rangoActual.IdOficina,
+            rangoActual.IdRango == 0 ? null : rangoActual.IdRango, cantidadSugeridaSolicitada);
+
+        if (sugerenciaRango.CupoTotal == 0)
+            mensajeErrorSugerenciaRango = "No existe cupo configurado para este tipo y año.";
+
+        StateHasChanged(); // Asegurar refresco UI si viene de un evento async
+    }
+
+    private async Task OnParametrosSugerenciaRangoCambio(ChangeEventArgs _)
+    {
+        await RefrescarSugerenciaRangoAsync();
+    }
+
+    private async Task AplicarSugerenciaRango()
+    {
+        await RefrescarSugerenciaRangoAsync();
+        if (!PuedeAplicarSugerencia) return;
+        rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
+        rangoActual.NumeroFin = sugerenciaRango.NumeroFinSugerido;
+    }
+
+    // --- GESTIÓN DE CUPOS ---
+    private void AbrirNuevoCupo()
+    {
+        LimpiarMensajes();
+        cupoTipoSeleccionado = 0;
+        cupoCantidad = 0;
+        cupoConsumido = 0;
+        mostrarModalCupo = true;
+    }
+
+    private async Task GuardarCupo()
+    {
+        mensajeErrorModalCupo = string.Empty;
+        procesando = true;
+        try
+        {
+            if (cupoTipoSeleccionado <= 0) { mensajeErrorModalCupo = "Seleccione un tipo."; return; }
+            if (cupoAnio < 2000) { mensajeErrorModalCupo = "Año inválido."; return; }
+
+            var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
+            if (!resultado.Exitoso) { mensajeErrorModalCupo = resultado.Mensaje; return; }
+
+            mensajeOk = "Cupo guardado correctamente.";
+            mostrarModalCupo = false;
+            await CargarTodo();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task OnCupoFiltroCambio(ChangeEventArgs e)
+    {
+        if (e.Value is string val && int.TryParse(val, out int id))
+        {
+            cupoTipoSeleccionado = id;
+            if (id > 0)
+            {
+                cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(id, cupoAnio) ?? 0;
+                cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(id, cupoAnio);
+            }
+        }
+    }
+
+    // --- UTILIDADES ---
+    private void CerrarModal() { mostrarModal = false; oficinasRangoFiltradas.Clear(); }
+    private void CerrarModalCupo() => mostrarModalCupo = false;
+    private Task IgnorarSubmitRango(EditContext _) => Task.CompletedTask;
+
+    private IEnumerable<CatOficina> BuscarOficinasRango(string terminoBusqueda)
+    {
+        var palabras = terminoBusqueda.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (palabras.Length == 0) return Enumerable.Empty<CatOficina>();
+        return oficinas.Where(oficina => palabras.All(palabra => (oficina.Nombre?.Contains(palabra, StringComparison.OrdinalIgnoreCase) ?? false))).OrderBy(oficina => oficina.Nombre);
+    }
+
+    private static bool CoincideOficinaSinImportarOrden(string? nombreOficina, string? busqueda)
+    {
+        if (string.IsNullOrWhiteSpace(nombreOficina) || string.IsNullOrWhiteSpace(busqueda)) return false;
+        var tokensBusqueda = Regex.Split(busqueda.Trim(), @"\s+").Where(token => !string.IsNullOrWhiteSpace(token));
+        return tokensBusqueda.All(token => nombreOficina.Contains(token, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string MensajeOficinaRango => rangoActual.IdOficina is not null
+        ? "Oficina seleccionada correctamente."
+        : "Seleccione una oficina específica.";
+
+    private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
+    private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
 
     private string ObtenerColorAccion(string accion) => accion switch
     {
