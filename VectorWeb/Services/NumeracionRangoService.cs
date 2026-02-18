@@ -145,6 +145,12 @@ public class NumeracionRangoService
             await DesactivarRangosAgotadosAsync(rango);
             await DesactivarRangosActivosEnConflictoAsync(rango);
 
+            var mensajeSolapamientoOficinasInternas = await ObtenerMensajeSolapamientoEnOficinasInternasAsync(rango);
+            if (!string.IsNullOrWhiteSpace(mensajeSolapamientoOficinasInternas))
+            {
+                return OperacionResultado.Fail(mensajeSolapamientoOficinasInternas);
+            }
+
             var mensajeConflictoActivo = await ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(rango);
             if (!string.IsNullOrWhiteSpace(mensajeConflictoActivo))
             {
@@ -585,6 +591,59 @@ public class NumeracionRangoService
         }
 
         return null;
+    }
+
+    private async Task<string?> ObtenerMensajeSolapamientoEnOficinasInternasAsync(MaeNumeracionRango rango)
+    {
+        if (!rango.IdOficina.HasValue)
+        {
+            return null;
+        }
+
+        var oficinaActual = await _context.CatOficinas
+            .AsNoTracking()
+            .Where(o => o.IdOficina == rango.IdOficina.Value)
+            .Select(o => new { o.IdOficina, o.Nombre, o.EsExterna })
+            .FirstOrDefaultAsync();
+
+        if (oficinaActual is null || oficinaActual.EsExterna == true)
+        {
+            return null;
+        }
+
+        var solapamiento = await _context.MaeNumeracionRangos
+            .AsNoTracking()
+            .Where(r =>
+                r.IdRango != rango.IdRango &&
+                r.IdTipo == rango.IdTipo &&
+                r.Anio == rango.Anio &&
+                r.IdOficina.HasValue &&
+                r.IdOficina != rango.IdOficina &&
+                r.NumeroInicio <= rango.NumeroFin &&
+                rango.NumeroInicio <= r.NumeroFin)
+            .Join(
+                _context.CatOficinas.AsNoTracking().Where(o => o.EsExterna != true),
+                r => r.IdOficina!.Value,
+                o => o.IdOficina,
+                (r, o) => new
+                {
+                    NombreOficina = string.IsNullOrWhiteSpace(o.Nombre) ? $"ID {o.IdOficina}" : o.Nombre.Trim(),
+                    r.NumeroInicio,
+                    r.NumeroFin
+                })
+            .OrderBy(r => r.NumeroInicio)
+            .FirstOrDefaultAsync();
+
+        if (solapamiento is null)
+        {
+            return null;
+        }
+
+        var nombreOficinaActual = string.IsNullOrWhiteSpace(oficinaActual.Nombre)
+            ? $"ID {oficinaActual.IdOficina}"
+            : oficinaActual.Nombre.Trim();
+
+        return $"El rango {rango.NumeroInicio}-{rango.NumeroFin} para la oficina interna {nombreOficinaActual} se solapa con el rango {solapamiento.NumeroInicio}-{solapamiento.NumeroFin} asignado a la oficina interna {solapamiento.NombreOficina}. Ninguna oficina interna puede tener rangos superpuestos para el mismo tipo de documento y año.";
     }
 
     private async Task<int> CalcularConsumoAcumuladoAsync(int idTipo, int anio, int? excluirIdRango)
