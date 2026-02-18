@@ -1,4 +1,7 @@
 @page "/about"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Policy = "documentos.ver")]
+
 
 <PageTitle>Manual de Uso - Vector</PageTitle>
 
