@@ -244,7 +244,7 @@
                         {
                             <tr>
                                 <td>
-                                    <span class="badge badge-status @(EsRojo(doc.EstadoSemaforo) ? "bg-danger" : "bg-info")" title="@doc.IdEstadoActualNavigation?.Nombre">
+                                    <span class="badge badge-status @ObtenerClaseSemaforo(doc.EstadoSemaforo)" title="@doc.IdEstadoActualNavigation?.Nombre">
                                         @doc.IdEstadoActualNavigation?.Nombre
                                     </span>
                                 </td>
@@ -510,7 +510,13 @@
 
     private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
     private async Task PaginaSiguiente() { if (PaginaActualEfectiva < TotalPaginas) { paginaActual++; await CargarDocumentos(); } }
-    private static bool EsRojo(string? s) => string.Equals(s, "ROJO", StringComparison.OrdinalIgnoreCase);
+    private static string ObtenerClaseSemaforo(string? estado) => (estado ?? string.Empty).ToUpperInvariant() switch
+    {
+        "ROJO" => "bg-danger text-white",
+        "AMARILLO" => "bg-warning text-dark",
+        "VERDE" => "bg-success text-white",
+        _ => "bg-secondary text-white"
+    };
     private string ObtenerReferenciaPadre(long id) => referenciasPadrePorId.TryGetValue(id, out var r) ? r : $"#{id}";
     private void IrAPase(MaeDocumento d) => Navegador.NavigateTo($"documentos/pase/{d.IdDocumento}");
     public void Dispose() => timerBusqueda?.Dispose();

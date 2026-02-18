@@ -1,0 +1,260 @@
+@page "/configuracion/plazos-documentos"
+@attribute [Authorize(Policy = "configuracion.rangos")]
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using VectorWeb.Models
+@using VectorWeb.Repositories
+@inject IRepository<CfgTiemposRespuestum> RepoPlazos
+@inject IRepository<CatTipoDocumento> RepoTipos
+@rendermode InteractiveServer
+
+<PageTitle>Plazos por Tipo de Documento - Vector</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3><i class="bi bi-hourglass-split me-2"></i>Plazos por tipo de documento</h3>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+    <div class="card-body">
+        <p class="text-muted mb-3">
+            Define los plazos (en días) por <strong>Tipo de Documento</strong> y <strong>Prioridad</strong>.
+            Estos valores se usan al crear nuevos documentos para calcular <code>FechaVencimiento</code>.
+        </p>
+
+        @if (!string.IsNullOrWhiteSpace(mensajeExito))
+        {
+            <div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i>@mensajeExito</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(mensajeError))
+        {
+            <div class="alert alert-warning"><i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError</div>
+        }
+
+        <EditForm Model="nuevoPlazo" OnValidSubmit="AgregarAsync">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Tipo de documento</label>
+                    <InputSelect class="form-select" @bind-Value="nuevoPlazo.IdTipoDocumento">
+                        <option value="0">-- Seleccione --</option>
+                        @foreach (var tipo in tipos)
+                        {
+                            <option value="@tipo.IdTipo">@tipo.Nombre</option>
+                        }
+                    </InputSelect>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Prioridad</label>
+                    <InputText class="form-control" @bind-Value="nuevoPlazo.Prioridad" placeholder="NORMAL" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Días máximos</label>
+                    <InputNumber class="form-control" @bind-Value="nuevoPlazo.DiasMaximos" min="0" />
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary" type="submit" disabled="@guardando">
+                        <i class="bi bi-plus-circle me-1"></i>Agregar
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tipo</th>
+                        <th style="width:220px">Prioridad</th>
+                        <th style="width:180px">Días máximos</th>
+                        <th style="width:140px" class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!plazos.Any())
+                    {
+                        <tr><td colspan="4" class="text-center text-muted py-4">Sin configuraciones.</td></tr>
+                    }
+                    else
+                    {
+                        @foreach (var p in plazos)
+                        {
+                            <tr>
+                                <td>@NombreTipo(p.IdTipoDocumento)</td>
+                                <td>
+                                    <input class="form-control form-control-sm" @bind="p.Prioridad" />
+                                </td>
+                                <td>
+                                    <InputNumber class="form-control form-control-sm" @bind-Value="p.DiasMaximos" min="0" />
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-success btn-sm me-1" @onclick="() => GuardarFilaAsync(p)" disabled="@guardando">
+                                        <i class="bi bi-save"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => EliminarAsync(p)" disabled="@guardando">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<CfgTiemposRespuestum> plazos = [];
+    private List<CatTipoDocumento> tipos = [];
+    private CfgTiemposRespuestum nuevoPlazo = new() { Prioridad = "NORMAL", DiasMaximos = 5 };
+    private bool guardando;
+    private string mensajeError = string.Empty;
+    private string mensajeExito = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync()
+    {
+        tipos = (await RepoTipos.GetAllAsync()).OrderBy(t => t.Nombre).ToList();
+        plazos = (await RepoPlazos.GetQueryable("IdTipoDocumentoNavigation")
+            .OrderBy(x => x.IdTipoDocumento)
+            .ThenBy(x => x.Prioridad)
+            .ToListAsync());
+    }
+
+    private string NombreTipo(int idTipo)
+        => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"Tipo {idTipo}";
+
+    private async Task AgregarAsync()
+    {
+        LimpiarMensajes();
+
+        if (nuevoPlazo.IdTipoDocumento <= 0)
+        {
+            mensajeError = "Seleccione un tipo de documento.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(nuevoPlazo.Prioridad))
+        {
+            mensajeError = "La prioridad es obligatoria.";
+            return;
+        }
+
+        if (nuevoPlazo.DiasMaximos < 0)
+        {
+            mensajeError = "Los días máximos no pueden ser negativos.";
+            return;
+        }
+
+        var prioridad = nuevoPlazo.Prioridad.Trim().ToUpperInvariant();
+        var yaExiste = plazos.Any(x => x.IdTipoDocumento == nuevoPlazo.IdTipoDocumento &&
+                                       string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
+        if (yaExiste)
+        {
+            mensajeError = "Ya existe una configuración para ese tipo y prioridad.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            await RepoPlazos.AddAsync(new CfgTiemposRespuestum
+            {
+                IdTipoDocumento = nuevoPlazo.IdTipoDocumento,
+                Prioridad = prioridad,
+                DiasMaximos = nuevoPlazo.DiasMaximos,
+                HorasMaximas = nuevoPlazo.HorasMaximas
+            });
+
+            nuevoPlazo = new CfgTiemposRespuestum { Prioridad = "NORMAL", DiasMaximos = 5 };
+            await CargarAsync();
+            mensajeExito = "Plazo agregado correctamente.";
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"No se pudo agregar: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task GuardarFilaAsync(CfgTiemposRespuestum fila)
+    {
+        LimpiarMensajes();
+
+        if (string.IsNullOrWhiteSpace(fila.Prioridad))
+        {
+            mensajeError = "La prioridad es obligatoria.";
+            return;
+        }
+
+        if (fila.DiasMaximos < 0)
+        {
+            mensajeError = "Los días máximos no pueden ser negativos.";
+            return;
+        }
+
+        var prioridad = fila.Prioridad.Trim().ToUpperInvariant();
+        var colision = plazos.Any(x => x.IdConfig != fila.IdConfig && x.IdTipoDocumento == fila.IdTipoDocumento &&
+                                       string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
+        if (colision)
+        {
+            mensajeError = "Ya existe otra fila con esa prioridad para este tipo.";
+            return;
+        }
+
+        guardando = true;
+        try
+        {
+            fila.Prioridad = prioridad;
+            await RepoPlazos.UpdateAsync(fila);
+            mensajeExito = "Plazo actualizado.";
+            await CargarAsync();
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"No se pudo actualizar: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private async Task EliminarAsync(CfgTiemposRespuestum fila)
+    {
+        LimpiarMensajes();
+
+        guardando = true;
+        try
+        {
+            await RepoPlazos.DeleteAsync(fila.IdConfig);
+            plazos.RemoveAll(x => x.IdConfig == fila.IdConfig);
+            mensajeExito = "Plazo eliminado.";
+        }
+        catch (Exception ex)
+        {
+            mensajeError = $"No se pudo eliminar: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void LimpiarMensajes()
+    {
+        mensajeError = string.Empty;
+        mensajeExito = string.Empty;
+    }
+}
