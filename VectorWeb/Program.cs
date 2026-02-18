@@ -18,8 +18,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // -----------------------------------------------------------------------------
-// CONFIGURACIÓN DE BASE DE DATOS
-// NOTA: Se eliminó "EnableRetryOnFailure" para permitir transacciones manuales.
+builder.Services.AddScoped<DocumentoPlazosService>();
+// CONFIGURACIÃ“N DE BASE DE DATOS
+// NOTA: Se eliminÃ³ "EnableRetryOnFailure" para permitir transacciones manuales.
 // -----------------------------------------------------------------------------
 
 // 1. DbContextFactory (Para Blazor Server)
@@ -35,7 +36,7 @@ builder.Services.AddDbContext<SecretariaDbContext>(options =>
 
 // -----------------------------------------------------------------------------
 
-// Repositorio Genérico (Transient para evitar bloqueos por concurrencia)
+// Repositorio GenÃ©rico (Transient para evitar bloqueos por concurrencia)
 builder.Services.AddTransient(typeof(IRepository<>), typeof(Repository<>));
 
 // Servicios de Negocio (Scoped)
@@ -45,7 +46,7 @@ builder.Services.AddScoped<RenovacionesService>();
 builder.Services.AddScoped<RolePermissionService>();
 builder.Services.AddScoped<PermissionAuditService>();
 
-// Caché
+// CachÃ©
 builder.Services.AddMemoryCache();
 
 // Seguridad y Permisos

@@ -17,6 +17,7 @@
 @inject IRepository<CatEstado> RepoEstados
 @inject IRepository<MaeRecluso> RepoReclusos
 @inject NumeracionRangoService RangoService
+@inject DocumentoPlazosService DocumentoPlazosService
 @inject NavigationManager Navegador
 @inject IJSRuntime JS
 @inject SecretariaDbContext DbContext
@@ -596,6 +597,8 @@
                 if (!numeroManualInterno.HasValue) { errorGuardar = "Número oficial obligatorio."; return; }
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
+
+            nuevoDoc.FechaVencimiento = await DocumentoPlazosService.CalcularFechaVencimientoAsync(nuevoDoc.IdTipo, DateTime.Now, "NORMAL");
 
             await using var trans = await DbContext.Database.BeginTransactionAsync();
             try
