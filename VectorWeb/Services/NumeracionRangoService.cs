@@ -293,6 +293,83 @@ public class NumeracionRangoService
             operacion: "obtener consumo acumulado");
     }
 
+    public async Task<SugerenciaRangoNumeracion> ObtenerSugerenciaRangoAsync(
+        int idTipo,
+        int anio,
+        int? idOficina,
+        int? idRangoActual,
+        int? cantidadSolicitada)
+    {
+        if (idTipo <= 0 || anio <= 0)
+        {
+            return new SugerenciaRangoNumeracion();
+        }
+
+        return await EjecutarLecturaSeguraAsync(async () =>
+        {
+            var queryRangos = _context.MaeNumeracionRangos
+                .AsNoTracking()
+                .Where(r =>
+                    r.IdTipo == idTipo &&
+                    r.Anio == anio &&
+                    (!idRangoActual.HasValue || r.IdRango != idRangoActual.Value));
+
+            var cupoTotal = await _context.MaeCuposSecretaria
+                .AsNoTracking()
+                .Where(c => c.IdTipo == idTipo && c.Anio == anio)
+                .Select(c => (int?)c.Cantidad)
+                .FirstOrDefaultAsync() ?? 0;
+
+            var consumoTotalAsignado = await queryRangos
+                .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
+
+            var consumoOtrasOficinas = 0;
+            if (idOficina.HasValue)
+            {
+                consumoOtrasOficinas = await queryRangos
+                    .Where(r => r.IdOficina.HasValue && r.IdOficina != idOficina.Value)
+                    .Join(
+                        _context.CatOficinas.AsNoTracking().Where(o => o.EsExterna != true),
+                        r => r.IdOficina!.Value,
+                        o => o.IdOficina,
+                        (r, _) => r)
+                    .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
+            }
+
+            var maximoNumeroAsignado = await queryRangos
+                .Select(r => (int?)r.NumeroFin)
+                .MaxAsync() ?? 0;
+
+            var saldoDisponible = Math.Max(0, cupoTotal - consumoTotalAsignado);
+            var desdeSugerido = Math.Max(1, maximoNumeroAsignado + 1);
+
+            var cantidadAProponer = cantidadSolicitada.GetValueOrDefault();
+            if (cantidadAProponer <= 0)
+            {
+                cantidadAProponer = saldoDisponible > 0 ? Math.Min(200, saldoDisponible) : 0;
+            }
+
+            var cantidadAprobada = Math.Min(cantidadAProponer, saldoDisponible);
+            var hastaSugerido = cantidadAprobada > 0
+                ? desdeSugerido + cantidadAprobada - 1
+                : desdeSugerido;
+
+            return new SugerenciaRangoNumeracion
+            {
+                CupoTotal = cupoTotal,
+                ConsumoTotalAsignado = consumoTotalAsignado,
+                ConsumoOtrasOficinas = consumoOtrasOficinas,
+                SaldoDisponible = saldoDisponible,
+                NumeroInicioSugerido = desdeSugerido,
+                NumeroFinSugerido = hastaSugerido,
+                CantidadSugerida = cantidadAprobada,
+                SugerenciaRecortadaPorSaldo = cantidadAprobada < cantidadAProponer
+            };
+        },
+            fallback: new SugerenciaRangoNumeracion(),
+            operacion: "obtener sugerencia de rango");
+    }
+
     public async Task<OperacionResultado> EliminarRangoAsync(int idRango, int? idUsuario = null)
     {
         return await EjecutarOperacionControladaAsync(async () =>
@@ -841,6 +918,19 @@ public sealed class OperacionResultado<T>
             ? "No fue posible completar la operación."
             : mensaje
     };
+}
+
+
+public sealed class SugerenciaRangoNumeracion
+{
+    public int CupoTotal { get; set; }
+    public int ConsumoTotalAsignado { get; set; }
+    public int ConsumoOtrasOficinas { get; set; }
+    public int SaldoDisponible { get; set; }
+    public int NumeroInicioSugerido { get; set; }
+    public int NumeroFinSugerido { get; set; }
+    public int CantidadSugerida { get; set; }
+    public bool SugerenciaRecortadaPorSaldo { get; set; }
 }
 
 public sealed class CupoLibroMayorItem
