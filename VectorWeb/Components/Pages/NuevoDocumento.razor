@@ -4,6 +4,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @using VectorWeb.Services
+@using VectorWeb.Utils
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
@@ -16,6 +17,7 @@
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
 @inject IRepository<MaeRecluso> RepoReclusos
+@inject IRepository<CfgTiemposRespuestum> RepoPlazos
 @inject NumeracionRangoService RangoService
 @inject DocumentoPlazosService DocumentoPlazosService
 @inject NavigationManager Navegador
@@ -172,6 +174,16 @@
                                 {
                                     <InputText @bind-Value="nuevoDoc.NumeroOficial" class="form-control shadow-none" maxlength="50" placeholder="Ej. JUZ-100/26" disabled="@bloqueoPorRangoAgotado" />
                                 }
+                            </div>
+                        </div>
+
+                        <div class="alert alert-light border d-flex align-items-center mb-3 py-2">
+                            <i class="bi bi-hourglass-split text-info me-2 fs-5"></i>
+                            <div>
+                                <small class="text-muted text-uppercase fw-bold" style="font-size:0.7rem;">Vencimiento Calculado (Dec. 500/991)</small>
+                                <div class="fw-bold text-dark">
+                                    @nuevoDoc.FechaVencimiento?.ToString("dddd dd 'de' MMMM, yyyy")
+                                </div>
                             </div>
                         </div>
                     }
@@ -554,7 +566,38 @@
                 if (paseConActuacionForzado) soloTraerSinActuacion = false;
             }
         }
-        if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+
+        // Si hay un tipo seleccionado (ej. Memorando por defecto en actuación), calculamos el vencimiento inicial
+        if (nuevoDoc.IdTipo > 0)
+        {
+            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+            await CalcularVencimientoAsync(nuevoDoc.IdTipo);
+        }
+    }
+
+    // --- NUEVO MÉTODO: CÁLCULO DE VENCIMIENTO SEGÚN DECRETO 500 ---
+    private async Task CalcularVencimientoAsync(int idTipo)
+    {
+        var config = (await RepoPlazos.GetQueryable()
+            .FirstOrDefaultAsync(c => c.IdTipoDocumento == idTipo && c.Prioridad == "NORMAL"));
+
+        if (config != null)
+        {
+            // Regla: Plazos < 30 días => Días Hábiles. Plazos >= 30 días => Días Corridos.
+            if (config.DiasMaximos < 30)
+            {
+                nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasHabiles(config.DiasMaximos);
+            }
+            else
+            {
+                nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasCorridos(config.DiasMaximos);
+            }
+        }
+        else
+        {
+            // Sin configuración: Asumimos 10 días hábiles por defecto
+            nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasHabiles(10);
+        }
     }
 
     private IEnumerable<MaeDocumento> DocumentosPadrePaginados => documentosPadreFiltrados.Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre).Take(tamanoPaginaPadre);
@@ -598,7 +641,13 @@
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
 
-            nuevoDoc.FechaVencimiento = await DocumentoPlazosService.CalcularFechaVencimientoAsync(nuevoDoc.IdTipo, DateTime.Now, "NORMAL");
+            // NOTA: Eliminamos la llamada a DocumentoPlazosService porque ya calculamos
+            // el vencimiento correctamente en OnTipoDocumentoChanged usando el Decreto 500.
+            // Si FechaVencimiento es nula (caso raro), calculamos un default aquí por seguridad.
+            if (!nuevoDoc.FechaVencimiento.HasValue)
+            {
+                await CalcularVencimientoAsync(nuevoDoc.IdTipo);
+            }
 
             await using var trans = await DbContext.Database.BeginTransactionAsync();
             try
@@ -632,7 +681,14 @@
 
     private async Task OnTipoDocumentoChanged(ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out var idT)) { nuevoDoc.IdTipo = idT; await EvaluarNumeracionAutomaticaAsync(idT); }
+        if (int.TryParse(e.Value?.ToString(), out var idT))
+        {
+            nuevoDoc.IdTipo = idT;
+            // 1. Numeración Automática
+            await EvaluarNumeracionAutomaticaAsync(idT);
+            // 2. Cálculo de Vencimiento (Decreto 500)
+            await CalcularVencimientoAsync(idT);
+        }
     }
 
     private async Task EvaluarNumeracionAutomaticaAsync(int idT)
