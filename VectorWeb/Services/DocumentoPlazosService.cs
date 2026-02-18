@@ -45,7 +45,7 @@ public class DocumentoPlazosService
         return configuraciones.OrderBy(c => c.DiasMaximos).Select(c => (int?)c.DiasMaximos).FirstOrDefault();
     }
 
-    public async Task<DateTime?> CalcularFechaVencimientoAsync(int idTipoDocumento, DateTime fechaBase, string prioridad = "NORMAL")
+    public async Task<DateTime?> CalcularFechaVencimientoAsync(int idTipoDocumento, DateTime fechaBase, string prioridad = "NORMAL", ISet<DateOnly>? feriados = null)
     {
         var dias = await ObtenerDiasPlazoAsync(idTipoDocumento, prioridad);
         if (!dias.HasValue)
@@ -53,8 +53,13 @@ public class DocumentoPlazosService
             return null;
         }
 
-        return dias.Value < 30
-            ? fechaBase.AgregarDiasHabiles(dias.Value)
-            : fechaBase.AgregarDiasCorridos(dias.Value);
+        return CalcularFechaVencimiento(fechaBase, dias.Value, feriados);
+    }
+
+    public DateTime CalcularFechaVencimiento(DateTime fechaBase, int diasPlazo, ISet<DateOnly>? feriados = null)
+    {
+        return diasPlazo < 30
+            ? fechaBase.AgregarDiasHabiles(diasPlazo, feriados)
+            : fechaBase.AgregarDiasCorridos(diasPlazo);
     }
 }
