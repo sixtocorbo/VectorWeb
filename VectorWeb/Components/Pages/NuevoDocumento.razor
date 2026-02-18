@@ -17,7 +17,6 @@
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
 @inject IRepository<MaeRecluso> RepoReclusos
-@inject IRepository<CfgTiemposRespuestum> RepoPlazos
 @inject NumeracionRangoService RangoService
 @inject DocumentoPlazosService DocumentoPlazosService
 @inject NavigationManager Navegador
@@ -575,29 +574,12 @@
         }
     }
 
-    // --- NUEVO MÉTODO: CÁLCULO DE VENCIMIENTO SEGÚN DECRETO 500 ---
+    // Cómputo de plazos centralizado en DocumentoPlazosService.
     private async Task CalcularVencimientoAsync(int idTipo)
     {
-        var config = (await RepoPlazos.GetQueryable()
-            .FirstOrDefaultAsync(c => c.IdTipoDocumento == idTipo && c.Prioridad == "NORMAL"));
-
-        if (config != null)
-        {
-            // Regla: Plazos < 30 días => Días Hábiles. Plazos >= 30 días => Días Corridos.
-            if (config.DiasMaximos < 30)
-            {
-                nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasHabiles(config.DiasMaximos);
-            }
-            else
-            {
-                nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasCorridos(config.DiasMaximos);
-            }
-        }
-        else
-        {
-            // Sin configuración: Asumimos 10 días hábiles por defecto
-            nuevoDoc.FechaVencimiento = DateTime.Now.AgregarDiasHabiles(10);
-        }
+        var fechaBase = DateTime.Today.AddDays(1);
+        nuevoDoc.FechaVencimiento = await DocumentoPlazosService.CalcularFechaVencimientoAsync(idTipo, fechaBase)
+            ?? DocumentoPlazosService.CalcularFechaVencimiento(fechaBase, 10);
     }
 
     private IEnumerable<MaeDocumento> DocumentosPadrePaginados => documentosPadreFiltrados.Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre).Take(tamanoPaginaPadre);
@@ -641,9 +623,7 @@
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
 
-            // NOTA: Eliminamos la llamada a DocumentoPlazosService porque ya calculamos
-            // el vencimiento correctamente en OnTipoDocumentoChanged usando el Decreto 500.
-            // Si FechaVencimiento es nula (caso raro), calculamos un default aquí por seguridad.
+            // Si FechaVencimiento es nula (caso raro), recalculamos por seguridad.
             if (!nuevoDoc.FechaVencimiento.HasValue)
             {
                 await CalcularVencimientoAsync(nuevoDoc.IdTipo);
