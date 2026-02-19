@@ -117,13 +117,15 @@
                         <small class="text-muted d-block mt-2">
                             <i class="bi bi-geo-alt-fill text-danger"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
                         </small>
-                    </div>
-                    <div class="col-md-3 text-md-end mt-3 mt-md-0">
                         @if (paseConActuacionForzado)
                         {
-                            <span class="badge bg-primary px-3 py-2">Oficina destino: @NombreOficinaDestinoPase</span>
+                            <div class="mt-2">
+                                <span class="badge bg-primary px-3 py-2">Oficina destino: @NombreOficinaDestinoPase</span>
+                            </div>
                         }
-                        else
+                    </div>
+                    <div class="col-md-3 text-md-end mt-3 mt-md-0">
+                        @if (!paseConActuacionForzado)
                         {
                             <div class="form-check form-switch d-inline-block text-start">
                                 <InputCheckbox id="soloTraerSinActuacion" class="form-check-input shadow-none" @bind-Value="soloTraerSinActuacion" />
