@@ -232,18 +232,6 @@
                     @if (!soloTraerSinActuacion)
                     {
                         <div class="section-title">Detalle del Contenido</div>
-                        <div class="mb-3">
-                            <label class="label-custom mb-1">Asunto</label>
-                            <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control shadow-none" rows="3" placeholder="Ingrese el asunto del documento..." />
-                            <div class="text-end">
-                                <small class="@(nuevoDoc.Asunto?.Length > 200 ? "text-danger" : "text-muted")">@(nuevoDoc.Asunto?.Length ?? 0) / 200 caracteres</small>
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="label-custom mb-1">Descripción detallada</label>
-                            <InputTextArea @bind-Value="nuevoDoc.Descripcion" class="form-control shadow-none" rows="4" placeholder="Ingrese una descripción detallada (opcional)..." />
-                        </div>
 
                         @if (!esActuacion)
                         {
@@ -296,6 +284,19 @@
                                 }
                             </div>
                         }
+
+                        <div class="mb-3">
+                            <label class="label-custom mb-1">Asunto</label>
+                            <InputTextArea @bind-Value="nuevoDoc.Asunto" class="form-control shadow-none" rows="3" placeholder="Ingrese el asunto del documento..." />
+                            <div class="text-end">
+                                <small class="@(nuevoDoc.Asunto?.Length > 200 ? "text-danger" : "text-muted")">@(nuevoDoc.Asunto?.Length ?? 0) / 200 caracteres</small>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="label-custom mb-1">Descripción detallada</label>
+                            <InputTextArea @bind-Value="nuevoDoc.Descripcion" class="form-control shadow-none" rows="4" placeholder="Ingrese una descripción detallada (opcional)..." />
+                        </div>
                     }
                 </div>
             </div>
