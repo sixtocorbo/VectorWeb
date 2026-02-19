@@ -268,6 +268,7 @@
     private string oficinaDestinoBusqueda = string.Empty;
     private List<CatOficina> oficinasDestinoFiltradas = new();
     private int indiceOficinaDestinoSeleccionada = -1;
+    private readonly Dictionary<int, int> usoOficinas = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -284,6 +285,7 @@
             oficinas = await RepoOficinas.GetQueryable().Where(o => usuarioSinOficinaAsignada || o.IdOficina != idOficinaUsuario).OrderBy(o => o.Nombre).ToListAsync();
             estados = (await RepoEstados.GetAllAsync()).ToList();
             idOficinaBandejaEntrada = (await RepoOficinas.GetQueryable().Where(o => o.Nombre.ToUpper() == "BANDEJA DE ENTRADA").Select(o => (int?)o.IdOficina).FirstOrDefaultAsync());
+            await CargarUsoOficinasAsync();
 
             await AnalizarPaqueteAsync();
             nuevoMovimiento.ObservacionPase = "Se remite para su conocimiento, consideración y fines pertinentes.";
@@ -317,14 +319,14 @@
         indiceOficinaDestinoSeleccionada = -1;
         if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda))
         {
-            oficinasDestinoFiltradas = oficinas.Where(o => o.Nombre.Contains(oficinaDestinoBusqueda, StringComparison.OrdinalIgnoreCase)).Take(8).ToList();
+            oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda).Take(8).ToList();
             var exact = oficinas.FirstOrDefault(o => string.Equals(o.Nombre, oficinaDestinoBusqueda, StringComparison.OrdinalIgnoreCase));
             if (exact != null) nuevoMovimiento.IdOficinaDestino = exact.IdOficina;
         }
         else { oficinasDestinoFiltradas.Clear(); }
     }
 
-    private void MostrarSugerenciasOficinaDestino() { if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda)) oficinasDestinoFiltradas = oficinas.Where(o => o.Nombre.Contains(oficinaDestinoBusqueda, StringComparison.OrdinalIgnoreCase)).Take(8).ToList(); }
+    private void MostrarSugerenciasOficinaDestino() { if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda)) oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda).Take(8).ToList(); }
 
     private void ManejarTecladoOficinasDestino(KeyboardEventArgs e)
     {
@@ -336,6 +338,46 @@
     }
 
     private void SeleccionarOficinaDestino(CatOficina oficina) { nuevoMovimiento.IdOficinaDestino = oficina.IdOficina; oficinaDestinoBusqueda = oficina.Nombre ?? ""; oficinasDestinoFiltradas.Clear(); indiceOficinaDestinoSeleccionada = -1; }
+
+    private async Task CargarUsoOficinasAsync()
+    {
+        var movimientos = await DbContext.TraMovimientos
+            .AsNoTracking()
+            .Select(m => new { m.IdOficinaOrigen, m.IdOficinaDestino })
+            .ToListAsync();
+
+        usoOficinas.Clear();
+        foreach (var movimiento in movimientos)
+        {
+            SumarUsoOficina(movimiento.IdOficinaOrigen);
+            SumarUsoOficina(movimiento.IdOficinaDestino);
+        }
+    }
+
+    private void SumarUsoOficina(int? idOficina)
+    {
+        if (!idOficina.HasValue || idOficina.Value <= 0) return;
+        usoOficinas[idOficina.Value] = usoOficinas.GetValueOrDefault(idOficina.Value) + 1;
+    }
+
+    private IEnumerable<CatOficina> BuscarOficinasDestino(string termino)
+    {
+        if (string.IsNullOrWhiteSpace(termino)) return Enumerable.Empty<CatOficina>();
+
+        return oficinas
+            .Where(o => o.Nombre.Contains(termino, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(o => PuntajeCoincidencia(o.Nombre, termino))
+            .ThenByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina))
+            .ThenBy(o => o.Nombre);
+    }
+
+    private static int PuntajeCoincidencia(string? nombreOficina, string termino)
+    {
+        if (string.IsNullOrWhiteSpace(nombreOficina)) return 0;
+        if (nombreOficina.Equals(termino, StringComparison.OrdinalIgnoreCase)) return 3;
+        if (nombreOficina.StartsWith(termino, StringComparison.OrdinalIgnoreCase)) return 2;
+        return 1;
+    }
 
     private async Task GuardarPaseDesdeBotonAsync()
     {
