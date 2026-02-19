@@ -33,9 +33,17 @@
             _ultimoMensaje = Mensaje;
             try
             {
-                await JS.InvokeVoidAsync("hacerScrollHaciaElemento", Id);
+                var existeFuncionScroll = await JS.InvokeAsync<bool>("eval", "typeof window.hacerScrollHaciaElemento === 'function'");
+                if (existeFuncionScroll)
+                {
+                    await JS.InvokeVoidAsync("hacerScrollHaciaElemento", Id);
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+                }
             }
-            catch (Microsoft.JSInterop.JSException)
+            catch
             {
                 await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
             }
