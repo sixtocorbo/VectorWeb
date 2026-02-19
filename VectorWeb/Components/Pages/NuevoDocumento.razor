@@ -484,6 +484,7 @@
     private List<MaeRecluso> reclusosFiltradosAsunto = new();
     private List<MaeRecluso> reclusosSeleccionadosAsunto = new();
     private int indicePPLSeleccionado = -1;
+    private string? bloqueReclusosHeredado;
 
     private string filtroModalPadre = string.Empty;
     private List<MaeDocumento> documentosPadreFiltrados = new();
@@ -575,6 +576,7 @@
                 nuevoDoc.IdDocumentoPadre = padre.IdDocumento;
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
+                bloqueReclusosHeredado = ExtraerBloqueReclusos(padre.Asunto);
                 nombreOficinaActualDoc = NombreOficina(padre.IdOficinaActual);
                 oficinaBusqueda = nombreOficinaActualDoc;
                 var tM = tipos.FirstOrDefault(t => t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase));
@@ -620,6 +622,11 @@
         errorGuardar = null;
         try
         {
+            if (esActuacion)
+            {
+                nuevoDoc.Asunto = ConstruirAsuntoConReclusos(nuevoDoc.Asunto, bloqueReclusosHeredado);
+            }
+
             if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
             {
                 if (!idOficinaBandejaEntrada.HasValue) { errorGuardar = "Error: No se encontró la Bandeja de Entrada."; return; }
@@ -817,4 +824,22 @@
     private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
     private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
     private void InsertarReclusosEnAsunto() { if (reclusosSeleccionadosAsunto.Any()) nuevoDoc.Asunto += $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}"; }
+
+    private static string? ExtraerBloqueReclusos(string? asunto)
+    {
+        if (string.IsNullOrWhiteSpace(asunto)) return null;
+
+        const string marcador = " | PPL(s): ";
+        var indice = asunto.IndexOf(marcador, StringComparison.OrdinalIgnoreCase);
+        return indice < 0 ? null : asunto[indice..].Trim();
+    }
+
+    private static string ConstruirAsuntoConReclusos(string? asuntoIngresado, string? bloqueReclusos)
+    {
+        if (string.IsNullOrWhiteSpace(bloqueReclusos)) return asuntoIngresado?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(asuntoIngresado)) return bloqueReclusos;
+        if (asuntoIngresado.Contains("| PPL(s):", StringComparison.OrdinalIgnoreCase)) return asuntoIngresado.Trim();
+
+        return $"{asuntoIngresado.Trim()} {bloqueReclusos}";
+    }
 }
