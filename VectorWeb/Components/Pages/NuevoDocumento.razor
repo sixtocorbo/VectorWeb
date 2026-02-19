@@ -10,7 +10,9 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.EntityFrameworkCore
+@using System.Globalization
 @using System.Security.Claims
+@using System.Text
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
@@ -812,8 +814,30 @@
     private void FiltrarReclusosAsunto(ChangeEventArgs e)
     {
         busquedaReclusoAsunto = e.Value?.ToString() ?? "";
-        reclusosFiltradosAsunto = reclusosActivos.Where(r => r.NombreCompleto.Contains(busquedaReclusoAsunto, StringComparison.OrdinalIgnoreCase)).Take(8).ToList();
+        var busquedaNormalizada = NormalizarTextoBusqueda(busquedaReclusoAsunto);
+        reclusosFiltradosAsunto = reclusosActivos
+            .Where(r => NormalizarTextoBusqueda(r.NombreCompleto).Contains(busquedaNormalizada, StringComparison.OrdinalIgnoreCase))
+            .Take(8)
+            .ToList();
         mostrarSugerenciasPPL = true;
+    }
+
+    private static string NormalizarTextoBusqueda(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return string.Empty;
+
+        var textoNormalizado = texto.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder(textoNormalizado.Length);
+
+        foreach (var c in textoNormalizado)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
     private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
