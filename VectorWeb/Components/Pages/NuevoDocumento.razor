@@ -112,7 +112,7 @@
             <div class="alert alert-warning shadow-sm border-0 mb-4 p-4">
                 <div class="row align-items-center">
                     <div class="col-md-9">
-                        <h5 class="fw-bold mb-1"><i class="bi bi-folder-fill me-2"></i>Expediente: @docPadreSeleccionado?.NumeroOficial</h5>
+                        <h5 class="fw-bold mb-1"><i class="bi bi-folder-fill me-2"></i>Expediente: @TipoYNumeroExpediente</h5>
                         <p class="mb-0 text-dark">@docPadreSeleccionado?.Asunto</p>
                         <small class="text-muted d-block mt-2">
                             <i class="bi bi-geo-alt-fill text-danger"></i> Ubicación actual: <strong>@nombreOficinaActualDoc</strong>
@@ -121,7 +121,7 @@
                     <div class="col-md-3 text-md-end mt-3 mt-md-0">
                         @if (paseConActuacionForzado)
                         {
-                            <span class="badge bg-primary px-3 py-2">TRASLADO AUTOMÁTICO</span>
+                            <span class="badge bg-primary px-3 py-2">Oficina destino: @NombreOficinaDestinoPase</span>
                         }
                         else
                         {
@@ -519,6 +519,34 @@
     private string EtiquetaBotonPaseConActuacion => AutoPaseDestino.HasValue
         ? "Guardar y Enviar todo"
         : "Guardar y Traer todo";
+    private string TipoYNumeroExpediente
+    {
+        get
+        {
+            var numero = docPadreSeleccionado?.NumeroOficial?.Trim();
+            if (string.IsNullOrWhiteSpace(numero)) return "S/D";
+
+            var tipo = NombreTipo(docPadreSeleccionado?.IdTipo);
+            return string.IsNullOrWhiteSpace(tipo) ? numero : $"{tipo} {numero}";
+        }
+    }
+    private string NombreOficinaDestinoPase
+    {
+        get
+        {
+            if (AutoPaseDestino.HasValue)
+            {
+                return NombreOficina(AutoPaseDestino.Value);
+            }
+
+            if (AutoPaseBandeja == true && idOficinaUsuarioActual > 0)
+            {
+                return NombreOficina(idOficinaUsuarioActual);
+            }
+
+            return "S/D";
+        }
+    }
     private string oficinaBusqueda = string.Empty;
     private List<CatOficina> oficinasFiltradas = new();
     private int indiceOficinaSeleccionada = -1;
@@ -826,6 +854,7 @@
     private void RecalcularDocumentosPadreFiltrados() => documentosPadreFiltrados = string.IsNullOrWhiteSpace(filtroModalPadre) ? documentosDisponibles : documentosDisponibles.Where(d => indicesBusquedaPadre[d.IdDocumento].Contains(filtroModalPadre, StringComparison.OrdinalIgnoreCase)).ToList();
 
     private string NombreOficina(int id) => nombresOficinas.GetValueOrDefault(id) ?? "S/D";
+    private string NombreTipo(int? idTipo) => idTipo.HasValue ? nombresTipos.GetValueOrDefault(idTipo.Value) ?? string.Empty : string.Empty;
     private async Task AjustarScrollSugerenciaAsync(ElementReference r, int i) => await JS.InvokeVoidAsync("scrollSugerenciaVisible", r, i);
 
     private void FiltrarReclusosAsunto(ChangeEventArgs e)
