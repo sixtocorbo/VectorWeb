@@ -215,10 +215,9 @@
                             <th style="width: 100px;">Fecha</th>
                             <th style="width: 160px;">Identificación</th>
                             <th style="width: 140px;">Vinculación</th>
-                            <th>Asunto</th>
-                            <th>Descripción</th>
+                            <th>Asunto / Descripción</th>
                             <th style="width: 150px;">Ubicación</th>
-                            <th class="text-end" style="width: 200px;">Acciones</th>
+                            <th class="text-end" style="width: 260px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -250,10 +249,11 @@
                                     }
                                 </td>
                                 <td>
-                                    <div class="asunto-cell" title="@doc.Asunto">@doc.Asunto</div>
-                                </td>
-                                <td>
-                                    <div class="descripcion-cell" title="@doc.Descripcion">@doc.Descripcion</div>
+                                    <div class="asunto-cell fw-semibold" title="@doc.Asunto">@doc.Asunto</div>
+                                    @if (!string.IsNullOrWhiteSpace(doc.Descripcion))
+                                    {
+                                        <div class="descripcion-cell mt-1" title="@doc.Descripcion">@doc.Descripcion</div>
+                                    }
                                 </td>
                                 <td>
                                     @if (doc.IdOficinaActual == idOficinaUsuario)
@@ -268,20 +268,11 @@
                                     }
                                 </td>
                                 <td class="text-end">
-                                    <div class="dropdown">
-                                        <button class="btn btn-light btn-sm border shadow-sm"
-                                                type="button"
-                                                @onclick="() => AlternarMenu(doc.IdDocumento)">
-                                            Acciones <i class="bi bi-chevron-down small ms-1"></i>
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 @(menuAbiertoId == doc.IdDocumento ? "show" : "")"
-                                            style="display: @(menuAbiertoId == doc.IdDocumento ? "block" : "none"); position: absolute; right: 0;">
-                                            <li><button class="dropdown-item py-2" @onclick="() => IrAPase(doc)"><i class="bi bi-send text-warning me-2"></i> Dar Pase</button></li>
-                                            <li><a class="dropdown-item py-2" href="documentos/historial/@doc.IdDocumento"><i class="bi bi-clock-history text-info me-2"></i> Historial</a></li>
-                                            <li><a class="dropdown-item py-2" href="documentos/recorrido/@doc.IdDocumento"><i class="bi bi-geo-alt text-secondary me-2"></i> Recorrido</a></li>
-                                            <li><hr class="dropdown-divider"></li>
-                                            <li><button class="dropdown-item py-2" @onclick="() => IrAEditar(doc.IdDocumento)"><i class="bi bi-pencil-square text-primary me-2"></i> Editar</button></li>
-                                        </ul>
+                                    <div class="d-flex justify-content-end gap-1 flex-wrap">
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => IrAPase(doc)"><i class="bi bi-send"></i> Pase</button>
+                                        <a class="btn btn-sm btn-outline-info" href="documentos/historial/@doc.IdDocumento"><i class="bi bi-clock-history"></i> Historial</a>
+                                        <a class="btn btn-sm btn-outline-secondary" href="documentos/recorrido/@doc.IdDocumento"><i class="bi bi-geo-alt"></i> Recorrido</a>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => IrAEditar(doc.IdDocumento)"><i class="bi bi-pencil-square"></i> Editar</button>
                                     </div>
                                 </td>
                             </tr>
@@ -329,7 +320,6 @@
     private int totalRojo;
     private int totalAmarillo;
     private int totalVerde;
-    private long? menuAbiertoId;
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
     private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
@@ -459,18 +449,6 @@
     {
         if (string.IsNullOrWhiteSpace(filtroSemaforo)) return q;
         return q.Where(d => d.EstadoSemaforo == filtroSemaforo);
-    }
-
-
-    private void AlternarMenu(long id)
-    {
-        if (menuAbiertoId == id)
-        {
-            menuAbiertoId = null;
-            return;
-        }
-
-        menuAbiertoId = id;
     }
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
 
