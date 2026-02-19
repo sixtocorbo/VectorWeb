@@ -554,7 +554,6 @@
     private string oficinaBusqueda = string.Empty;
     private List<CatOficina> oficinasFiltradas = new();
     private int indiceOficinaSeleccionada = -1;
-    private bool mostrarSugerenciasArriba;
     private bool esNumeracionAutomatica;
     private bool esNumeracionExterna;
     private bool esNumeracionManualInterna;
@@ -565,9 +564,7 @@
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
-    private string EstiloPanelSugerencias => mostrarSugerenciasArriba
-        ? "z-index: 20; bottom: calc(100% + .25rem);"
-        : "z-index: 20; top: calc(100% + .25rem);";
+    private const string EstiloPanelSugerencias = "z-index: 20; top: calc(100% + .25rem);";
     private ElementReference contenedorSugerenciasOficinaRef;
     private DotNetObjectReference<NuevoDocumento>? dotNetRef;
     private bool detectorClickRegistrado;
