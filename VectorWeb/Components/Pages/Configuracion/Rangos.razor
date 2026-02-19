@@ -20,21 +20,21 @@
 </div>
 
 @* --- MENSAJES DE ALERTA (Sin Toast, integrados) --- *@
-@if (!string.IsNullOrWhiteSpace(mensajeError))
-{
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError
-        <button type="button" class="btn-close" @onclick="() => mensajeError = string.Empty"></button>
-    </div>
-}
+<AlertaScroll Id="alertaPrincipalError"
+             Mensaje="@mensajeError"
+             Tipo="danger"
+             CssClass="alert-dismissible fade show"
+             IconoCss="bi bi-exclamation-triangle-fill"
+             PermitirCerrar="true"
+             OnCerrar="LimpiarMensajeError" />
 
-@if (!string.IsNullOrWhiteSpace(mensajeOk))
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="bi bi-check-circle-fill me-2"></i>@mensajeOk
-        <button type="button" class="btn-close" @onclick="() => mensajeOk = string.Empty"></button>
-    </div>
-}
+<AlertaScroll Id="alertaPrincipalOk"
+             Mensaje="@mensajeOk"
+             Tipo="success"
+             CssClass="alert-dismissible fade show"
+             IconoCss="bi bi-check-circle-fill"
+             PermitirCerrar="true"
+             OnCerrar="LimpiarMensajeOk" />
 
 @* --- SISTEMA DE PESTAÑAS --- *@
 <ul class="nav nav-tabs mb-4">
@@ -313,7 +313,7 @@ else
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(mensajeErrorModalRango))
                     {
-                        <div class="alert alert-danger" role="alert">@mensajeErrorModalRango</div>
+                        <AlertaScroll Id="alertaModalRango" Mensaje="@mensajeErrorModalRango" Tipo="danger" />
                     }
 
                     <EditForm Model="rangoActual">
@@ -473,7 +473,7 @@ else
                 <div class="modal-body">
                     @if (!string.IsNullOrWhiteSpace(mensajeErrorModalCupo))
                     {
-                        <div class="alert alert-danger" role="alert">@mensajeErrorModalCupo</div>
+                        <AlertaScroll Id="alertaModalCupo" Mensaje="@mensajeErrorModalCupo" Tipo="danger" />
                     }
 
                     <div class="mb-3">
@@ -749,16 +749,16 @@ else
         procesando = true;
         try
         {
-            if (rangoActual.IdTipo <= 0) { mensajeErrorModalRango = "Seleccione un tipo."; return; }
-            if (!rangoActual.IdOficina.HasValue) { mensajeErrorModalRango = "Seleccione una oficina."; return; }
-            if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { mensajeErrorModalRango = "Rango inválido (Inicio > Fin)."; return; }
+            if (rangoActual.IdTipo <= 0) { MostrarErrorModalRango("Seleccione un tipo."); return; }
+            if (!rangoActual.IdOficina.HasValue) { MostrarErrorModalRango("Seleccione una oficina."); return; }
+            if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { MostrarErrorModalRango("Rango inválido (Inicio > Fin)."); return; }
 
             // IMPORTANTE: Aquí se espera que el servicio valide si hay otro rango activo y devuelva Fail si es necesario.
             var resultado = await RangoService.GuardarRangoAsync(rangoActual);
 
             if (!resultado.Exitoso)
             {
-                mensajeErrorModalRango = resultado.Mensaje;
+                MostrarErrorModalRango(resultado.Mensaje);
                 return;
             }
 
@@ -937,11 +937,11 @@ else
         procesando = true;
         try
         {
-            if (cupoTipoSeleccionado <= 0) { mensajeErrorModalCupo = "Seleccione un tipo."; return; }
-            if (cupoAnio < 2000) { mensajeErrorModalCupo = "Año inválido."; return; }
+            if (cupoTipoSeleccionado <= 0) { MostrarErrorModalCupo("Seleccione un tipo."); return; }
+            if (cupoAnio < 2000) { MostrarErrorModalCupo("Año inválido."); return; }
 
             var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
-            if (!resultado.Exitoso) { mensajeErrorModalCupo = resultado.Mensaje; return; }
+            if (!resultado.Exitoso) { MostrarErrorModalCupo(resultado.Mensaje); return; }
 
             mensajeOk = "Cupo guardado correctamente.";
             mostrarModalCupo = false;
@@ -961,6 +961,28 @@ else
                 cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(id, cupoAnio);
             }
         }
+    }
+
+    private Task LimpiarMensajeError()
+    {
+        mensajeError = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private Task LimpiarMensajeOk()
+    {
+        mensajeOk = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private void MostrarErrorModalRango(string mensaje)
+    {
+        mensajeErrorModalRango = mensaje;
+    }
+
+    private void MostrarErrorModalCupo(string mensaje)
+    {
+        mensajeErrorModalCupo = mensaje;
     }
 
     // --- UTILIDADES ---

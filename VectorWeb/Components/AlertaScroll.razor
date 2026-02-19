@@ -1,0 +1,49 @@
+@inject IJSRuntime JS
+
+@if (!string.IsNullOrWhiteSpace(Mensaje))
+{
+    <div id="@Id" class="alert alert-@Tipo @CssClass" role="alert">
+        @if (!string.IsNullOrWhiteSpace(IconoCss))
+        {
+            <i class="@IconoCss me-2"></i>
+        }
+        @Mensaje
+        @if (PermitirCerrar)
+        {
+            <button type="button" class="btn-close" @onclick="Cerrar"></button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string Mensaje { get; set; } = string.Empty;
+    [Parameter] public string Tipo { get; set; } = "danger";
+    [Parameter] public string Id { get; set; } = $"alerta-{Guid.NewGuid():N}";
+    [Parameter] public string CssClass { get; set; } = string.Empty;
+    [Parameter] public string IconoCss { get; set; } = string.Empty;
+    [Parameter] public bool PermitirCerrar { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+
+    private string _ultimoMensaje = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrWhiteSpace(Mensaje) && !string.Equals(Mensaje, _ultimoMensaje, StringComparison.Ordinal))
+        {
+            _ultimoMensaje = Mensaje;
+            await JS.InvokeVoidAsync("hacerScrollHaciaElemento", Id);
+        }
+        else if (string.IsNullOrWhiteSpace(Mensaje))
+        {
+            _ultimoMensaje = string.Empty;
+        }
+    }
+
+    private async Task Cerrar()
+    {
+        if (OnCerrar.HasDelegate)
+        {
+            await OnCerrar.InvokeAsync();
+        }
+    }
+}

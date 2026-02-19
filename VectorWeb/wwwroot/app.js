@@ -23,6 +23,13 @@ window.scrollSugerenciaVisible = (contenedor, indice) => {
     }
 };
 
+window.hacerScrollHaciaElemento = (elementoId) => {
+    const elemento = document.getElementById(elementoId);
+    if (elemento) {
+        elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+};
+
 (() => {
     const SELECTOR_MENSAJES = '.alert[role="alert"], .validation-message';
     let ultimoScrollAt = 0;
