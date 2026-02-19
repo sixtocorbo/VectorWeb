@@ -41,16 +41,13 @@ public sealed class DatabaseBackupService
         }
         catch (SqlException ex) when (IsAccessDenied(ex))
         {
-            var fallbackDirectory = await FindWritableSqlBackupDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
-            if (string.IsNullOrWhiteSpace(fallbackDirectory))
+            var fallbackPath = await CreateBackupInWritableSqlDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
+            if (string.IsNullOrWhiteSpace(fallbackPath))
             {
                 throw;
             }
 
-            var fallbackPath = Path.Combine(fallbackDirectory, fileName);
-            var finalPath = TryCopyBackupToPreferredPath(fallbackPath, preferredBackupPath);
-
-            return new DatabaseBackupResult(databaseName, finalPath, DateTime.Now);
+            return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
         }
         finally
         {
@@ -70,7 +67,7 @@ public sealed class DatabaseBackupService
            || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
 
-    private static async Task<string?> FindWritableSqlBackupDirectoryAsync(
+    private static async Task<string?> CreateBackupInWritableSqlDirectoryAsync(
         SecretariaDbContext dbContext,
         string databaseName,
         string fileName,
@@ -89,7 +86,7 @@ public sealed class DatabaseBackupService
             try
             {
                 await ExecuteBackupAsync(dbContext, databaseName, backupPath, cancellationToken);
-                return directory;
+                return backupPath;
             }
             catch (SqlException ex) when (IsAccessDenied(ex))
             {
@@ -98,31 +95,6 @@ public sealed class DatabaseBackupService
         }
 
         return null;
-    }
-
-    private static string TryCopyBackupToPreferredPath(string sourcePath, string preferredBackupPath)
-    {
-        try
-        {
-            var targetDirectory = Path.GetDirectoryName(preferredBackupPath);
-            if (string.IsNullOrWhiteSpace(targetDirectory))
-            {
-                return sourcePath;
-            }
-
-            Directory.CreateDirectory(targetDirectory);
-            File.Copy(sourcePath, preferredBackupPath, overwrite: true);
-
-            return preferredBackupPath;
-        }
-        catch (IOException)
-        {
-            return sourcePath;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return sourcePath;
-        }
     }
 
     private static async Task<string?> GetSqlServerDefaultBackupDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
