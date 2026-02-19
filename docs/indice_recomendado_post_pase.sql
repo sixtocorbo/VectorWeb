@@ -5,7 +5,7 @@ Objetivo:
 Contexto:
   La bandeja consulta con filtros por IdOficinaActual y calcula:
   - COUNT DISTINCT de IdHiloConversacion
-  - Conteos por EstadoSemaforo
+  - Conteos por EstadoSemaforo (columna calculada no determinística)
   - Ordenamiento por FechaCreacion DESC
 
 Índice recomendado:
@@ -22,13 +22,19 @@ BEGIN
     (
         IdOficinaActual ASC,
         IdHiloConversacion ASC,
-        EstadoSemaforo ASC,
         FechaCreacion DESC
     )
-    INCLUDE (IdDocumento, IdEstadoActual, IdDocumentoPadre, IdTipo, NumeroOficial)
+    INCLUDE (IdDocumento, IdEstadoActual, IdDocumentoPadre, IdTipo, NumeroOficial, FechaVencimiento)
     WHERE IdEstadoActual <> 5;
 END
 GO
+
+/*
+NOTA:
+  EstadoSemaforo usa GETDATE() en su definición, por lo tanto SQL Server la considera
+  no determinística y no permite indexarla (ni en key, ni INCLUDE, ni estadísticas).
+  Este índice usa FechaVencimiento para reducir lecturas en cálculos de semáforo.
+*/
 
 /*
 Validación rápida sugerida:
