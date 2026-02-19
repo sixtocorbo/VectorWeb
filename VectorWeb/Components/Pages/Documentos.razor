@@ -238,13 +238,13 @@
                                     @if (doc.IdDocumentoPadre.HasValue)
                                     {
                                         <div class="badge bg-light text-dark border fw-normal py-1 px-2" title="Hijo de: @ObtenerReferenciaPadre(doc.IdDocumentoPadre.Value)">
-                                            <i class="bi bi-link-45deg"></i> Vinculado
+                                            <i class="bi bi-link-45deg"></i> Hijo (@doc.IdDocumentoPadre.Value)
                                         </div>
                                     }
                                     @if (cantidadHijosPorPadre.TryGetValue(doc.IdDocumento, out var cantHijos) && cantHijos > 0)
                                     {
                                         <div class="badge bg-primary-subtle text-primary border border-primary-subtle py-1 px-2 mt-1">
-                                            <i class="bi bi-diagram-2"></i> @cantHijos derivados
+                                            <i class="bi bi-diagram-2"></i> Padre (@cantHijos)
                                         </div>
                                     }
                                 </td>
