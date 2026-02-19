@@ -26,27 +26,74 @@ public sealed class DatabaseBackupService
         }
 
         var databaseName = GetDatabaseName(connectionString);
-        var backupDirectory = Path.GetFullPath(_backupDirectory);
-        Directory.CreateDirectory(backupDirectory);
-
         var fileName = BuildBackupFileName(databaseName, DateTime.Now);
-        var fullPath = Path.Combine(backupDirectory, fileName);
-
-        var sql = $"BACKUP DATABASE {EscapeIdentifier(databaseName)} TO DISK = N'{EscapeLiteral(fullPath)}' WITH INIT, FORMAT, CHECKSUM, STATS = 10";
+        var preferredBackupPath = Path.Combine(Path.GetFullPath(_backupDirectory), fileName);
 
         var timeoutOriginal = dbContext.Database.GetCommandTimeout();
         dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
 
+        string? sqlServerDefaultDirectory = null;
+
         try
         {
-            await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+            Directory.CreateDirectory(Path.GetDirectoryName(preferredBackupPath)!);
+            await ExecuteBackupAsync(dbContext, databaseName, preferredBackupPath, cancellationToken);
+
+            return new DatabaseBackupResult(databaseName, preferredBackupPath, DateTime.Now);
+        }
+        catch (SqlException ex) when (IsAccessDenied(ex))
+        {
+            sqlServerDefaultDirectory = await GetSqlServerDefaultBackupDirectoryAsync(dbContext, cancellationToken);
+            if (string.IsNullOrWhiteSpace(sqlServerDefaultDirectory))
+            {
+                throw;
+            }
+
+            var fallbackPath = Path.Combine(sqlServerDefaultDirectory, fileName);
+            await ExecuteBackupAsync(dbContext, databaseName, fallbackPath, cancellationToken);
+
+            return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
         }
         finally
         {
             dbContext.Database.SetCommandTimeout(timeoutOriginal);
         }
+    }
 
-        return new DatabaseBackupResult(databaseName, fullPath, DateTime.Now);
+    private static async Task ExecuteBackupAsync(SecretariaDbContext dbContext, string databaseName, string fullPath, CancellationToken cancellationToken)
+    {
+        var sql = $"BACKUP DATABASE {EscapeIdentifier(databaseName)} TO DISK = N'{EscapeLiteral(fullPath)}' WITH INIT, FORMAT, CHECKSUM, STATS = 10";
+        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
+    }
+
+    private static bool IsAccessDenied(SqlException ex)
+        => ex.Message.Contains("Operating system error 5", StringComparison.OrdinalIgnoreCase)
+           || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
+           || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<string?> GetSqlServerDefaultBackupDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
+    {
+        await using var connection = dbContext.Database.GetDbConnection();
+        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(4000))";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return result as string;
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     public static string GetDatabaseName(string connectionString)
