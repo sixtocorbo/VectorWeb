@@ -484,6 +484,7 @@
     private string filtroModalPadre = string.Empty;
     private List<MaeDocumento> documentosPadreFiltrados = new();
     private readonly Dictionary<int, string> nombresOficinas = new();
+    private readonly Dictionary<int, int> usoOficinas = new();
     private readonly Dictionary<int, string> nombresTipos = new();
     private readonly Dictionary<int, string> nombresEstados = new();
     private readonly Dictionary<long, string> indicesBusquedaPadre = new();
@@ -531,6 +532,7 @@
             .ToList();
 
         foreach (var of in oficinas) if (!string.IsNullOrWhiteSpace(of.Nombre)) nombresOficinas[of.IdOficina] = of.Nombre;
+        await CargarUsoOficinasAsync();
         foreach (var t in tipos) if (!string.IsNullOrWhiteSpace(t.Nombre)) nombresTipos[t.IdTipo] = t.Nombre;
         foreach (var e in estados) if (!string.IsNullOrWhiteSpace(e.Nombre)) nombresEstados[e.IdEstado] = e.Nombre;
 
@@ -692,6 +694,7 @@
     private void FiltrarOficinas(ChangeEventArgs e)
     {
         oficinaBusqueda = e.Value?.ToString() ?? "";
+        indiceOficinaSeleccionada = -1;
         oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList();
     }
 
@@ -705,7 +708,45 @@
         else if (e.Key == "Enter" && indiceOficinaSeleccionada >= 0) await SeleccionarOficina(oficinasFiltradas[indiceOficinaSeleccionada]);
     }
 
-    private IEnumerable<CatOficina> BuscarOficinas(string t) => oficinas.Where(o => o.Nombre.Contains(t, StringComparison.OrdinalIgnoreCase)).OrderBy(o => o.Nombre);
+    private async Task CargarUsoOficinasAsync()
+    {
+        var movimientos = await DbContext.TraMovimientos
+            .AsNoTracking()
+            .Select(m => new { m.IdOficinaOrigen, m.IdOficinaDestino })
+            .ToListAsync();
+
+        usoOficinas.Clear();
+        foreach (var movimiento in movimientos)
+        {
+            SumarUsoOficina(movimiento.IdOficinaOrigen);
+            SumarUsoOficina(movimiento.IdOficinaDestino);
+        }
+    }
+
+    private void SumarUsoOficina(int? idOficina)
+    {
+        if (!idOficina.HasValue || idOficina.Value <= 0) return;
+        usoOficinas[idOficina.Value] = usoOficinas.GetValueOrDefault(idOficina.Value) + 1;
+    }
+
+    private IEnumerable<CatOficina> BuscarOficinas(string t)
+    {
+        if (string.IsNullOrWhiteSpace(t)) return Enumerable.Empty<CatOficina>();
+
+        return oficinas
+            .Where(o => o.Nombre.Contains(t, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(o => PuntajeCoincidencia(o.Nombre, t))
+            .ThenByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina))
+            .ThenBy(o => o.Nombre);
+    }
+
+    private static int PuntajeCoincidencia(string? nombreOficina, string termino)
+    {
+        if (string.IsNullOrWhiteSpace(nombreOficina)) return 0;
+        if (nombreOficina.Equals(termino, StringComparison.OrdinalIgnoreCase)) return 3;
+        if (nombreOficina.StartsWith(termino, StringComparison.OrdinalIgnoreCase)) return 2;
+        return 1;
+    }
     private string ConstruirIndiceBusquedaPadre(MaeDocumento d) => $"{d.NumeroOficial} {d.Asunto} {d.Descripcion}";
     private void RecalcularDocumentosPadreFiltrados() => documentosPadreFiltrados = string.IsNullOrWhiteSpace(filtroModalPadre) ? documentosDisponibles : documentosDisponibles.Where(d => indicesBusquedaPadre[d.IdDocumento].Contains(filtroModalPadre, StringComparison.OrdinalIgnoreCase)).ToList();
 
