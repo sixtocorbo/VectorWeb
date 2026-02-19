@@ -45,6 +45,7 @@ builder.Services.AddScoped<DocumentoVinculacionService>();
 builder.Services.AddScoped<RenovacionesService>();
 builder.Services.AddScoped<RolePermissionService>();
 builder.Services.AddScoped<PermissionAuditService>();
+builder.Services.AddScoped<DatabaseBackupService>();
 
 // Caché
 builder.Services.AddMemoryCache();

@@ -87,7 +87,8 @@ public static class AppPermissions
             [SeguridadUsuariosRoles] =
             [
                 new("Usuarios y roles", "/configuracion/usuarios"),
-                new("Auditoría de permisos", "/configuracion/auditoria-permisos")
+                new("Auditoría de permisos", "/configuracion/auditoria-permisos"),
+                new("Respaldo de base de datos", "/configuracion/respaldo-bd")
             ]
         };
 }
