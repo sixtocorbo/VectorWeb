@@ -52,7 +52,9 @@ public sealed class DatabaseBackupService
             var fallbackPath = Path.Combine(sqlServerDefaultDirectory, fileName);
             await ExecuteBackupAsync(dbContext, databaseName, fallbackPath, cancellationToken);
 
-            return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
+            var finalPath = TryCopyBackupToPreferredPath(fallbackPath, preferredBackupPath);
+
+            return new DatabaseBackupResult(databaseName, finalPath, DateTime.Now);
         }
         finally
         {
@@ -70,6 +72,31 @@ public sealed class DatabaseBackupService
         => ex.Message.Contains("Operating system error 5", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
+
+    private static string TryCopyBackupToPreferredPath(string sourcePath, string preferredBackupPath)
+    {
+        try
+        {
+            var targetDirectory = Path.GetDirectoryName(preferredBackupPath);
+            if (string.IsNullOrWhiteSpace(targetDirectory))
+            {
+                return sourcePath;
+            }
+
+            Directory.CreateDirectory(targetDirectory);
+            File.Copy(sourcePath, preferredBackupPath, overwrite: true);
+
+            return preferredBackupPath;
+        }
+        catch (IOException)
+        {
+            return sourcePath;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return sourcePath;
+        }
+    }
 
     private static async Task<string?> GetSqlServerDefaultBackupDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
     {
