@@ -154,10 +154,10 @@
                                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                                         <input type="text" class="form-control shadow-none" placeholder="Buscar por nombre o CI..."
                                                value="@busquedaReclusoAsunto" autocomplete="off"
-                                               @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onkeydown="ManejarTecladoPPL" />
+                                               @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onblur="OcultarSugerenciasPPLAsync" @onkeydown="ManejarTecladoPPL" />
                                     </div>
 
-                                    @if (reclusosFiltradosAsunto.Any())
+                                    @if (mostrarSugerenciasPPL && reclusosFiltradosAsunto.Any())
                                     {
                                         <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="z-index: 1000;">
                                             @for (var i = 0; i < reclusosFiltradosAsunto.Count; i++)
@@ -254,6 +254,7 @@
     private List<MaeRecluso> reclusosFiltradosAsunto = new();
     private List<MaeRecluso> reclusosSeleccionadosAsunto = new();
     private int indicePPLSeleccionado = -1;
+    private bool mostrarSugerenciasPPL;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -318,9 +319,16 @@
             .Take(8)
             .ToList();
         indicePPLSeleccionado = -1;
+        mostrarSugerenciasPPL = true;
     }
 
     private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
+
+    private async Task OcultarSugerenciasPPLAsync()
+    {
+        await Task.Delay(150);
+        mostrarSugerenciasPPL = false;
+    }
 
     private Task ManejarTecladoPPL(KeyboardEventArgs e)
     {
@@ -343,6 +351,7 @@
         busquedaReclusoAsunto = "";
         reclusosFiltradosAsunto.Clear();
         indicePPLSeleccionado = -1;
+        mostrarSugerenciasPPL = false;
     }
 
     private void QuitarReclusoAsunto(int idRecluso) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == idRecluso);

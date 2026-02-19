@@ -251,10 +251,10 @@
                                             <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                                             <input type="text" class="form-control shadow-none" placeholder="Buscar por nombre o CI..."
                                                    value="@busquedaReclusoAsunto" autocomplete="off"
-                                                   @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onkeydown="ManejarTecladoPPL" />
+                                                   @oninput="FiltrarReclusosAsunto" @onfocus="MostrarSugerenciasPPL" @onblur="OcultarSugerenciasPPLAsync" @onkeydown="ManejarTecladoPPL" />
                                         </div>
 
-                                        @if (reclusosFiltradosAsunto.Any())
+                                        @if (mostrarSugerenciasPPL && reclusosFiltradosAsunto.Any())
                                         {
                                             <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="z-index: 1000;">
                                                 @for (var i = 0; i < reclusosFiltradosAsunto.Count; i++)
@@ -484,6 +484,7 @@
     private List<MaeRecluso> reclusosFiltradosAsunto = new();
     private List<MaeRecluso> reclusosSeleccionadosAsunto = new();
     private int indicePPLSeleccionado = -1;
+    private bool mostrarSugerenciasPPL;
     private string? bloqueReclusosHeredado;
 
     private string filtroModalPadre = string.Empty;
@@ -812,15 +813,22 @@
     {
         busquedaReclusoAsunto = e.Value?.ToString() ?? "";
         reclusosFiltradosAsunto = reclusosActivos.Where(r => r.NombreCompleto.Contains(busquedaReclusoAsunto, StringComparison.OrdinalIgnoreCase)).Take(8).ToList();
+        mostrarSugerenciasPPL = true;
     }
 
     private void MostrarSugerenciasPPL() => FiltrarReclusosAsunto(new ChangeEventArgs { Value = busquedaReclusoAsunto });
+    private async Task OcultarSugerenciasPPLAsync()
+    {
+        await Task.Delay(150);
+        mostrarSugerenciasPPL = false;
+    }
+
     private Task ManejarTecladoPPL(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
         return Task.CompletedTask;
     }
-    private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); }
+    private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); mostrarSugerenciasPPL = false; }
     private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
     private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
     private void InsertarReclusosEnAsunto() { if (reclusosSeleccionadosAsunto.Any()) nuevoDoc.Asunto += $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}"; }
