@@ -31,7 +31,14 @@
         if (!string.IsNullOrWhiteSpace(Mensaje) && !string.Equals(Mensaje, _ultimoMensaje, StringComparison.Ordinal))
         {
             _ultimoMensaje = Mensaje;
-            await JS.InvokeVoidAsync("hacerScrollHaciaElemento", Id);
+            try
+            {
+                await JS.InvokeVoidAsync("hacerScrollHaciaElemento", Id);
+            }
+            catch (Microsoft.JSInterop.JSException)
+            {
+                await JS.InvokeVoidAsync("window.scrollTo", 0, 0);
+            }
         }
         else if (string.IsNullOrWhiteSpace(Mensaje))
         {
