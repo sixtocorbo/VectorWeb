@@ -334,17 +334,30 @@
             // Total documentos creados en 2026
             var docs2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026);
 
-            // Documentos Activos (No archivados, creados en 2026)
-            // Asumimos IdEstadoActual 5 = Archivado
+            // Documentos Activos/Archivados (creados en 2026)
+            // No hardcodeamos el ID de estado porque Cat_Estado es configurable por ambiente.
+            var idsEstadoArchivado = await db.CatEstados
+                .Where(e => e.Nombre != null &&
+                           (EF.Functions.Like(e.Nombre, "%ARCHIV%") ||
+                            EF.Functions.Like(e.Nombre, "%FINALIZ%")))
+                .Select(e => e.IdEstado)
+                .ToListAsync();
+
+            // Fallback por compatibilidad histórica.
+            if (idsEstadoArchivado.Count == 0)
+            {
+                idsEstadoArchivado.Add(5);
+            }
+
             var docsActivos2026 = await db.MaeDocumentos
                                     .CountAsync(d => d.FechaCreacion >= inicio2026 &&
                                                      d.FechaCreacion <= fin2026 &&
-                                                     d.IdEstadoActual != 5);
+                                                     !idsEstadoArchivado.Contains(d.IdEstadoActual));
 
             var docsArchivados2026 = await db.MaeDocumentos
                                     .CountAsync(d => d.FechaCreacion >= inicio2026 &&
                                                      d.FechaCreacion <= fin2026 &&
-                                                     d.IdEstadoActual == 5);
+                                                     idsEstadoArchivado.Contains(d.IdEstadoActual));
 
             metricas = new List<MetricaResumen>
             {
@@ -359,7 +372,7 @@
             // Usaremos "Activos" generales para el semáforo para no perder alertas importantes, pero solo de tipo Documento.
 
             var docsSemaforo = await db.MaeDocumentos
-                .Where(x => x.FechaVencimiento != null && x.IdEstadoActual != 5) // Excluir Archivados
+                .Where(x => x.FechaVencimiento != null && !idsEstadoArchivado.Contains(x.IdEstadoActual)) // Excluir Archivados
                 .GroupBy(x => x.EstadoSemaforo)
                 .Select(g => new { Estado = g.Key, Total = g.Count() })
                 .ToListAsync();
