@@ -23,6 +23,31 @@ window.scrollSugerenciaVisible = (contenedor, indice) => {
     }
 };
 
+window.registrarOcultarSugerenciasOficina = (contenedor, dotNetHelper) => {
+    if (!contenedor || !dotNetHelper) {
+        return;
+    }
+
+    const manejarClickDocumento = (evento) => {
+        if (!contenedor.contains(evento.target)) {
+            dotNetHelper.invokeMethodAsync('OcultarSugerenciasOficina');
+        }
+    };
+
+    document.addEventListener('click', manejarClickDocumento, true);
+    contenedor.__ocultarSugerenciasOficinaHandler = manejarClickDocumento;
+};
+
+window.desregistrarOcultarSugerenciasOficina = (contenedor) => {
+    const handler = contenedor?.__ocultarSugerenciasOficinaHandler;
+    if (!handler) {
+        return;
+    }
+
+    document.removeEventListener('click', handler, true);
+    delete contenedor.__ocultarSugerenciasOficinaHandler;
+};
+
 window.hacerScrollHaciaElemento = (elementoId) => {
     const elemento = document.getElementById(elementoId);
     if (elemento) {
