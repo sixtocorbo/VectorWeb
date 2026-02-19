@@ -322,7 +322,7 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Tipo de Documento</label>
-                                <InputSelect @bind-Value="rangoActual.IdTipo" class="form-select" @onchange="OnParametrosSugerenciaRangoCambio">
+                                <InputSelect @bind-Value="rangoActual.IdTipo" @bind-Value:after="OnParametrosSugerenciaRangoCambio" class="form-select">
                                     <option value="0">-- Seleccione --</option>
                                     @foreach (var tipo in tipos)
                                     {
@@ -366,7 +366,7 @@ else
 
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Año</label>
-                                <InputNumber @bind-Value="rangoActual.Anio" class="form-control" @oninput="OnParametrosSugerenciaRangoCambio" />
+                                <InputNumber @bind-Value="rangoActual.Anio" @bind-Value:after="OnParametrosSugerenciaRangoCambio" class="form-control" />
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label text-muted">Nombre de Serie (Auto-generado)</label>
@@ -896,7 +896,7 @@ else
         StateHasChanged(); // Asegurar refresco UI si viene de un evento async
     }
 
-    private async Task OnParametrosSugerenciaRangoCambio(ChangeEventArgs _)
+    private async Task OnParametrosSugerenciaRangoCambio()
     {
         await RefrescarSugerenciaRangoAsync();
     }
