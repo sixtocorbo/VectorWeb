@@ -3,6 +3,8 @@
 @attribute [Authorize(Policy = "reclusos.gestionar")]
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using System.Globalization
+@using System.Text
 @inject IRepository<MaeRecluso> Repositorio
 @inject IJSRuntime JS
 @rendermode InteractiveServer
@@ -143,13 +145,31 @@
     {
         if (string.IsNullOrWhiteSpace(textoBusqueda)) return true;
 
-        var terminos = textoBusqueda
+        var terminos = QuitarDiacriticos(textoBusqueda)
             .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        var textoRecluso = $"{recluso.NombreCompleto ?? string.Empty} {recluso.Documento ?? string.Empty}";
+        var textoRecluso = QuitarDiacriticos($"{recluso.NombreCompleto ?? string.Empty} {recluso.Documento ?? string.Empty}");
 
         return terminos.All(termino =>
             textoRecluso.Contains(termino, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string QuitarDiacriticos(string texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return string.Empty;
+
+        var textoNormalizado = texto.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(textoNormalizado.Length);
+
+        foreach (var c in textoNormalizado)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 
     // Carga inicial de datos

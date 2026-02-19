@@ -320,6 +320,7 @@
     private int totalRojo;
     private int totalAmarillo;
     private int totalVerde;
+    private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
     private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
@@ -446,7 +447,13 @@
         foreach (var t in tms)
         {
             var p = $"%{t}%";
-            q = q.Where(d => EF.Functions.Like(d.NumeroOficial ?? "", p) || EF.Functions.Like(d.Asunto ?? "", p) || EF.Functions.Like(d.Descripcion ?? "", p) || EF.Functions.Like(d.IdTipoNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdOficinaActualNavigation.Nombre ?? "", p) || EF.Functions.Like(d.IdEstadoActualNavigation.Nombre ?? "", p));
+            q = q.Where(d =>
+                EF.Functions.Like(EF.Functions.Collate(d.NumeroOficial ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.Asunto ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.Descripcion ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.IdTipoNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.IdOficinaActualNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.IdEstadoActualNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p));
         }
         return q;
     }
