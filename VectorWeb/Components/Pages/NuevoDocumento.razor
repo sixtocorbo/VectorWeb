@@ -652,6 +652,12 @@
             return;
         }
 
+        var funcionRegistroDisponible = await JS.InvokeAsync<string>("eval", "typeof window.registrarOcultarSugerenciasOficina") == "function";
+        if (!funcionRegistroDisponible)
+        {
+            return;
+        }
+
         dotNetRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("registrarOcultarSugerenciasOficina", contenedorSugerenciasOficinaRef, dotNetRef);
         detectorClickRegistrado = true;
