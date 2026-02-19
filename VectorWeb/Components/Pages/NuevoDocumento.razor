@@ -132,6 +132,35 @@
                     {
                         <div class="section-title">Identificación y Clasificación</div>
                         <div class="row g-3 mb-4">
+                            @if (!esActuacion)
+                            {
+                                <div class="col-md-6">
+                                    <label class="label-custom mb-1">Oficina de Ubicación Inicial</label>
+                                    <div class="position-relative">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white text-muted"><i class="bi bi-building"></i></span>
+                                            <input type="text" class="form-control shadow-none" placeholder="Buscar oficina..."
+                                                   value="@oficinaBusqueda" autocomplete="off"
+                                                   @oninput="FiltrarOficinas" @onfocus="MostrarSugerenciasOficina" @onkeydown="ManejarTecladoOficinas" />
+                                        </div>
+
+                                        @if (oficinasFiltradas.Any())
+                                        {
+                                            <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="@EstiloPanelSugerencias">
+                                                @for (var i = 0; i < oficinasFiltradas.Count; i++)
+                                                {
+                                                    var ofi = oficinasFiltradas[i];
+                                                    var activeClass = i == indiceOficinaSeleccionada ? "active" : "";
+                                                    <button type="button" class="list-group-item list-group-item-action @activeClass py-2" @onclick="() => SeleccionarOficina(ofi)">
+                                                        @ofi.Nombre
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
                             <div class="col-md-4">
                                 <label class="label-custom mb-1">Tipo de Documento</label>
                                 <select class="form-select shadow-none" value="@nuevoDoc.IdTipo" @onchange="OnTipoDocumentoChanged">
@@ -141,6 +170,19 @@
                                         <option value="@tipo.IdTipo">@tipo.Nombre</option>
                                     }
                                 </select>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="label-custom mb-1">Estado del Trámite</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white text-muted"><i class="bi bi-flag"></i></span>
+                                    <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-select shadow-none">
+                                        @foreach (var est in estados)
+                                        {
+                                            <option value="@est.IdEstado">@est.Nombre</option>
+                                        }
+                                    </InputSelect>
+                                </div>
                             </div>
 
                             <div class="col-md-4">
@@ -255,53 +297,6 @@
                             </div>
                         }
                     }
-
-                    <div class="row g-3">
-                        @if (!esActuacion)
-                        {
-                            <div class="col-md-6">
-                                <label class="label-custom mb-1">Oficina de Ubicación Inicial</label>
-                                <div class="position-relative">
-                                    <div class="input-group">
-                                        <span class="input-group-text bg-white text-muted"><i class="bi bi-building"></i></span>
-                                        <input type="text" class="form-control shadow-none" placeholder="Buscar oficina..."
-                                               value="@oficinaBusqueda" autocomplete="off"
-                                               @oninput="FiltrarOficinas" @onfocus="MostrarSugerenciasOficina" @onkeydown="ManejarTecladoOficinas" />
-                                    </div>
-
-                                    @if (oficinasFiltradas.Any())
-                                    {
-                                        <div class="list-group position-absolute start-0 end-0 shadow border-0 mt-1" style="@EstiloPanelSugerencias">
-                                            @for (var i = 0; i < oficinasFiltradas.Count; i++)
-                                            {
-                                                var ofi = oficinasFiltradas[i];
-                                                var activeClass = i == indiceOficinaSeleccionada ? "active" : "";
-                                                <button type="button" class="list-group-item list-group-item-action @activeClass py-2" @onclick="() => SeleccionarOficina(ofi)">
-                                                    @ofi.Nombre
-                                                </button>
-                                            }
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-                        }
-
-                        @if (!(esActuacion && soloTraerSinActuacion))
-                        {
-                            <div class="col-md-6">
-                                <label class="label-custom mb-1">Estado del Trámite</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-white text-muted"><i class="bi bi-flag"></i></span>
-                                    <InputSelect @bind-Value="nuevoDoc.IdEstadoActual" class="form-select shadow-none">
-                                        @foreach (var est in estados)
-                                        {
-                                            <option value="@est.IdEstado">@est.Nombre</option>
-                                        }
-                                    </InputSelect>
-                                </div>
-                            </div>
-                        }
-                    </div>
                 </div>
             </div>
 
@@ -554,7 +549,7 @@
             if (int.TryParse(oid, out var idO)) { idOficinaUsuarioActual = idO; nuevoDoc.IdOficinaActual = idO; }
         }
 
-        oficinaBusqueda = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual)?.Nombre ?? "";
+        oficinaBusqueda = string.Empty;
 
         if (IdPadre.HasValue)
         {
@@ -567,6 +562,7 @@
                 nuevoDoc.IdHiloConversacion = padre.IdHiloConversacion;
                 nuevoDoc.IdOficinaActual = padre.IdOficinaActual;
                 nombreOficinaActualDoc = NombreOficina(padre.IdOficinaActual);
+                oficinaBusqueda = nombreOficinaActualDoc;
                 var tM = tipos.FirstOrDefault(t => t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase));
                 if (tM != null) nuevoDoc.IdTipo = tM.IdTipo;
                 if (paseConActuacionForzado) soloTraerSinActuacion = false;
@@ -618,6 +614,8 @@
             }
 
             if (string.IsNullOrWhiteSpace(nuevoDoc.Asunto)) { errorGuardar = "Asunto obligatorio."; return; }
+            if (nuevoDoc.IdTipo <= 0) { errorGuardar = "Debe seleccionar un tipo de documento."; return; }
+            if (nuevoDoc.IdOficinaActual <= 0) { errorGuardar = "Debe seleccionar una oficina válida."; return; }
             if (esNumeracionAutomatica)
             {
                 var res = await RangoService.ConsumirSiguienteNumeroAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
@@ -681,6 +679,8 @@
     private async Task EvaluarNumeracionAutomaticaAsync(int idT)
     {
         esNumeracionAutomatica = esNumeracionExterna = esNumeracionManualInterna = bloqueoPorRangoAgotado = false;
+        mensajeNumeracion = string.Empty;
+        rangoManualInternoActivo = null;
         var ofi = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
         if (ofi?.EsExterna == true) { esNumeracionExterna = true; return; }
         var rango = await RangoService.ObtenerRangoActivoAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
@@ -695,11 +695,24 @@
     {
         oficinaBusqueda = e.Value?.ToString() ?? "";
         indiceOficinaSeleccionada = -1;
+        nuevoDoc.IdOficinaActual = 0;
+        mensajeNumeracion = string.Empty;
+        esNumeracionAutomatica = false;
+        esNumeracionManualInterna = false;
+        esNumeracionExterna = false;
+        bloqueoPorRangoAgotado = false;
+        rangoManualInternoActivo = null;
+        numeroManualInterno = null;
         oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList();
     }
 
     private async Task SeleccionarOficina(CatOficina o) { nuevoDoc.IdOficinaActual = o.IdOficina; oficinaBusqueda = o.Nombre; oficinasFiltradas.Clear(); if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
-    private void MostrarSugerenciasOficina() { if (!string.IsNullOrWhiteSpace(oficinaBusqueda)) oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList(); }
+    private void MostrarSugerenciasOficina()
+    {
+        oficinasFiltradas = string.IsNullOrWhiteSpace(oficinaBusqueda)
+            ? oficinas.OrderByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina)).ThenBy(o => o.Nombre).Take(8).ToList()
+            : BuscarOficinas(oficinaBusqueda).Take(8).ToList();
+    }
 
     private async Task ManejarTecladoOficinas(KeyboardEventArgs e)
     {
@@ -731,7 +744,12 @@
 
     private IEnumerable<CatOficina> BuscarOficinas(string t)
     {
-        if (string.IsNullOrWhiteSpace(t)) return Enumerable.Empty<CatOficina>();
+        if (string.IsNullOrWhiteSpace(t))
+        {
+            return oficinas
+                .OrderByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina))
+                .ThenBy(o => o.Nombre);
+        }
 
         return oficinas
             .Where(o => o.Nombre.Contains(t, StringComparison.OrdinalIgnoreCase))
