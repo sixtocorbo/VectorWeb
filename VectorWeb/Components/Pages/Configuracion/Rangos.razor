@@ -417,7 +417,7 @@ else
 
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Desde</label>
-                                <InputNumber Value="@rangoActual.NumeroInicio" ValueChanged="OnNumeroInicioChanged" class="form-control" />
+                                <InputNumber @bind-Value="rangoActual.NumeroInicio" @bind-Value:after="OnNumeroInicioChanged" class="form-control" />
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Cantidad a Asignar</label>
@@ -817,9 +817,9 @@ else
         }
     }
 
-    private Task OnNumeroInicioChanged(int valor)
+    private Task OnNumeroInicioChanged()
     {
-        rangoActual.NumeroInicio = Math.Max(1, valor);
+        rangoActual.NumeroInicio = Math.Max(1, rangoActual.NumeroInicio);
         RecalcularNumeroFinDesdeCantidad();
         _busquedaOficinaPendiente = false;
         _debounceTimer.Stop();
