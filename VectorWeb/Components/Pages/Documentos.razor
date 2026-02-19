@@ -146,7 +146,7 @@
                     <div class="search-input-wrapper">
                         <i class="bi bi-search search-icon"></i>
                         <input class="form-control search-input shadow-none"
-                               placeholder="Buscar por número, asunto o descripción..."
+                               placeholder="Buscar por número, ID de ingreso, asunto o descripción..."
                                @bind="FiltroBusqueda"
                                @bind:event="oninput" />
                     </div>
@@ -448,7 +448,9 @@
         {
             var p = $"%{t}%";
             q = q.Where(d =>
-                EF.Functions.Like(EF.Functions.Collate(d.NumeroOficial ?? "", CollationBusquedaSinAcentos), p)
+                EF.Functions.Like(EF.Functions.Collate(d.IdDocumento.ToString(), CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.NumeroOficial ?? "", CollationBusquedaSinAcentos), p)
+                || EF.Functions.Like(EF.Functions.Collate(d.NumeroInterno ?? "", CollationBusquedaSinAcentos), p)
                 || EF.Functions.Like(EF.Functions.Collate(d.Asunto ?? "", CollationBusquedaSinAcentos), p)
                 || EF.Functions.Like(EF.Functions.Collate(d.Descripcion ?? "", CollationBusquedaSinAcentos), p)
                 || EF.Functions.Like(EF.Functions.Collate(d.IdTipoNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p)
