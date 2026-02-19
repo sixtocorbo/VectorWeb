@@ -93,7 +93,15 @@
         @if (!string.IsNullOrWhiteSpace(mensajeNumeracion))
         {
             <div class="alert alert-info border-0 shadow-sm small py-2 mb-4" role="alert">
-                <i class="bi bi-info-circle-fill me-2"></i> @mensajeNumeracion
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span><i class="bi bi-info-circle-fill me-2"></i> @mensajeNumeracion</span>
+                    @if (MostrarAccesoGestionRangos)
+                    {
+                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AbrirGestionRangosConContexto">
+                            <i class="bi bi-sliders me-1"></i> Gestionar rango de esta oficina
+                        </button>
+                    }
+                </div>
             </div>
         }
 
@@ -514,6 +522,11 @@
     private string EstiloPanelSugerencias => mostrarSugerenciasArriba
         ? "z-index: 20; bottom: calc(100% + .25rem);"
         : "z-index: 20; top: calc(100% + .25rem);";
+    private bool MostrarAccesoGestionRangos =>
+        bloqueoPorRangoAgotado
+        && string.Equals(mensajeNumeracion, "No hay rango configurado.", StringComparison.Ordinal)
+        && nuevoDoc.IdTipo > 0
+        && nuevoDoc.IdOficinaActual > 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -700,6 +713,13 @@
     }
 
     private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
+
+    private void AbrirGestionRangosConContexto()
+    {
+        if (!MostrarAccesoGestionRangos) return;
+        var destino = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}";
+        Navegador.NavigateTo(destino);
+    }
 
     private void FiltrarOficinas(ChangeEventArgs e)
     {
