@@ -35,6 +35,18 @@ public sealed class DatabaseBackupService
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(preferredBackupPath)!);
+            var preferredDirectory = Path.GetDirectoryName(preferredBackupPath)!;
+            var preferredPathIsReachableBySql = await CanSqlServerAccessDirectoryAsync(dbContext, preferredDirectory, cancellationToken);
+
+            if (preferredPathIsReachableBySql is false)
+            {
+                var fallbackPath = await CreateBackupInWritableSqlDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(fallbackPath))
+                {
+                    return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
+                }
+            }
+
             await ExecuteBackupAsync(dbContext, databaseName, preferredBackupPath, cancellationToken);
 
             return new DatabaseBackupResult(databaseName, preferredBackupPath, DateTime.Now);
@@ -52,6 +64,53 @@ public sealed class DatabaseBackupService
         finally
         {
             dbContext.Database.SetCommandTimeout(timeoutOriginal);
+        }
+    }
+
+    private static async Task<bool?> CanSqlServerAccessDirectoryAsync(
+        SecretariaDbContext dbContext,
+        string directoryPath,
+        CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DECLARE @exists INT; EXEC master.dbo.xp_fileexist @path = @path, @file_exists = @exists OUTPUT; SELECT @exists;";
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@path";
+            parameter.Value = directoryPath;
+            command.Parameters.Add(parameter);
+
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return result switch
+            {
+                int value => value == 1,
+                long value => value == 1,
+                decimal value => value == 1,
+                byte value => value == 1,
+                short value => value == 1,
+                string text when int.TryParse(text, out var parsed) => parsed == 1,
+                _ => null
+            };
+        }
+        catch (SqlException)
+        {
+            return null;
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync();
+            }
         }
     }
 
