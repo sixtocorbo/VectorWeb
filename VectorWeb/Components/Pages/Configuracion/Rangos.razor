@@ -7,6 +7,7 @@
 @using System.Text.RegularExpressions
 @using System.Globalization
 @using System.Timers
+@using Microsoft.AspNetCore.Components
 @inject NumeracionRangoService RangoService
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatOficina> RepoOficinas
@@ -525,6 +526,15 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "tipo")]
+    public int? TipoPreseleccionado { get; set; }
+
+    [SupplyParameterFromQuery(Name = "oficina")]
+    public int? OficinaPreseleccionada { get; set; }
+
+    [SupplyParameterFromQuery(Name = "anio")]
+    public int? AnioPreseleccionado { get; set; }
+
     // --- VARIABLES DE ESTADO ---
     private enum TabConfig { Rangos, Cupos, Bitacora }
     private TabConfig tabActiva = TabConfig.Rangos;
@@ -568,6 +578,7 @@ else
     private SugerenciaRangoNumeracion sugerenciaRango = new();
     private string mensajeErrorSugerenciaRango = string.Empty;
     private static readonly CultureInfo CulturaUi = CultureInfo.GetCultureInfo("es-DO");
+    private bool contextoPreseleccionAplicado;
 
     // Lógica de filtrado en memoria para la tabla de rangos
     private IEnumerable<MaeNumeracionRango> RangosFiltrados =>
@@ -604,6 +615,7 @@ else
         {
             await CargarCatalogos();
             await CargarTodo();
+            AplicarContextoPreseleccionado();
         }
         finally
         {
@@ -629,6 +641,32 @@ else
         mensajeOk = string.Empty;
         mensajeErrorModalRango = string.Empty;
         mensajeErrorModalCupo = string.Empty;
+    }
+
+    private void AplicarContextoPreseleccionado()
+    {
+        if (contextoPreseleccionAplicado) return;
+        if (!TipoPreseleccionado.HasValue || !OficinaPreseleccionada.HasValue) return;
+
+        var tipoExiste = tipos.Any(t => t.IdTipo == TipoPreseleccionado.Value);
+        var oficina = oficinas.FirstOrDefault(o => o.IdOficina == OficinaPreseleccionada.Value);
+        if (!tipoExiste || oficina is null) return;
+
+        AbrirNuevoRango();
+        rangoActual.IdTipo = TipoPreseleccionado.Value;
+        rangoActual.IdOficina = oficina.IdOficina;
+        oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
+        oficinasRangoFiltradas.Clear();
+        indiceOficinaRangoSeleccionada = -1;
+
+        if (AnioPreseleccionado.HasValue && AnioPreseleccionado.Value >= 2000)
+        {
+            rangoActual.Anio = AnioPreseleccionado.Value;
+        }
+
+        tabActiva = TabConfig.Rangos;
+        contextoPreseleccionAplicado = true;
+        _ = RefrescarSugerenciaRangoAsync();
     }
 
     // --- CARGA DE DATOS ---
