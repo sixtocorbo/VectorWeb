@@ -146,13 +146,6 @@
                     </div>
 
                     <div class="col-12">
-                        <span class="label-info">Asunto / Título</span>
-                        <InputText class="form-control border-primary-subtle bg-primary-subtle bg-opacity-10 fw-semibold"
-                                   @bind-Value="documento.Asunto"
-                                   placeholder="Ingrese el asunto del documento" />
-                    </div>
-
-                    <div class="col-12">
                         <div class="search-panel p-3">
                             <label class="label-custom mb-2"><i class="bi bi-people-fill me-1 text-primary"></i> Vincular PPL al Asunto</label>
                             <div class="row g-2">
@@ -201,6 +194,13 @@
                                 </div>
                             }
                         </div>
+                    </div>
+
+                    <div class="col-12">
+                        <span class="label-info">Asunto / Título</span>
+                        <InputText class="form-control border-primary-subtle bg-primary-subtle bg-opacity-10 fw-semibold"
+                                   @bind-Value="documento.Asunto"
+                                   placeholder="Ingrese el asunto del documento" />
                     </div>
 
                     <div class="col-12">
