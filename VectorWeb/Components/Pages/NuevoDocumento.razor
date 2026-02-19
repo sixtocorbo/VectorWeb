@@ -643,6 +643,15 @@
 
                 if (AutoPaseBandeja == true) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, idOficinaUsuarioActual, "Traslado automático retorno");
                 else if (AutoPaseDestino.HasValue) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, AutoPaseDestino.Value, "Traslado automático destino");
+                else if (!esActuacion
+                    && idOficinaBandejaEntrada.HasValue
+                    && nuevoDoc.IdOficinaActual != idOficinaBandejaEntrada.Value)
+                {
+                    await MoverFamiliaADestino(
+                        nuevoDoc.IdHiloConversacion,
+                        idOficinaBandejaEntrada.Value,
+                        "Ingreso automático a bandeja de entrada");
+                }
 
                 await trans.CommitAsync(); Navegador.NavigateTo("documentos");
             }
