@@ -373,28 +373,6 @@ else
                                 <input type="text" class="form-control bg-light" value="@rangoActual.NombreRango" readonly />
                             </div>
 
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Desde</label>
-                                <InputNumber @bind-Value="rangoActual.NumeroInicio" class="form-control" />
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Hasta</label>
-                                <InputNumber @bind-Value="rangoActual.NumeroFin" class="form-control" />
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Cantidad a Asignar</label>
-                                <input type="number"
-                                       class="form-control"
-                                       min="0"
-                                       value="@cantidadSugeridaSolicitada"
-                                       @oninput="OnCantidadSugeridaInput" />
-                                <div class="form-text">Usada para sugerencia en tiempo real.</div>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Último Utilizado</label>
-                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
-                            </div>
-
                             @if (rangoActual.IdTipo > 0 && rangoActual.Anio > 0)
                             {
                                 <div class="col-12">
@@ -436,6 +414,28 @@ else
                                     </div>
                                 </div>
                             }
+
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Desde</label>
+                                <InputNumber Value="@rangoActual.NumeroInicio" ValueChanged="OnNumeroInicioChanged" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Cantidad a Asignar</label>
+                                <input type="number"
+                                       class="form-control"
+                                       min="0"
+                                       value="@cantidadSugeridaSolicitada"
+                                       @oninput="OnCantidadSugeridaInput" />
+                                <div class="form-text">El sistema calcula automáticamente el Hasta.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Hasta (calculado)</label>
+                                <input type="number" class="form-control bg-light" value="@rangoActual.NumeroFin" readonly />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold">Último Utilizado</label>
+                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
+                            </div>
                         </div>
 
                         <div class="mt-4 form-check form-switch">
@@ -688,7 +688,10 @@ else
     private async Task CargarCatalogos()
     {
         tipos = (await RepoTipos.GetAllAsync()).OrderBy(t => t.Nombre).ToList();
-        oficinas = (await RepoOficinas.GetAllAsync()).OrderBy(o => o.Nombre).ToList();
+        oficinas = (await RepoOficinas.GetAllAsync())
+            .Where(o => o.EsExterna != true)
+            .OrderBy(o => o.Nombre)
+            .ToList();
     }
 
     private async Task CargarRangos() => listaRangos = await RangoService.ObtenerRangosAsync();
@@ -710,6 +713,7 @@ else
         };
         ResetearBusquedaOficina();
         cantidadSugeridaSolicitada = 1000;
+        RecalcularNumeroFinDesdeCantidad();
         sugerenciaRango = new SugerenciaRangoNumeracion();
         mostrarModal = true;
         _ = RefrescarSugerenciaRangoAsync();
@@ -734,6 +738,7 @@ else
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
+        RecalcularNumeroFinDesdeCantidad();
         mostrarModal = true;
         _ = RefrescarSugerenciaRangoAsync();
     }
@@ -796,7 +801,8 @@ else
     {
         if (int.TryParse(e.Value?.ToString(), out int valor))
         {
-            cantidadSugeridaSolicitada = valor;
+            cantidadSugeridaSolicitada = Math.Max(0, valor);
+            RecalcularNumeroFinDesdeCantidad();
             _busquedaOficinaPendiente = false;
             _debounceTimer.Stop();
             _debounceTimer.Start();
@@ -804,10 +810,21 @@ else
         else if (string.IsNullOrWhiteSpace(e.Value?.ToString()))
         {
             cantidadSugeridaSolicitada = null;
+            RecalcularNumeroFinDesdeCantidad();
             _busquedaOficinaPendiente = false;
             _debounceTimer.Stop();
             _debounceTimer.Start();
         }
+    }
+
+    private Task OnNumeroInicioChanged(int valor)
+    {
+        rangoActual.NumeroInicio = Math.Max(1, valor);
+        RecalcularNumeroFinDesdeCantidad();
+        _busquedaOficinaPendiente = false;
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
+        return Task.CompletedTask;
     }
 
     private void EjecutarBusquedaOficina()
@@ -889,7 +906,19 @@ else
         await RefrescarSugerenciaRangoAsync();
         if (!PuedeAplicarSugerencia) return;
         rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
-        rangoActual.NumeroFin = sugerenciaRango.NumeroFinSugerido;
+        cantidadSugeridaSolicitada = sugerenciaRango.CantidadSugerida;
+        RecalcularNumeroFinDesdeCantidad();
+    }
+
+    private void RecalcularNumeroFinDesdeCantidad()
+    {
+        var inicio = Math.Max(1, rangoActual.NumeroInicio);
+        rangoActual.NumeroInicio = inicio;
+
+        var cantidad = cantidadSugeridaSolicitada.GetValueOrDefault();
+        rangoActual.NumeroFin = cantidad > 0
+            ? inicio + cantidad - 1
+            : inicio;
     }
 
     // --- GESTIÓN DE CUPOS ---

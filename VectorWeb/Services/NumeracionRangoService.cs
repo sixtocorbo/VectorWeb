@@ -109,6 +109,22 @@ public class NumeracionRangoService
             return OperacionResultado.Fail("Debe seleccionar una oficina para el rango.");
         }
 
+        var oficinaSeleccionada = await _context.CatOficinas
+            .AsNoTracking()
+            .Where(o => o.IdOficina == rango.IdOficina.Value)
+            .Select(o => new { o.IdOficina, o.EsExterna })
+            .FirstOrDefaultAsync();
+
+        if (oficinaSeleccionada is null)
+        {
+            return OperacionResultado.Fail("La oficina seleccionada no existe.");
+        }
+
+        if (oficinaSeleccionada.EsExterna == true)
+        {
+            return OperacionResultado.Fail("Los rangos de numeración solo se pueden asignar a oficinas internas.");
+        }
+
         if (rango.NumeroInicio <= 0 || rango.NumeroFin <= 0 || rango.NumeroInicio > rango.NumeroFin)
         {
             return OperacionResultado.Fail("El rango ingresado no es válido.");
@@ -336,12 +352,8 @@ public class NumeracionRangoService
                     .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
             }
 
-            var maximoNumeroAsignado = await queryRangos
-                .Select(r => (int?)r.NumeroFin)
-                .MaxAsync() ?? 0;
-
             var saldoDisponible = Math.Max(0, cupoTotal - consumoTotalAsignado);
-            var desdeSugerido = Math.Max(1, maximoNumeroAsignado + 1);
+            var desdeSugerido = 1;
 
             MaeNumeracionRango? rangoActivoOficina = null;
             if (idOficina.HasValue)
@@ -373,9 +385,17 @@ public class NumeracionRangoService
             }
 
             var cantidadAprobada = Math.Min(cantidadAProponer, saldoDisponible);
-            var hastaSugerido = cantidadAprobada > 0
-                ? desdeSugerido + cantidadAprobada - 1
-                : desdeSugerido;
+
+            if (cantidadAprobada > 0)
+            {
+                var hueco = await BuscarPrimerHuecoDisponibleAsync(queryRangos, cantidadAprobada, cupoTotal);
+                if (hueco.HasValue)
+                {
+                    desdeSugerido = hueco.Value.inicio;
+                }
+            }
+
+            var hastaSugerido = cantidadAprobada > 0 ? desdeSugerido + cantidadAprobada - 1 : desdeSugerido;
 
             return new SugerenciaRangoNumeracion
             {
@@ -751,6 +771,64 @@ public class NumeracionRangoService
 
         return await query
             .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
+    }
+
+    private static (int inicio, int fin)? BuscarPrimerHuecoEnOrden(List<(int inicio, int fin)> rangosOrdenados, int longitudNecesaria, int cupoTotal)
+    {
+        var cursor = 1;
+
+        foreach (var (inicioRango, finRango) in rangosOrdenados)
+        {
+            var inicioNormalizado = Math.Max(1, inicioRango);
+            var finNormalizado = Math.Min(cupoTotal, finRango);
+
+            if (finNormalizado < inicioNormalizado)
+            {
+                continue;
+            }
+
+            if (cursor < inicioNormalizado)
+            {
+                var largoHueco = inicioNormalizado - cursor;
+                if (largoHueco >= longitudNecesaria)
+                {
+                    return (cursor, cursor + longitudNecesaria - 1);
+                }
+            }
+
+            cursor = Math.Max(cursor, finNormalizado + 1);
+            if (cursor > cupoTotal)
+            {
+                break;
+            }
+        }
+
+        if (cursor + longitudNecesaria - 1 <= cupoTotal)
+        {
+            return (cursor, cursor + longitudNecesaria - 1);
+        }
+
+        return null;
+    }
+
+    private async Task<(int inicio, int fin)?> BuscarPrimerHuecoDisponibleAsync(IQueryable<MaeNumeracionRango> queryRangos, int cantidadSolicitada, int cupoTotal)
+    {
+        if (cantidadSolicitada <= 0 || cupoTotal <= 0)
+        {
+            return null;
+        }
+
+        var rangosAsignados = await queryRangos
+            .Select(r => new { r.NumeroInicio, r.NumeroFin })
+            .OrderBy(r => r.NumeroInicio)
+            .ThenBy(r => r.NumeroFin)
+            .ToListAsync();
+
+        var intervalos = rangosAsignados
+            .Select(r => (inicio: r.NumeroInicio, fin: r.NumeroFin))
+            .ToList();
+
+        return BuscarPrimerHuecoEnOrden(intervalos, cantidadSolicitada, cupoTotal);
     }
 
     private async Task AsegurarCupoSecretariaAsync(int idTipo, int anio)
