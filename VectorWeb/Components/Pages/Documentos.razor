@@ -164,8 +164,8 @@
 
                 <div class="col-md-3 d-flex align-items-center justify-content-md-end pb-2">
                     <div class="form-check form-switch custom-switch">
-                        <input class="form-check-input" type="checkbox" id="swGlobal" @bind="verTodo" @bind:after="CargarDocumentos">
-                        <label class="form-check-label fw-bold small" for="swGlobal">Vista Global</label>
+                        <input class="form-check-input" type="checkbox" id="swGlobal" @bind="mostrarSoloMiBandeja" @bind:after="OnToggleVistaChanged">
+                        <label class="form-check-label fw-bold small" for="swGlobal">Mi bandeja</label>
                     </div>
                 </div>
             </div>
@@ -315,7 +315,7 @@
     private int idOficinaUsuario;
     private string nombreOficinaUsuario = "Mi Oficina";
     private int totalExpedientesPendientes;
-    private bool verTodo;
+    private bool mostrarSoloMiBandeja = true;
     private string? filtroSemaforo;
     private int totalRojo;
     private int totalAmarillo;
@@ -343,6 +343,12 @@
 
     private Task OnTamanoPaginaChanged() => CargarDocumentos();
 
+    private Task OnToggleVistaChanged()
+    {
+        paginaActual = 1;
+        return CargarDocumentos();
+    }
+
     private bool EsSemaforoActivo(string estado) => string.Equals(filtroSemaforo, estado, StringComparison.OrdinalIgnoreCase);
 
     private async Task FiltrarPorEstado(string? estado)
@@ -365,7 +371,7 @@
                 await using var db = await DbContextFactory.CreateDbContextAsync();
                 var of = await db.CatOficinas.AsNoTracking().FirstOrDefaultAsync(o => o.IdOficina == idOficinaUsuario);
                 nombreOficinaUsuario = of?.Nombre ?? $"Oficina {idOficinaUsuario}";
-                if (idOficinaUsuario <= 0) verTodo = true;
+                if (idOficinaUsuario <= 0) mostrarSoloMiBandeja = false;
             }
         }
         await CargarDocumentos();
@@ -377,7 +383,7 @@
         var qBase = db.MaeDocumentos.AsNoTracking()
             .Include(d => d.IdTipoNavigation).Include(d => d.IdOficinaActualNavigation).Include(d => d.IdEstadoActualNavigation).AsQueryable();
 
-        if (!verTodo && idOficinaUsuario > 0) qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
+        if (mostrarSoloMiBandeja && idOficinaUsuario > 0) qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
 
         totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
 
