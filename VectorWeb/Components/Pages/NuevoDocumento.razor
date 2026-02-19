@@ -285,7 +285,7 @@
                                         {
                                             <span class="badge bg-white text-primary border border-primary-subtle d-inline-flex align-items-center gap-2 py-2 px-3 shadow-sm">
                                                 @recluso.NombreCompleto
-                                                <i class="bi bi-x-circle-fill text-danger cursor-pointer" style="cursor:pointer" @onclick="() => QuitarReclusoAsunto(recluso.NombreCompleto)"></i>
+                                                <i class="bi bi-x-circle-fill text-danger cursor-pointer" style="cursor:pointer" @onclick="() => QuitarReclusoAsunto(recluso.IdRecluso)"></i>
                                             </span>
                                         }
                                     </div>
@@ -813,52 +813,8 @@
         if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
         return Task.CompletedTask;
     }
-    private void AgregarReclusoAsunto(MaeRecluso r)
-    {
-        if (!reclusosSeleccionadosAsunto.Any(s =>
-                string.Equals((s.NombreCompleto ?? string.Empty).Trim(), (r.NombreCompleto ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase)))
-        {
-            reclusosSeleccionadosAsunto.Add(r);
-        }
-
-        busquedaReclusoAsunto = "";
-        reclusosFiltradosAsunto.Clear();
-    }
-
-    private void QuitarReclusoAsunto(string? nombre)
-        => reclusosSeleccionadosAsunto.RemoveAll(r =>
-            string.Equals((r.NombreCompleto ?? string.Empty).Trim(), (nombre ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase));
-
+    private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); }
+    private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
     private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
-
-    private void InsertarReclusosEnAsunto()
-    {
-        if (!reclusosSeleccionadosAsunto.Any()) return;
-
-        nuevoDoc.Asunto = AgregarNombresPplAlAsunto(
-            nuevoDoc.Asunto,
-            reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto));
-    }
-
-    private static string AgregarNombresPplAlAsunto(string? asuntoBase, IEnumerable<string?> nombresNuevos)
-    {
-        var asuntoNormalizado = (asuntoBase ?? string.Empty).Trim();
-        var separador = " | PPL(s): ";
-        var indicePpl = asuntoNormalizado.IndexOf(separador, StringComparison.OrdinalIgnoreCase);
-        var prefijo = indicePpl >= 0 ? asuntoNormalizado[..indicePpl].Trim() : asuntoNormalizado;
-
-        var nombresExistentes = indicePpl >= 0
-            ? asuntoNormalizado[(indicePpl + separador.Length)..]
-                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            : Array.Empty<string>();
-
-        var nombresUnicos = nombresExistentes
-            .Concat(nombresNuevos.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n!.Trim()))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (!nombresUnicos.Any()) return prefijo;
-        if (string.IsNullOrWhiteSpace(prefijo)) return $"PPL(s): {string.Join(", ", nombresUnicos)}";
-        return $"{prefijo}{separador}{string.Join(", ", nombresUnicos)}";
-    }
+    private void InsertarReclusosEnAsunto() { if (reclusosSeleccionadosAsunto.Any()) nuevoDoc.Asunto += $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}"; }
 }
