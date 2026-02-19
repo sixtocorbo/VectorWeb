@@ -243,6 +243,15 @@
                     {
                         <div class="section-title">Detalle del Contenido</div>
 
+                        @if (mostrarAvisoTextoSugeridoPadre)
+                        {
+                            <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 small">
+                                <i class="bi bi-info-circle-fill me-1"></i>
+                                El asunto y la descripción se sugieren porque provienen del expediente padre. Podés modificarlos si lo necesitás;
+                                mantener nombres de PPL en el texto ayuda a la trazabilidad en búsquedas.
+                            </div>
+                        }
+
                         @if (!esActuacion)
                         {
                             <div class="search-panel p-3 mb-4">
@@ -505,6 +514,7 @@
     private int idOficinaUsuarioActual;
     private string nombreOficinaActualDoc = string.Empty;
     private bool soloTraerSinActuacion;
+    private bool mostrarAvisoTextoSugeridoPadre;
     private bool paseConActuacionForzado => AutoPaseBandeja == true || AutoPaseDestino.HasValue;
     private string EtiquetaBotonPaseConActuacion => AutoPaseDestino.HasValue
         ? "Guardar y Enviar todo"
@@ -589,6 +599,8 @@
                     soloTraerSinActuacion = false;
                     nuevoDoc.Asunto = padre.Asunto?.Trim() ?? string.Empty;
                     nuevoDoc.Descripcion = padre.Descripcion;
+                    mostrarAvisoTextoSugeridoPadre = !string.IsNullOrWhiteSpace(nuevoDoc.Asunto)
+                        || !string.IsNullOrWhiteSpace(nuevoDoc.Descripcion);
                 }
             }
         }
