@@ -22,3 +22,73 @@ window.scrollSugerenciaVisible = (contenedor, indice) => {
         contenedor.scrollTop = bottomItem - contenedor.clientHeight;
     }
 };
+
+(() => {
+    const SELECTOR_MENSAJES = '.alert[role="alert"], .validation-message';
+    let ultimoScrollAt = 0;
+
+    const estaVisible = (elemento) => {
+        const rect = elemento.getBoundingClientRect();
+        return rect.top >= 0 && rect.bottom <= window.innerHeight;
+    };
+
+    const hacerScrollAlMensaje = (elemento) => {
+        if (!elemento || !(elemento instanceof HTMLElement)) {
+            return;
+        }
+
+        const ahora = Date.now();
+        if (ahora - ultimoScrollAt < 250) {
+            return;
+        }
+
+        if (estaVisible(elemento)) {
+            return;
+        }
+
+        ultimoScrollAt = ahora;
+        elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const procesarMensajes = (nodo) => {
+        if (!(nodo instanceof HTMLElement)) {
+            return;
+        }
+
+        if (nodo.matches(SELECTOR_MENSAJES)) {
+            hacerScrollAlMensaje(nodo);
+            return;
+        }
+
+        const primerMensaje = nodo.querySelector(SELECTOR_MENSAJES);
+        if (primerMensaje) {
+            hacerScrollAlMensaje(primerMensaje);
+        }
+    };
+
+    const observer = new MutationObserver((mutaciones) => {
+        for (const mutacion of mutaciones) {
+            for (const nodo of mutacion.addedNodes) {
+                procesarMensajes(nodo);
+            }
+
+            if (mutacion.type === 'characterData' && mutacion.target?.parentElement) {
+                procesarMensajes(mutacion.target.parentElement);
+            }
+        }
+    });
+
+    const iniciarObservador = () => {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+        });
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', iniciarObservador, { once: true });
+    } else {
+        iniciarObservador();
+    }
+})();
