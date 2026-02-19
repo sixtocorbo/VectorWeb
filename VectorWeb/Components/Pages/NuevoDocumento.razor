@@ -584,7 +584,12 @@
                 oficinaBusqueda = nombreOficinaActualDoc;
                 var tM = tipos.FirstOrDefault(t => t.Nombre.Contains("Memorando", StringComparison.OrdinalIgnoreCase));
                 if (tM != null) nuevoDoc.IdTipo = tM.IdTipo;
-                if (paseConActuacionForzado) soloTraerSinActuacion = false;
+                if (paseConActuacionForzado)
+                {
+                    soloTraerSinActuacion = false;
+                    nuevoDoc.Asunto = padre.Asunto?.Trim() ?? string.Empty;
+                    nuevoDoc.Descripcion = padre.Descripcion;
+                }
             }
         }
 
