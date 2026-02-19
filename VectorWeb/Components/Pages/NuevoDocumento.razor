@@ -220,10 +220,18 @@
                                         <span class="input-group-text bg-primary text-white"><i class="bi bi-magic"></i></span>
                                     </div>
                                     <small class="text-muted d-block mt-1">Estimado: <strong>@proximoNumeroAutomatico</strong> (@serieNumeracionAutomatica)</small>
+                                    @if (!string.IsNullOrWhiteSpace(rangoDisponibleTexto))
+                                    {
+                                        <small class="text-primary d-block">Rango disponible: <strong>@rangoDisponibleTexto</strong></small>
+                                    }
                                 }
                                 else if (esNumeracionManualInterna)
                                 {
                                     <InputNumber @bind-Value="numeroManualInterno" class="form-control shadow-none border-primary" placeholder="Ingresar número" disabled="@bloqueoPorRangoAgotado" />
+                                    @if (!string.IsNullOrWhiteSpace(rangoDisponibleTexto))
+                                    {
+                                        <small class="text-primary d-block mt-1">Rango disponible para esta oficina: <strong>@rangoDisponibleTexto</strong></small>
+                                    }
                                 }
                                 else
                                 {
@@ -559,6 +567,7 @@
     private bool esNumeracionManualInterna;
     private bool bloqueoPorRangoAgotado;
     private string mensajeNumeracion = string.Empty;
+    private string rangoDisponibleTexto = string.Empty;
     private string serieNumeracionAutomatica = string.Empty;
     private int proximoNumeroAutomatico;
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
@@ -716,6 +725,18 @@
             else if (esNumeracionManualInterna)
             {
                 if (!numeroManualInterno.HasValue) { errorGuardar = "Número oficial obligatorio."; return; }
+                if (rangoManualInternoActivo is null)
+                {
+                    errorGuardar = "No se pudo validar el número oficial porque no se encontró un rango activo para la oficina seleccionada.";
+                    return;
+                }
+
+                if (numeroManualInterno.Value < rangoManualInternoActivo.NumeroInicio || numeroManualInterno.Value > rangoManualInternoActivo.NumeroFin)
+                {
+                    errorGuardar = $"El número oficial debe estar dentro del rango permitido para la oficina ({rangoManualInternoActivo.NumeroInicio}-{rangoManualInternoActivo.NumeroFin}).";
+                    return;
+                }
+
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
 
@@ -780,12 +801,26 @@
     {
         esNumeracionAutomatica = esNumeracionExterna = esNumeracionManualInterna = bloqueoPorRangoAgotado = false;
         mensajeNumeracion = string.Empty;
+        rangoDisponibleTexto = string.Empty;
         rangoManualInternoActivo = null;
         var ofi = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
         if (ofi?.EsExterna == true) { esNumeracionExterna = true; return; }
         var rango = await RangoService.ObtenerRangoActivoAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-        if (rango != null && idOficinaBandejaEntrada == nuevoDoc.IdOficinaActual) { esNumeracionAutomatica = true; serieNumeracionAutomatica = rango.NombreRango; proximoNumeroAutomatico = rango.UltimoUtilizado + 1; }
-        else if (rango != null) { esNumeracionManualInterna = true; rangoManualInternoActivo = rango; }
+        if (rango != null && idOficinaBandejaEntrada == nuevoDoc.IdOficinaActual)
+        {
+            esNumeracionAutomatica = true;
+            serieNumeracionAutomatica = rango.NombreRango;
+            proximoNumeroAutomatico = rango.UltimoUtilizado + 1;
+            rangoDisponibleTexto = $"{rango.NumeroInicio}-{rango.NumeroFin}";
+            mensajeNumeracion = $"Numeración automática habilitada para esta oficina. Rango vigente: {rangoDisponibleTexto}.";
+        }
+        else if (rango != null)
+        {
+            esNumeracionManualInterna = true;
+            rangoManualInternoActivo = rango;
+            rangoDisponibleTexto = $"{rango.NumeroInicio}-{rango.NumeroFin}";
+            mensajeNumeracion = $"Rango vigente para esta oficina: {rangoDisponibleTexto}. Ingrese un número dentro de ese intervalo.";
+        }
         else { bloqueoPorRangoAgotado = true; mensajeNumeracion = "No hay rango configurado para el tipo de documento seleccionado."; }
     }
 
@@ -804,6 +839,7 @@
         indiceOficinaSeleccionada = -1;
         nuevoDoc.IdOficinaActual = 0;
         mensajeNumeracion = string.Empty;
+        rangoDisponibleTexto = string.Empty;
         esNumeracionAutomatica = false;
         esNumeracionManualInterna = false;
         esNumeracionExterna = false;
