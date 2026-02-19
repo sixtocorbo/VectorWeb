@@ -127,7 +127,7 @@ public sealed class DatabaseBackupService
 
     private static async Task<string?> GetSqlServerDefaultBackupDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
     {
-        await using var connection = dbContext.Database.GetDbConnection();
+        var connection = dbContext.Database.GetDbConnection();
         var wasClosed = connection.State == System.Data.ConnectionState.Closed;
         if (wasClosed)
         {
@@ -152,7 +152,7 @@ public sealed class DatabaseBackupService
 
     private static async Task<string?> GetMasterDatabaseDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
     {
-        await using var connection = dbContext.Database.GetDbConnection();
+        var connection = dbContext.Database.GetDbConnection();
         var wasClosed = connection.State == System.Data.ConnectionState.Closed;
         if (wasClosed)
         {
