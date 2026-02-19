@@ -32,8 +32,6 @@ public sealed class DatabaseBackupService
         var timeoutOriginal = dbContext.Database.GetCommandTimeout();
         dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
 
-        string? sqlServerDefaultDirectory = null;
-
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(preferredBackupPath)!);
@@ -43,15 +41,13 @@ public sealed class DatabaseBackupService
         }
         catch (SqlException ex) when (IsAccessDenied(ex))
         {
-            sqlServerDefaultDirectory = await GetSqlServerDefaultBackupDirectoryAsync(dbContext, cancellationToken);
-            if (string.IsNullOrWhiteSpace(sqlServerDefaultDirectory))
+            var fallbackDirectory = await FindWritableSqlBackupDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
+            if (string.IsNullOrWhiteSpace(fallbackDirectory))
             {
                 throw;
             }
 
-            var fallbackPath = Path.Combine(sqlServerDefaultDirectory, fileName);
-            await ExecuteBackupAsync(dbContext, databaseName, fallbackPath, cancellationToken);
-
+            var fallbackPath = Path.Combine(fallbackDirectory, fileName);
             var finalPath = TryCopyBackupToPreferredPath(fallbackPath, preferredBackupPath);
 
             return new DatabaseBackupResult(databaseName, finalPath, DateTime.Now);
@@ -70,8 +66,39 @@ public sealed class DatabaseBackupService
 
     private static bool IsAccessDenied(SqlException ex)
         => ex.Message.Contains("Operating system error 5", StringComparison.OrdinalIgnoreCase)
+           || ex.Message.Contains("error operativo del sistema 5", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<string?> FindWritableSqlBackupDirectoryAsync(
+        SecretariaDbContext dbContext,
+        string databaseName,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        var candidates = new[]
+        {
+            await GetSqlServerDefaultBackupDirectoryAsync(dbContext, cancellationToken),
+            await GetMasterDatabaseDirectoryAsync(dbContext, cancellationToken)
+        };
+
+        foreach (var directory in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var backupPath = Path.Combine(directory!, fileName);
+
+            try
+            {
+                await ExecuteBackupAsync(dbContext, databaseName, backupPath, cancellationToken);
+                return directory;
+            }
+            catch (SqlException ex) when (IsAccessDenied(ex))
+            {
+                continue;
+            }
+        }
+
+        return null;
+    }
 
     private static string TryCopyBackupToPreferredPath(string sourcePath, string preferredBackupPath)
     {
@@ -111,6 +138,31 @@ public sealed class DatabaseBackupService
         {
             await using var command = connection.CreateCommand();
             command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(4000))";
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            return result as string;
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<string?> GetMasterDatabaseDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
+    {
+        await using var connection = dbContext.Database.GetDbConnection();
+        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
+        if (wasClosed)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000))";
             var result = await command.ExecuteScalarAsync(cancellationToken);
             return result as string;
         }
