@@ -1,4 +1,5 @@
 using System.Data;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using VectorWeb.Models;
@@ -163,20 +164,23 @@ public class NumeracionRangoService
                 return OperacionResultado.Fail($"No hay cupo suficiente para este rango. Disponible: {Math.Max(0, disponible)} números para el año {anioObjetivo}.");
             }
 
-            await DesactivarRangosAgotadosAsync(rango);
-            await DesactivarRangosActivosEnConflictoAsync(rango);
-
             var mensajeSolapamientoOficinasInternas = await ObtenerMensajeSolapamientoEnOficinasInternasAsync(rango);
             if (!string.IsNullOrWhiteSpace(mensajeSolapamientoOficinasInternas))
             {
                 return OperacionResultado.Fail(mensajeSolapamientoOficinasInternas);
             }
 
-            var mensajeConflictoActivo = await ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(rango);
+            await DesactivarRangosAgotadosAsync(rango);
+
+            var idsRangosActivosEnConflicto = await ObtenerIdsRangosActivosEnConflictoAsync(rango);
+
+            var mensajeConflictoActivo = await ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(rango, idsRangosActivosEnConflicto);
             if (!string.IsNullOrWhiteSpace(mensajeConflictoActivo))
             {
                 return OperacionResultado.Fail(mensajeConflictoActivo);
             }
+
+            await DesactivarRangosActivosEnConflictoAsync(idsRangosActivosEnConflicto);
 
             if (rango.IdRango == 0)
             {
@@ -253,31 +257,39 @@ public class NumeracionRangoService
         }
     }
 
-    private async Task DesactivarRangosActivosEnConflictoAsync(MaeNumeracionRango rango)
+    private async Task<List<int>> ObtenerIdsRangosActivosEnConflictoAsync(MaeNumeracionRango rango)
     {
         if (!rango.Activo)
         {
-            return;
+            return new List<int>();
         }
 
-        var rangosActivosEnConflicto = await _context.MaeNumeracionRangos
+        return await _context.MaeNumeracionRangos
             .Where(r =>
                 r.IdRango != rango.IdRango &&
                 r.IdTipo == rango.IdTipo &&
                 r.Anio == rango.Anio &&
                 r.Activo &&
                 r.IdOficina == rango.IdOficina)
+            .Select(r => r.IdRango)
             .ToListAsync();
+    }
 
-        if (rangosActivosEnConflicto.Count == 0)
+    private async Task DesactivarRangosActivosEnConflictoAsync(IEnumerable<int> idsRangosActivosEnConflicto)
+    {
+        var ids = idsRangosActivosEnConflicto
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
         {
             return;
         }
 
-        foreach (var rangoActivo in rangosActivosEnConflicto)
-        {
-            rangoActivo.Activo = false;
-        }
+        await _context.MaeNumeracionRangos
+            .Where(r => ids.Contains(r.IdRango))
+            .ExecuteUpdateAsync(updates =>
+                updates.SetProperty(r => r.Activo, false));
     }
 
     public async Task<int?> ObtenerCantidadCupoAsync(int idTipo, int anio)
@@ -562,7 +574,6 @@ public class NumeracionRangoService
         return await EjecutarOperacionControladaAsync(async () =>
         {
             var anioObjetivo = anio ?? DateTime.Now.Year;
-            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
             var rango = await ObtenerRangoAdministradoAsync(idTipoDocumento, idOficina, anioObjetivo, incluirAgotados: true);
 
@@ -576,9 +587,24 @@ public class NumeracionRangoService
                 return OperacionResultado<MaeNumeracionRango>.Fail($"Rango agotado ({rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}). Debe registrar un nuevo rango para continuar.");
             }
 
-            rango.UltimoUtilizado++;
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            var parametroIdRango = new SqlParameter("@IdRango", rango.IdRango);
+
+            var nuevoUltimoUtilizado = await _context.Database
+                .SqlQueryRaw<int?>(@"
+                    UPDATE dbo.Mae_NumeracionRangos
+                    SET UltimoUtilizado = UltimoUtilizado + 1
+                    OUTPUT INSERTED.UltimoUtilizado
+                    WHERE IdRango = @IdRango
+                      AND Activo = 1
+                      AND UltimoUtilizado < NumeroFin;", parametroIdRango)
+                .SingleOrDefaultAsync();
+
+            if (!nuevoUltimoUtilizado.HasValue)
+            {
+                return OperacionResultado<MaeNumeracionRango>.Fail("El rango ya no está disponible para continuar numerando. Recargue la vista para obtener el estado más reciente.");
+            }
+
+            rango.UltimoUtilizado = nuevoUltimoUtilizado.Value;
 
             return OperacionResultado<MaeNumeracionRango>.Ok(rango);
         }, "No fue posible consumir el siguiente número oficial.", "consumir siguiente número");
@@ -672,18 +698,23 @@ public class NumeracionRangoService
             : await queryOficina.OrderBy(r => r.NumeroInicio).ThenBy(r => r.IdRango).FirstOrDefaultAsync();
     }
 
-    private async Task<string?> ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango)
+    private async Task<string?> ObtenerMensajeUnicoActivoPorTipoOficinaAnioAsync(MaeNumeracionRango rango, IReadOnlyCollection<int>? idsRangosIgnorados = null)
     {
         if (!rango.Activo)
         {
             return null;
         }
 
+        var idsIgnorados = idsRangosIgnorados is null || idsRangosIgnorados.Count == 0
+            ? null
+            : idsRangosIgnorados.ToHashSet();
+
         var existeActivo = await _context.MaeNumeracionRangos.AnyAsync(r =>
             r.IdRango != rango.IdRango &&
             r.IdTipo == rango.IdTipo &&
             r.Anio == rango.Anio &&
             r.Activo &&
+            (idsIgnorados == null || !idsIgnorados.Contains(r.IdRango)) &&
             r.IdOficina == rango.IdOficina);
 
         if (existeActivo)
