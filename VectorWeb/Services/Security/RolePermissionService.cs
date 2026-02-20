@@ -14,15 +14,11 @@ public class RolePermissionService
         .OrderBy(permiso => permiso, StringComparer.OrdinalIgnoreCase)
         .ToArray();
 
-    private static readonly IReadOnlyDictionary<string, int> PermisoAIndice = PermisosOrdenados
-        .Select((permiso, indice) => new { permiso, indice })
-        .ToDictionary(x => x.permiso, x => x.indice, StringComparer.OrdinalIgnoreCase);
-
-    private static readonly IReadOnlyDictionary<int, string> IndiceAPermiso = PermisosOrdenados
+    private static readonly IReadOnlyDictionary<int, string> LegacyIndiceAPermiso = PermisosOrdenados
         .Select((permiso, indice) => new { permiso, indice })
         .ToDictionary(x => x.indice, x => x.permiso);
 
-    private static readonly IReadOnlyDictionary<string, string> PermisoCanonical = PermisosOrdenados
+    private static readonly IReadOnlyDictionary<string, string> PermisoCanonical = AppPermissions.Todos
         .ToDictionary(permiso => permiso, permiso => permiso, StringComparer.OrdinalIgnoreCase);
 
     private readonly IDbContextFactory<SecretariaDbContext> _dbContextFactory;
@@ -141,13 +137,13 @@ public class RolePermissionService
             .ToDictionary(
                 x => x.Key,
                 x => x.Value
-                    .Where(p => PermisoAIndice.ContainsKey(p))
-                    .OrderBy(p => PermisoAIndice[p])
-                    .Select(p => PermisoAIndice[p].ToString())
+                    .Where(p => PermisoCanonical.ContainsKey(p))
+                    .Select(p => PermisoCanonical[p])
+                    .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                     .ToArray(),
                 StringComparer.OrdinalIgnoreCase);
 
-        return string.Join('|', payload.Select(x => $"{x.Key}:{string.Join(',', x.Value)}"));
+        return JsonSerializer.Serialize(payload);
     }
 
     public static Dictionary<string, HashSet<string>> ObtenerMatrizDefault()
@@ -222,11 +218,18 @@ public class RolePermissionService
             var rolNormalizado = NormalizarRol(partes[0]);
             var permisos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var indiceRaw in partes[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var permisoRaw in partes[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                if (int.TryParse(indiceRaw, out var indicePermiso) && IndiceAPermiso.TryGetValue(indicePermiso, out var permiso))
+                if (PermisoCanonical.TryGetValue(permisoRaw, out var permiso))
                 {
                     permisos.Add(permiso);
+                    continue;
+                }
+
+                if (int.TryParse(permisoRaw, out var indicePermiso)
+                    && LegacyIndiceAPermiso.TryGetValue(indicePermiso, out var permisoLegacy))
+                {
+                    permisos.Add(permisoLegacy);
                 }
             }
 
