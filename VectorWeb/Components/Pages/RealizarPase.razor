@@ -19,6 +19,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @inject SecretariaDbContext DbContext
+@inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <div class="container-fluid py-4">
@@ -262,7 +263,7 @@
     private int idOficinaUsuario = 0;
     private bool usuarioSinOficinaAsignada;
     private bool esPaseDesdeOficinaRemota;
-    private bool crearActuacionRemota;
+    private bool crearActuacionRemota = true;
     private int? idOficinaBandejaEntrada;
     private string nombreOficinaBandejaEntrada = "BANDEJA DE ENTRADA";
     private int idOficinaOrigenPaquete;
@@ -383,12 +384,19 @@
     private async Task GuardarPaseDesdeBotonAsync()
     {
         if (!editContextRealizarPase.Validate()) return;
+
+        var requiereOficinaDestino = !esPaseDesdeOficinaRemota;
+        if (requiereOficinaDestino && nuevoMovimiento.IdOficinaDestino == 0)
+        {
+            await JS.InvokeVoidAsync("alert", "Debe seleccionar una oficina de destino antes de confirmar el pase.");
+            return;
+        }
+
         if (crearActuacionRemota)
         {
             var url = $"documentos/nuevo?IdPadre={docPadre?.IdDocumento ?? Id}&AutoPase" + (esPaseDesdeOficinaRemota ? "Bandeja=true" : $"Destino={nuevoMovimiento.IdOficinaDestino}");
             Navegador.NavigateTo(url); return;
         }
-        if (nuevoMovimiento.IdOficinaDestino == 0) return;
 
         var fechaBaseVencimiento = DateTime.Now;
         var diasPlazoPorTipo = await ObtenerDiasPlazoPorTipoAsync(documentosAEnviar);
