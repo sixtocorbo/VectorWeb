@@ -94,6 +94,12 @@ public class CustomAuthStateProvider : AuthenticationStateProvider
             // Browser storage is unavailable during server pre-rendering.
             return false;
         }
+        catch (Exception)
+        {
+            // Session payload may be unreadable after key rotation or payload corruption.
+            await _sessionStorage.DeleteAsync(SessionKey);
+            return false;
+        }
     }
 
     private async Task<ClaimsPrincipal> ConstruirPrincipalAsync(int idUsuario, string nombre, string rol, int idOficina)

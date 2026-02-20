@@ -51,7 +51,7 @@ public sealed class DatabaseBackupService
 
             return new DatabaseBackupResult(databaseName, preferredBackupPath, DateTime.Now);
         }
-        catch (SqlException ex) when (IsAccessDenied(ex))
+        catch (SqlException ex) when (IsPathOrAccessError(ex))
         {
             var fallbackPath = await CreateBackupInWritableSqlDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
             if (string.IsNullOrWhiteSpace(fallbackPath))
@@ -120,9 +120,11 @@ public sealed class DatabaseBackupService
         await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
     }
 
-    private static bool IsAccessDenied(SqlException ex)
+    private static bool IsPathOrAccessError(SqlException ex)
         => ex.Message.Contains("Operating system error 5", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("error operativo del sistema 5", StringComparison.OrdinalIgnoreCase)
+           || ex.Message.Contains("Operating system error 3", StringComparison.OrdinalIgnoreCase)
+           || ex.Message.Contains("error operativo del sistema 3", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
            || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
 
@@ -147,7 +149,7 @@ public sealed class DatabaseBackupService
                 await ExecuteBackupAsync(dbContext, databaseName, backupPath, cancellationToken);
                 return backupPath;
             }
-            catch (SqlException ex) when (IsAccessDenied(ex))
+            catch (SqlException ex) when (IsPathOrAccessError(ex))
             {
                 continue;
             }
