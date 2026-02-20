@@ -320,6 +320,7 @@
     private int totalRojo;
     private int totalAmarillo;
     private int totalVerde;
+    private const int DiasRiesgoSemaforo = 3;
     private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
@@ -389,12 +390,14 @@
         totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
 
         var qConBusqueda = AplicarFiltroBusqueda(qBase);
+        var fechaHoy = DateTime.Today;
+        var fechaRiesgo = fechaHoy.AddDays(DiasRiesgoSemaforo);
 
-        totalRojo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "ROJO");
-        totalAmarillo = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "AMARILLO");
-        totalVerde = await qConBusqueda.CountAsync(d => d.EstadoSemaforo == "VERDE");
+        totalRojo = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value < fechaHoy);
+        totalAmarillo = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value >= fechaHoy && d.FechaVencimiento.Value <= fechaRiesgo);
+        totalVerde = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value > fechaRiesgo);
 
-        var q = AplicarFiltroSemaforo(qConBusqueda);
+        var q = AplicarFiltroSemaforo(qConBusqueda, fechaHoy, fechaRiesgo);
 
         TotalRegistros = await q.CountAsync();
         if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
@@ -447,23 +450,32 @@
         foreach (var t in tms)
         {
             var p = $"%{t}%";
+            var esNumero = long.TryParse(t, out var idDocumentoBuscado);
+
             q = q.Where(d =>
-                EF.Functions.Like(EF.Functions.Collate(d.IdDocumento.ToString(), CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.NumeroOficial ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.NumeroInterno ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.Asunto ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.Descripcion ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.IdTipoNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.IdOficinaActualNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p)
-                || EF.Functions.Like(EF.Functions.Collate(d.IdEstadoActualNavigation.Nombre ?? "", CollationBusquedaSinAcentos), p));
+                (esNumero && d.IdDocumento == idDocumentoBuscado)
+                || (d.NumeroOficial != null && EF.Functions.Like(EF.Functions.Collate(d.NumeroOficial, CollationBusquedaSinAcentos), p))
+                || (d.NumeroInterno != null && EF.Functions.Like(EF.Functions.Collate(d.NumeroInterno, CollationBusquedaSinAcentos), p))
+                || (d.Asunto != null && EF.Functions.Like(EF.Functions.Collate(d.Asunto, CollationBusquedaSinAcentos), p))
+                || (d.Descripcion != null && EF.Functions.Like(EF.Functions.Collate(d.Descripcion, CollationBusquedaSinAcentos), p))
+                || (d.IdTipoNavigation != null && d.IdTipoNavigation.Nombre != null && EF.Functions.Like(EF.Functions.Collate(d.IdTipoNavigation.Nombre, CollationBusquedaSinAcentos), p))
+                || (d.IdOficinaActualNavigation != null && d.IdOficinaActualNavigation.Nombre != null && EF.Functions.Like(EF.Functions.Collate(d.IdOficinaActualNavigation.Nombre, CollationBusquedaSinAcentos), p))
+                || (d.IdEstadoActualNavigation != null && d.IdEstadoActualNavigation.Nombre != null && EF.Functions.Like(EF.Functions.Collate(d.IdEstadoActualNavigation.Nombre, CollationBusquedaSinAcentos), p)));
         }
         return q;
     }
 
-    private IQueryable<MaeDocumento> AplicarFiltroSemaforo(IQueryable<MaeDocumento> q)
+    private IQueryable<MaeDocumento> AplicarFiltroSemaforo(IQueryable<MaeDocumento> q, DateTime fechaHoy, DateTime fechaRiesgo)
     {
         if (string.IsNullOrWhiteSpace(filtroSemaforo)) return q;
-        return q.Where(d => d.EstadoSemaforo == filtroSemaforo);
+
+        return filtroSemaforo.ToUpperInvariant() switch
+        {
+            "ROJO" => q.Where(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value < fechaHoy),
+            "AMARILLO" => q.Where(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value >= fechaHoy && d.FechaVencimiento.Value <= fechaRiesgo),
+            "VERDE" => q.Where(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value > fechaRiesgo),
+            _ => q
+        };
     }
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
 
