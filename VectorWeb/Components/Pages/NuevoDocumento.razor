@@ -14,8 +14,6 @@
 @using System.Globalization
 @using System.Security.Claims
 @using System.Text
-@inject IRepository<MaeDocumento> RepoDocs
-@inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatTipoDocumento> RepoTipos
 @inject IRepository<CatEstado> RepoEstados
@@ -24,7 +22,7 @@
 @inject DocumentoPlazosService DocumentoPlazosService
 @inject NavigationManager Navegador
 @inject IJSRuntime JS
-@inject SecretariaDbContext DbContext
+@inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
@@ -415,7 +413,7 @@
                             <div class="input-group shadow-sm">
                                 <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
                                 <input class="form-control border-start-0 shadow-none" placeholder="Nro oficial, asunto o tipo..."
-                                       @bind="FiltroModalPadre" @bind:event="oninput" />
+                                       value="@filtroModalPadre" @oninput="OnFiltroModalPadreInput" />
                             </div>
                         </div>
                         <div class="col-md-4 text-md-end d-flex align-items-end justify-content-md-end">
@@ -522,9 +520,9 @@
     private readonly Dictionary<int, int> usoOficinas = new();
     private readonly Dictionary<int, string> nombresTipos = new();
     private readonly Dictionary<int, string> nombresEstados = new();
-    private readonly Dictionary<long, string> indicesBusquedaPadre = new();
-    private List<MaeDocumento> documentosDisponibles = new();
     private bool mostrarModalPadres;
+    private bool cargandoPadres;
+    private int totalRegistrosPadre;
     private int paginaPadreActual = 1;
     private int tamanoPaginaPadre = 10;
     private MaeDocumento? docPadreSeleccionado;
@@ -628,9 +626,7 @@
         foreach (var t in tipos) if (!string.IsNullOrWhiteSpace(t.Nombre)) nombresTipos[t.IdTipo] = t.Nombre;
         foreach (var e in estados) if (!string.IsNullOrWhiteSpace(e.Nombre)) nombresEstados[e.IdEstado] = e.Nombre;
 
-        documentosDisponibles = (await RepoDocs.GetAllAsync()).OrderByDescending(d => d.FechaCreacion).ToList();
-        foreach (var doc in documentosDisponibles) indicesBusquedaPadre[doc.IdDocumento] = ConstruirIndiceBusquedaPadre(doc);
-        RecalcularDocumentosPadreFiltrados();
+        await BuscarPadresPaginadosAsync();
 
         if (estados.Any()) nuevoDoc.IdEstadoActual = estados.First().IdEstado;
         nuevoDoc.IdHiloConversacion = Guid.NewGuid();
@@ -650,7 +646,8 @@
 
         if (IdPadre.HasValue)
         {
-            var padre = documentosDisponibles.FirstOrDefault(d => d.IdDocumento == IdPadre.Value);
+            await using var db = await DbContextFactory.CreateDbContextAsync();
+            var padre = await db.MaeDocumentos.AsNoTracking().FirstOrDefaultAsync(d => d.IdDocumento == IdPadre.Value);
             if (padre != null)
             {
                 esActuacion = true;
@@ -708,18 +705,43 @@
             ?? DocumentoPlazosService.CalcularFechaVencimiento(fechaBase, 10);
     }
 
-    private IEnumerable<MaeDocumento> DocumentosPadrePaginados => documentosPadreFiltrados.Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre).Take(tamanoPaginaPadre);
-    private int TotalRegistrosPadre => documentosPadreFiltrados.Count;
+    private IEnumerable<MaeDocumento> DocumentosPadrePaginados => documentosPadreFiltrados;
+    private int TotalRegistrosPadre => totalRegistrosPadre;
     private int TotalPaginasPadre => Math.Max(1, (int)Math.Ceiling(TotalRegistrosPadre / (double)tamanoPaginaPadre));
-    private int PaginaPadreEfectiva => Math.Min(paginaPadreActual, TotalPaginasPadre);
+    private int PaginaPadreEfectiva => Math.Max(1, Math.Min(paginaPadreActual, TotalPaginasPadre));
     private int DesdeRegistroPadre => TotalRegistrosPadre == 0 ? 0 : ((PaginaPadreEfectiva - 1) * tamanoPaginaPadre) + 1;
-    private int HastaRegistroPadre => Math.Min(PaginaPadreEfectiva * tamanoPaginaPadre, TotalRegistrosPadre);
+    private int HastaRegistroPadre => TotalRegistrosPadre == 0
+        ? 0
+        : DesdeRegistroPadre + documentosPadreFiltrados.Count - 1;
 
-    private void AbrirModalPadres() => mostrarModalPadres = true;
+    private async Task AbrirModalPadres()
+    {
+        mostrarModalPadres = true;
+        await BuscarPadresPaginadosAsync();
+    }
     private void CerrarModalPadres() => mostrarModalPadres = false;
-    private string FiltroModalPadre { get => filtroModalPadre; set { if (filtroModalPadre == value) return; filtroModalPadre = value; paginaPadreActual = 1; RecalcularDocumentosPadreFiltrados(); } }
-    private void PaginaPadreAnterior() { if (PaginaPadreEfectiva > 1) paginaPadreActual--; }
-    private void PaginaPadreSiguiente() { if (PaginaPadreEfectiva < TotalPaginasPadre) paginaPadreActual++; }
+    private async Task OnFiltroModalPadreInput(ChangeEventArgs e)
+    {
+        var valor = e.Value?.ToString() ?? string.Empty;
+        if (filtroModalPadre == valor) return;
+        filtroModalPadre = valor;
+        paginaPadreActual = 1;
+        await BuscarPadresPaginadosAsync();
+    }
+
+    private async Task PaginaPadreAnterior()
+    {
+        if (PaginaPadreEfectiva <= 1) return;
+        paginaPadreActual--;
+        await BuscarPadresPaginadosAsync();
+    }
+
+    private async Task PaginaPadreSiguiente()
+    {
+        if (PaginaPadreEfectiva >= TotalPaginasPadre) return;
+        paginaPadreActual++;
+        await BuscarPadresPaginadosAsync();
+    }
     private void SeleccionarPadreDesdeModal(MaeDocumento p) { SeleccionarPadre(p); mostrarModalPadres = false; }
     private void SeleccionarPadre(MaeDocumento p) { docPadreSeleccionado = p; nuevoDoc.IdDocumentoPadre = p.IdDocumento; nuevoDoc.IdHiloConversacion = p.IdHiloConversacion; }
     private void QuitarVinculo() { docPadreSeleccionado = null; nuevoDoc.IdDocumentoPadre = null; nuevoDoc.IdHiloConversacion = Guid.NewGuid(); }
@@ -737,7 +759,11 @@
             if (esActuacion && soloTraerSinActuacion && docPadreSeleccionado != null)
             {
                 if (!idOficinaBandejaEntrada.HasValue) { errorGuardar = "Error: No se encontró la Bandeja de Entrada."; return; }
-                await MoverFamiliaADestino(docPadreSeleccionado.IdHiloConversacion, idOficinaBandejaEntrada.Value, "Traslado de familia sin actuación");
+                await using var dbSoloTraslado = await DbContextFactory.CreateDbContextAsync();
+                await using var transSoloTraslado = await dbSoloTraslado.Database.BeginTransactionAsync();
+                await MoverFamiliaADestino(dbSoloTraslado, docPadreSeleccionado.IdHiloConversacion, idOficinaBandejaEntrada.Value, "Traslado de familia sin actuación");
+                await dbSoloTraslado.SaveChangesAsync();
+                await transSoloTraslado.CommitAsync();
                 Navegador.NavigateTo("documentos"); return;
             }
 
@@ -774,24 +800,37 @@
                 await CalcularVencimientoAsync(nuevoDoc.IdTipo);
             }
 
-            await using var trans = await DbContext.Database.BeginTransactionAsync();
+            await using var db = await DbContextFactory.CreateDbContextAsync();
+            await using var trans = await db.Database.BeginTransactionAsync();
             try
             {
-                await RepoDocs.AddAsync(nuevoDoc);
-                await RepoMovimientos.AddAsync(new TraMovimiento { IdDocumento = nuevoDoc.IdDocumento, IdOficinaOrigen = nuevoDoc.IdOficinaActual, IdOficinaDestino = nuevoDoc.IdOficinaActual, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador, ObservacionPase = esActuacion ? "Actuación agregada" : "Documento creado" });
+                db.MaeDocumentos.Add(nuevoDoc);
+                await db.SaveChangesAsync();
 
-                if (AutoPaseBandeja == true) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, idOficinaUsuarioActual, "Traslado automático retorno");
-                else if (AutoPaseDestino.HasValue) await MoverFamiliaADestino(nuevoDoc.IdHiloConversacion, AutoPaseDestino.Value, "Traslado automático destino");
+                db.TraMovimientos.Add(new TraMovimiento
+                {
+                    IdDocumento = nuevoDoc.IdDocumento,
+                    IdOficinaOrigen = nuevoDoc.IdOficinaActual,
+                    IdOficinaDestino = nuevoDoc.IdOficinaActual,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                    ObservacionPase = esActuacion ? "Actuación agregada" : "Documento creado"
+                });
+
+                if (AutoPaseBandeja == true) await MoverFamiliaADestino(db, nuevoDoc.IdHiloConversacion, idOficinaUsuarioActual, "Traslado automático retorno");
+                else if (AutoPaseDestino.HasValue) await MoverFamiliaADestino(db, nuevoDoc.IdHiloConversacion, AutoPaseDestino.Value, "Traslado automático destino");
                 else if (!esActuacion
                     && idOficinaBandejaEntrada.HasValue
                     && nuevoDoc.IdOficinaActual != idOficinaBandejaEntrada.Value)
                 {
                     await MoverFamiliaADestino(
+                        db,
                         nuevoDoc.IdHiloConversacion,
                         idOficinaBandejaEntrada.Value,
                         "Ingreso automático a bandeja de entrada");
                 }
 
+                await db.SaveChangesAsync();
                 await trans.CommitAsync(); Navegador.NavigateTo("documentos");
             }
             catch { await trans.RollbackAsync(); throw; }
@@ -802,14 +841,25 @@
     private Task IgnorarSubmitNuevoDocumento(EditContext _) => Task.CompletedTask;
     private async Task GuardarDesdeBotonAsync() { if (editContextNuevoDocumento.Validate()) await Guardar(); }
 
-    private async Task MoverFamiliaADestino(Guid hilo, int destino, string obs)
+    private async Task MoverFamiliaADestino(SecretariaDbContext db, Guid hilo, int destino, string obs)
     {
-        var fam = (await RepoDocs.GetAllAsync()).Where(d => d.IdHiloConversacion == hilo).ToList();
+        var fam = await db.MaeDocumentos
+            .Where(d => d.IdHiloConversacion == hilo)
+            .ToListAsync();
+
         foreach (var d in fam)
         {
             if (d.IdOficinaActual == destino) continue;
-            await RepoMovimientos.AddAsync(new TraMovimiento { IdDocumento = d.IdDocumento, IdOficinaOrigen = d.IdOficinaActual, IdOficinaDestino = destino, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador, ObservacionPase = obs });
-            d.IdOficinaActual = destino; await RepoDocs.UpdateAsync(d);
+            db.TraMovimientos.Add(new TraMovimiento
+            {
+                IdDocumento = d.IdDocumento,
+                IdOficinaOrigen = d.IdOficinaActual,
+                IdOficinaDestino = destino,
+                FechaMovimiento = DateTime.Now,
+                IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador,
+                ObservacionPase = obs
+            });
+            d.IdOficinaActual = destino;
         }
     }
 
@@ -908,7 +958,8 @@
 
     private async Task CargarUsoOficinasAsync()
     {
-        var movimientos = await DbContext.TraMovimientos
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+        var movimientos = await db.TraMovimientos
             .AsNoTracking()
             .Select(m => new { m.IdOficinaOrigen, m.IdOficinaDestino })
             .ToListAsync();
@@ -950,8 +1001,42 @@
         if (nombreOficina.StartsWith(termino, StringComparison.OrdinalIgnoreCase)) return 2;
         return 1;
     }
-    private string ConstruirIndiceBusquedaPadre(MaeDocumento d) => $"{d.NumeroOficial} {d.Asunto} {d.Descripcion}";
-    private void RecalcularDocumentosPadreFiltrados() => documentosPadreFiltrados = string.IsNullOrWhiteSpace(filtroModalPadre) ? documentosDisponibles : documentosDisponibles.Where(d => indicesBusquedaPadre[d.IdDocumento].Contains(filtroModalPadre, StringComparison.OrdinalIgnoreCase)).ToList();
+    private async Task BuscarPadresPaginadosAsync()
+    {
+        cargandoPadres = true;
+
+        try
+        {
+            await using var db = await DbContextFactory.CreateDbContextAsync();
+            var query = db.MaeDocumentos.AsNoTracking().AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(filtroModalPadre))
+            {
+                var patron = $"%{filtroModalPadre.Trim()}%";
+                query = query.Where(d =>
+                    EF.Functions.Like(d.NumeroOficial ?? string.Empty, patron)
+                    || EF.Functions.Like(d.Asunto ?? string.Empty, patron)
+                    || EF.Functions.Like(d.Descripcion ?? string.Empty, patron));
+            }
+
+            totalRegistrosPadre = await query.CountAsync();
+            var totalPaginasCalculadas = Math.Max(1, (int)Math.Ceiling(totalRegistrosPadre / (double)tamanoPaginaPadre));
+            if (paginaPadreActual > totalPaginasCalculadas)
+            {
+                paginaPadreActual = totalPaginasCalculadas;
+            }
+
+            documentosPadreFiltrados = await query
+                .OrderByDescending(d => d.FechaCreacion)
+                .Skip((PaginaPadreEfectiva - 1) * tamanoPaginaPadre)
+                .Take(tamanoPaginaPadre)
+                .ToListAsync();
+        }
+        finally
+        {
+            cargandoPadres = false;
+        }
+    }
 
     private string NombreOficina(int id) => nombresOficinas.GetValueOrDefault(id) ?? "S/D";
     private string NombreTipo(int? idTipo) => idTipo.HasValue ? nombresTipos.GetValueOrDefault(idTipo.Value) ?? string.Empty : string.Empty;
