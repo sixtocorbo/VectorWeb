@@ -27,85 +27,109 @@ public sealed class DocumentoVinculacionService
 
         await using var tx = await context.Database.BeginTransactionAsync();
 
-        var documentos = await context.MaeDocumentos
+        var esqueletoRelacional = await context.MaeDocumentos
+            .AsNoTracking()
+            .Select(d => new { d.IdDocumento, d.IdDocumentoPadre })
             .ToListAsync();
 
-        var porId = documentos.ToDictionary(d => d.IdDocumento);
+        var padresDict = esqueletoRelacional.ToDictionary(d => d.IdDocumento, d => d.IdDocumentoPadre);
 
-        if (!porId.TryGetValue(idPadre, out var padre))
+        if (!padresDict.ContainsKey(idPadre))
         {
             return VinculacionResultado.ConError("No se encontró el documento padre seleccionado.");
         }
 
-        var relacionesHijos = documentos
+        var relacionesHijos = esqueletoRelacional
             .Where(d => d.IdDocumentoPadre.HasValue)
             .GroupBy(d => d.IdDocumentoPadre!.Value)
             .ToDictionary(g => g.Key, g => g.Select(x => x.IdDocumento).ToList());
 
         var detalles = new List<VinculacionDetalle>();
-        var modificados = new HashSet<long>();
+        var idsAModificar = new HashSet<long>();
+        var subarbolPorHijo = new Dictionary<long, List<long>>();
 
         foreach (var idHijo in hijosSolicitados)
         {
-            if (!porId.TryGetValue(idHijo, out var hijo))
+            if (!padresDict.TryGetValue(idHijo, out var idPadreActualHijo))
             {
                 detalles.Add(new VinculacionDetalle(idHijo, "Documento inexistente.", 0, false));
                 continue;
             }
 
-            if (GeneraCiclo(idPadre, idHijo, porId))
+            if (GeneraCiclo(idPadre, idHijo, padresDict))
             {
                 detalles.Add(new VinculacionDetalle(idHijo, "Operación omitida: generaría una relación circular.", 0, false));
                 continue;
             }
 
             var idsSubarbol = ObtenerSubarbol(idHijo, relacionesHijos);
+            subarbolPorHijo[idHijo] = idsSubarbol;
             var cantidadDescendientes = Math.Max(0, idsSubarbol.Count - 1);
 
-            var mensajeEstado = hijo.IdDocumentoPadre.HasValue
-                ? $"Reasignado desde padre #{hijo.IdDocumentoPadre.Value}."
+            var mensajeEstado = idPadreActualHijo.HasValue
+                ? $"Reasignado desde padre #{idPadreActualHijo.Value}."
                 : "Vinculado sin padre previo.";
-
-            hijo.IdDocumentoPadre = idPadre;
-            modificados.Add(hijo.IdDocumento);
 
             foreach (var id in idsSubarbol)
             {
-                if (!porId.TryGetValue(id, out var itemSubarbol))
-                {
-                    continue;
-                }
-
-                itemSubarbol.IdHiloConversacion = padre.IdHiloConversacion;
-                modificados.Add(id);
+                idsAModificar.Add(id);
             }
 
             detalles.Add(new VinculacionDetalle(idHijo, mensajeEstado, cantidadDescendientes, true));
         }
 
-        if (modificados.Count == 0)
+        if (idsAModificar.Count == 0)
         {
             return VinculacionResultado.ConError("No se aplicaron cambios. Revise las validaciones de consistencia.", detalles);
+        }
+
+        idsAModificar.Add(idPadre);
+
+        var documentosParaActualizar = await context.MaeDocumentos
+            .Where(d => idsAModificar.Contains(d.IdDocumento))
+            .ToDictionaryAsync(d => d.IdDocumento);
+
+        if (!documentosParaActualizar.TryGetValue(idPadre, out var padre))
+        {
+            return VinculacionResultado.ConError("No se encontró el documento padre seleccionado.");
+        }
+
+        foreach (var idHijo in hijosSolicitados.Where(id => subarbolPorHijo.ContainsKey(id)))
+        {
+            if (!documentosParaActualizar.TryGetValue(idHijo, out var hijo))
+            {
+                continue;
+            }
+
+            hijo.IdDocumentoPadre = idPadre;
+
+            foreach (var idDescendiente in subarbolPorHijo[idHijo])
+            {
+                if (documentosParaActualizar.TryGetValue(idDescendiente, out var desc))
+                {
+                    desc.IdHiloConversacion = padre.IdHiloConversacion;
+                }
+            }
         }
 
         await context.SaveChangesAsync();
         await tx.CommitAsync();
 
-        return VinculacionResultado.Ok(detalles, modificados.Count);
+        return VinculacionResultado.Ok(detalles, idsAModificar.Count - 1);
     }
 
-    private static bool GeneraCiclo(long idPadre, long idCandidatoHijo, IReadOnlyDictionary<long, MaeDocumento> porId)
+    private static bool GeneraCiclo(long idPadre, long idCandidatoHijo, IReadOnlyDictionary<long, long?> padresDict)
     {
         var cursor = idPadre;
 
-        while (porId.TryGetValue(cursor, out var actual) && actual.IdDocumentoPadre.HasValue)
+        while (padresDict.TryGetValue(cursor, out var idDocumentoPadre) && idDocumentoPadre.HasValue)
         {
-            if (actual.IdDocumentoPadre.Value == idCandidatoHijo)
+            if (idDocumentoPadre.Value == idCandidatoHijo)
             {
                 return true;
             }
 
-            cursor = actual.IdDocumentoPadre.Value;
+            cursor = idDocumentoPadre.Value;
         }
 
         return false;
