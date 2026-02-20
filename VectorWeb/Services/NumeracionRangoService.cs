@@ -597,14 +597,16 @@ public class NumeracionRangoService
                     WHERE IdRango = @IdRango
                       AND Activo = 1
                       AND UltimoUtilizado < NumeroFin;", parametroIdRango)
-                .SingleOrDefaultAsync();
+                .ToListAsync();
 
-            if (!nuevoUltimoUtilizado.HasValue)
+            var valorConsumido = nuevoUltimoUtilizado.SingleOrDefault();
+
+            if (!valorConsumido.HasValue)
             {
                 return OperacionResultado<MaeNumeracionRango>.Fail("El rango ya no está disponible para continuar numerando. Recargue la vista para obtener el estado más reciente.");
             }
 
-            rango.UltimoUtilizado = nuevoUltimoUtilizado.Value;
+            rango.UltimoUtilizado = valorConsumido.Value;
 
             return OperacionResultado<MaeNumeracionRango>.Ok(rango);
         }, "No fue posible consumir el siguiente número oficial.", "consumir siguiente número");
