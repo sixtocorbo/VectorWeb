@@ -402,7 +402,7 @@
         TotalRegistros = await q.CountAsync();
         if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
 
-        listaDocs = await q.OrderByDescending(d => d.FechaCreacion).Skip((PaginaActualEfectiva - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
+        listaDocs = await q.OrderByDescending(d => d.FechaCreacion).ThenByDescending(d => d.IdDocumento).Skip((PaginaActualEfectiva - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
 
         var idsPadre = listaDocs.Where(d => d.IdDocumentoPadre.HasValue).Select(d => d.IdDocumentoPadre!.Value).Distinct().ToList();
         if (idsPadre.Any())
