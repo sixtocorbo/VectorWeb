@@ -490,15 +490,16 @@
             .Select(g => new
             {
                 IdTipo = g.Key,
-                Dias = g.Where(c => string.Equals((c.Prioridad ?? string.Empty).Trim(), "NORMAL", StringComparison.OrdinalIgnoreCase))
-                    .Select(c => (int?)c.DiasMaximos)
-                    .FirstOrDefault() ?? g.Min(c => c.DiasMaximos)
+                // CORRECCIÓN: Usamos operaciones nativas de SQL ( != null, .Trim() y .ToUpper() )
+                // que EF Core sabe traducir perfectamente a T-SQL.
+                Dias = g.Where(c => c.Prioridad != null && c.Prioridad.Trim().ToUpper() == "NORMAL")
+                        .Select(c => (int?)c.DiasMaximos)
+                        .FirstOrDefault() ?? g.Min(c => c.DiasMaximos)
             })
             .ToListAsync();
 
         return configuracionesPorTipo.ToDictionary(x => x.IdTipo, x => x.Dias);
     }
-
     private static DateTime? ObtenerFechaVencimientoPorTipo(IReadOnlyDictionary<int, DateTime?> vencimientoPorTipo, int idTipoDocumento)
     {
         if (idTipoDocumento <= 0)
