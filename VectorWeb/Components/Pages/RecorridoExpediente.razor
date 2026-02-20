@@ -79,6 +79,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
+                        <th>Documento</th>
                         <th>Recorrido completo</th>
                         <th>Fecha</th>
                         <th>Hora</th>
@@ -89,7 +90,7 @@
                     @if (!MovimientosFiltrados.Any())
                     {
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">No hay movimientos para los filtros seleccionados.</td>
+                            <td colspan="6" class="text-center text-muted py-4">No hay movimientos para los filtros seleccionados.</td>
                         </tr>
                     }
                     else
@@ -98,6 +99,10 @@
                         {
                             <tr>
                                 <td class="fw-bold">@(item.idx + 1)</td>
+                                <td>
+                                    <div class="fw-semibold">@item.mov.IdDocumentoNavigation?.NumeroOficial</div>
+                                    <small class="text-muted">@item.mov.IdDocumentoNavigation?.Asunto</small>
+                                </td>
                                 <td>
                                     <span class="fw-semibold text-secondary">@item.mov.IdOficinaOrigenNavigation?.Nombre</span>
                                     <i class="bi bi-arrow-right mx-2 text-primary"></i>
@@ -134,7 +139,7 @@
         .Where(m => string.IsNullOrWhiteSpace(filtroDestino) ||
                     string.Equals(m.IdOficinaDestinoNavigation?.Nombre, filtroDestino, StringComparison.OrdinalIgnoreCase))
         .Where(m => string.IsNullOrWhiteSpace(filtroTexto) ||
-                    ($"{m.IdOficinaOrigenNavigation?.Nombre} {m.IdOficinaDestinoNavigation?.Nombre} {m.ObservacionPase}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
+                    ($"{m.IdDocumentoNavigation?.NumeroOficial} {m.IdDocumentoNavigation?.Asunto} {m.IdOficinaOrigenNavigation?.Nombre} {m.IdOficinaDestinoNavigation?.Nombre} {m.ObservacionPase}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
         .Where(m => !filtroDesde.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date >= filtroDesde.Value.Date))
         .Where(m => !filtroHasta.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date <= filtroHasta.Value.Date))
         .OrderByDescending(m => m.FechaMovimiento)
@@ -163,7 +168,7 @@
             .ToListAsync();
 
         movimientos = await RepoMovimientos
-            .GetQueryable("IdOficinaOrigenNavigation,IdOficinaDestinoNavigation")
+            .GetQueryable("IdDocumentoNavigation,IdOficinaOrigenNavigation,IdOficinaDestinoNavigation")
             .Where(m => idsEnHilo.Contains(m.IdDocumento))
             .ToListAsync();
 
