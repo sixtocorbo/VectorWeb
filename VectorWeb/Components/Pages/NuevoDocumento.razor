@@ -106,6 +106,12 @@
                         </button>
                     }
                 </div>
+                @if (!string.IsNullOrWhiteSpace(NumeroAsignadoTramiteTexto))
+                {
+                    <div class="text-success fw-semibold mt-2">
+                        Para este trámite se ha asignado el número: @NumeroAsignadoTramiteTexto
+                    </div>
+                }
             </div>
         }
 
@@ -540,6 +546,28 @@
 
             var tipo = NombreTipo(docPadreSeleccionado?.IdTipo);
             return string.IsNullOrWhiteSpace(tipo) ? numero : $"{tipo} {numero}";
+        }
+    }
+    private string NumeroAsignadoTramiteTexto
+    {
+        get
+        {
+            if (!esNumeracionAutomatica || nuevoDoc.IdTipo <= 0 || proximoNumeroAutomatico <= 0)
+            {
+                return string.Empty;
+            }
+
+            var tipoSeleccionado = tipos.FirstOrDefault(t => t.IdTipo == nuevoDoc.IdTipo);
+            var prefijo = tipoSeleccionado?.Codigo?.Trim();
+
+            if (string.IsNullOrWhiteSpace(prefijo))
+            {
+                prefijo = tipoSeleccionado?.Nombre?.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(prefijo)
+                ? proximoNumeroAutomatico.ToString()
+                : $"{prefijo} {proximoNumeroAutomatico}";
         }
     }
     private string NombreOficinaDestinoPase
