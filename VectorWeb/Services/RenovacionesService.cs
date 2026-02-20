@@ -155,25 +155,36 @@ public sealed class RenovacionesService
     {
         entidad.Observaciones = ConstruirObservaciones(codAutorizacion, descAutorizacion, obsUsuario);
 
-        if (entidad.IdSalida == 0)
+        await using var tx = await context.Database.BeginTransactionAsync();
+        try
         {
-            context.TraSalidasLaborales.Add(entidad);
+            if (entidad.IdSalida == 0)
+            {
+                context.TraSalidasLaborales.Add(entidad);
+            }
+            else
+            {
+                context.TraSalidasLaborales.Update(entidad);
+            }
+
+            await context.SaveChangesAsync();
+
+            if (idsDocumentos != null) // Permitir lista vacía para limpiar, pero no null
+            {
+                var idsNormalizados = idsDocumentos
+                    .Where(x => x > 0)
+                    .Distinct()
+                    .ToList();
+
+                await ActualizarVinculosDocumentos(entidad.IdSalida, idsNormalizados);
+            }
+
+            await tx.CommitAsync();
         }
-        else
+        catch
         {
-            context.TraSalidasLaborales.Update(entidad);
-        }
-
-        await context.SaveChangesAsync();
-
-        if (idsDocumentos != null) // Permitir lista vacía para limpiar, pero no null
-        {
-            var idsNormalizados = idsDocumentos
-                .Where(x => x > 0)
-                .Distinct()
-                .ToList();
-
-            await ActualizarVinculosDocumentos(entidad.IdSalida, idsNormalizados);
+            await tx.RollbackAsync();
+            throw;
         }
     }
 
