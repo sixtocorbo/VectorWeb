@@ -791,6 +791,8 @@
             try
             {
                 db.MaeDocumentos.Add(nuevoDoc);
+                await db.SaveChangesAsync();
+
                 db.TraMovimientos.Add(new TraMovimiento { IdDocumento = nuevoDoc.IdDocumento, IdOficinaOrigen = nuevoDoc.IdOficinaActual, IdOficinaDestino = nuevoDoc.IdOficinaActual, FechaMovimiento = DateTime.Now, IdUsuarioResponsable = nuevoDoc.IdUsuarioCreador, ObservacionPase = esActuacion ? "Actuación agregada" : "Documento creado" });
 
                 if (AutoPaseBandeja == true) await MoverFamiliaADestino(db, nuevoDoc.IdHiloConversacion, idOficinaUsuarioActual, "Traslado automático retorno");
