@@ -10,15 +10,20 @@ public static class FechaHelper
     [
         (1, 1),   // Año Nuevo
         (1, 6),   // Reyes
-        (4, 19),  // Desembarco de los 33
         (5, 1),   // Día de los Trabajadores
-        (5, 18),  // Batalla de las Piedras
         (6, 19),  // Natalicio de Artigas
         (7, 18),  // Jura de la Constitución
         (8, 25),  // Declaratoria de la Independencia
-        (10, 12), // Día de la Raza
         (11, 2),  // Difuntos
         (12, 25)  // Navidad
+    ];
+
+    // Feriados laborables trasladables por ley
+    private static readonly (int Mes, int Dia)[] FeriadosTrasladablesUy =
+    [
+        (4, 19),  // Desembarco de los 33
+        (5, 18),  // Batalla de las Piedras
+        (10, 12)  // Día de la Raza
     ];
 
     private static readonly Dictionary<int, HashSet<DateOnly>> FeriadosMovilesPorAnio = [];
@@ -80,7 +85,7 @@ public static class FechaHelper
         // Feriados Fijos
         if (FeriadosFijosUy.Contains((fecha.Month, fecha.Day))) return true;
 
-        // Feriados Móviles (Semana de Turismo y Carnaval)
+        // Feriados Móviles (Semana de Turismo, Carnaval y trasladables)
         return ObtenerFeriadosMoviles(fecha.Year).Contains(fecha);
     }
 
@@ -105,8 +110,27 @@ public static class FechaHelper
             domingoPascua.AddDays(-2)   // Viernes Santo
         };
 
+        foreach (var (mes, dia) in FeriadosTrasladablesUy)
+        {
+            nuevosFeriados.Add(CalcularFeriadoTrasladado(anio, mes, dia));
+        }
+
         FeriadosMovilesPorAnio[anio] = nuevosFeriados;
         return nuevosFeriados;
+    }
+
+    private static DateOnly CalcularFeriadoTrasladado(int anio, int mes, int dia)
+    {
+        var fechaOriginal = new DateOnly(anio, mes, dia);
+
+        return fechaOriginal.DayOfWeek switch
+        {
+            DayOfWeek.Tuesday => fechaOriginal.AddDays(-1),
+            DayOfWeek.Wednesday => fechaOriginal.AddDays(-2),
+            DayOfWeek.Thursday => fechaOriginal.AddDays(4),
+            DayOfWeek.Friday => fechaOriginal.AddDays(3),
+            _ => fechaOriginal
+        };
     }
 
     private static DateOnly CalcularDomingoPascua(int anio)

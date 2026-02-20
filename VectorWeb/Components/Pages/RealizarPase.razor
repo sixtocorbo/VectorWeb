@@ -8,13 +8,14 @@
 @using System.Security.Claims
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using VectorWeb.Services
 @using VectorWeb.Utils
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
 @inject IRepository<CatEstado> RepoEstados
 @inject IRepository<EventosSistema> RepoEventos
-@inject IRepository<CfgTiemposRespuestum> RepoPlazos
+@inject DocumentoPlazosService DocumentoPlazosService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @inject SecretariaDbContext DbContext
@@ -389,6 +390,12 @@
         }
         if (nuevoMovimiento.IdOficinaDestino == 0) return;
 
+        var fechaBaseVencimiento = DateTime.Now;
+        var diasPlazoPorTipo = await ObtenerDiasPlazoPorTipoAsync(documentosAEnviar);
+        var vencimientoPorTipo = diasPlazoPorTipo.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (DateTime?)DocumentoPlazosService.CalcularFechaVencimiento(fechaBaseVencimiento, kvp.Value));
+
         await using var trans = await DbContext.Database.BeginTransactionAsync();
         try
         {
@@ -396,7 +403,10 @@
                 .Where(d => documentosAEnviar.Select(doc => doc.IdDocumento).Contains(d.IdDocumento))
                 .ToDictionaryAsync(d => d.IdDocumento);
 
-            foreach (var doc in documentosAEnviar)
+            var fechaVencimientoPorPadre = new Dictionary<long, DateTime?>();
+            foreach (var doc in documentosAEnviar
+                         .OrderBy(d => d.IdDocumentoPadre.HasValue)
+                         .ThenBy(d => d.FechaCreacion))
             {
                 if (!documentosPorId.TryGetValue(doc.IdDocumento, out var documentoActualizar))
                 {
@@ -406,7 +416,19 @@
                 var ori = documentoActualizar.IdOficinaActual;
                 documentoActualizar.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
                 documentoActualizar.IdEstadoActual = nuevoEstadoId;
-                documentoActualizar.FechaVencimiento = await CalcularNuevoVencimientoAsync(documentoActualizar.IdTipo);
+
+                if (documentoActualizar.IdDocumentoPadre.HasValue)
+                {
+                    documentoActualizar.FechaVencimiento = fechaVencimientoPorPadre.TryGetValue(documentoActualizar.IdDocumentoPadre.Value, out var fechaPadre)
+                        ? fechaPadre
+                        : null;
+                }
+                else
+                {
+                    var fechaVencimientoRaiz = ObtenerFechaVencimientoPorTipo(vencimientoPorTipo, documentoActualizar.IdTipo);
+                    documentoActualizar.FechaVencimiento = fechaVencimientoRaiz;
+                    fechaVencimientoPorPadre[documentoActualizar.IdDocumento] = fechaVencimientoRaiz;
+                }
 
                 if (docPadre != null && documentoActualizar.IdDocumento == docPadre.IdDocumento)
                 {
@@ -440,26 +462,45 @@
     }
     private Task IgnorarSubmitRealizarPase(EditContext _) => Task.CompletedTask;
 
-    private async Task<DateTime?> CalcularNuevoVencimientoAsync(int idTipoDocumento)
+    private async Task<Dictionary<int, int>> ObtenerDiasPlazoPorTipoAsync(IEnumerable<MaeDocumento> documentos)
+    {
+        var tiposDocumento = documentos
+            .Select(d => d.IdTipo)
+            .Where(idTipo => idTipo > 0)
+            .Distinct()
+            .ToList();
+
+        if (!tiposDocumento.Any())
+        {
+            return new Dictionary<int, int>();
+        }
+
+        var configuracionesPorTipo = await DbContext.CfgTiemposRespuesta
+            .AsNoTracking()
+            .Where(c => tiposDocumento.Contains(c.IdTipoDocumento))
+            .GroupBy(c => c.IdTipoDocumento)
+            .Select(g => new
+            {
+                IdTipo = g.Key,
+                Dias = g.Where(c => string.Equals((c.Prioridad ?? string.Empty).Trim(), "NORMAL", StringComparison.OrdinalIgnoreCase))
+                    .Select(c => (int?)c.DiasMaximos)
+                    .FirstOrDefault() ?? g.Min(c => c.DiasMaximos)
+            })
+            .ToListAsync();
+
+        return configuracionesPorTipo.ToDictionary(x => x.IdTipo, x => x.Dias);
+    }
+
+    private static DateTime? ObtenerFechaVencimientoPorTipo(IReadOnlyDictionary<int, DateTime?> vencimientoPorTipo, int idTipoDocumento)
     {
         if (idTipoDocumento <= 0)
         {
             return null;
         }
 
-        var configuraciones = await RepoPlazos.FindAsync(c => c.IdTipoDocumento == idTipoDocumento);
-        if (!configuraciones.Any())
-        {
-            return null;
-        }
-
-        var configuracion = configuraciones.FirstOrDefault(c =>
-                               string.Equals((c.Prioridad ?? string.Empty).Trim(), "NORMAL", StringComparison.OrdinalIgnoreCase))
-                           ?? configuraciones.OrderBy(c => c.DiasMaximos).First();
-
-        return configuracion.DiasMaximos < 30
-            ? DateTime.Now.AgregarDiasHabiles(configuracion.DiasMaximos)
-            : DateTime.Now.AgregarDiasCorridos(configuracion.DiasMaximos);
+        return vencimientoPorTipo.TryGetValue(idTipoDocumento, out var fechaVencimiento)
+            ? fechaVencimiento
+            : null;
     }
 
     private static string FormatearNumeroConTipo(MaeDocumento documento)
