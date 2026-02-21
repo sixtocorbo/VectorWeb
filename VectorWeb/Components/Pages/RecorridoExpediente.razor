@@ -142,7 +142,7 @@
         .Where(m => !filtroDesde.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date >= filtroDesde.Value.Date))
         .Where(m => !filtroHasta.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date <= filtroHasta.Value.Date))
         .OrderByDescending(m => m.FechaMovimiento)
-        .ThenByDescending(m => m.IdMovimiento);
+        .ThenBy(m => m.IdMovimiento);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -150,36 +150,49 @@
         noEncontrado = false;
         movimientos.Clear();
 
-        documento = await RepoDocs
-            .GetQueryable("IdTipoNavigation,IdEstadoActualNavigation")
-            .FirstOrDefaultAsync(d => d.IdDocumento == Id);
-
-        if (documento is null)
+        try
         {
-            noEncontrado = true;
-            cargando = false;
-            return;
+            // BLINDAJE 1: Obtener el documento base
+            var docs = await RepoDocs.GetFilteredAsync(d => d.IdDocumento == Id, "IdTipoNavigation,IdEstadoActualNavigation");
+            documento = docs.FirstOrDefault();
+
+            if (documento is null)
+            {
+                noEncontrado = true;
+                cargando = false;
+                return;
+            }
+
+            // BLINDAJE 2: Obtener IDs de la familia (hilo)
+            var familia = await RepoDocs.GetFilteredAsync(d => d.IdHiloConversacion == documento.IdHiloConversacion);
+            var idsEnHilo = familia.Select(d => d.IdDocumento).ToList();
+
+            // BLINDAJE 3: Obtener movimientos con navegación cargada
+            var movs = await RepoMovimientos.GetFilteredAsync(
+                m => idsEnHilo.Contains(m.IdDocumento),
+                "IdDocumentoNavigation.IdTipoNavigation,IdOficinaOrigenNavigation,IdOficinaDestinoNavigation"
+            );
+
+            movimientos = movs.ToList();
+
+            // Cargar lista de destinos para el filtro desplegable
+            destinosDisponibles = movimientos
+                .Select(m => m.IdOficinaDestinoNavigation?.Nombre)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n)
+                .Cast<string>()
+                .ToList();
         }
-
-        var idsEnHilo = await RepoDocs.GetQueryable()
-            .Where(d => d.IdHiloConversacion == documento.IdHiloConversacion)
-            .Select(d => d.IdDocumento)
-            .ToListAsync();
-
-        movimientos = await RepoMovimientos
-            .GetQueryable("IdDocumentoNavigation.IdTipoNavigation,IdOficinaOrigenNavigation,IdOficinaDestinoNavigation")
-            .Where(m => idsEnHilo.Contains(m.IdDocumento))
-            .ToListAsync();
-
-        destinosDisponibles = movimientos
-            .Select(m => m.IdOficinaDestinoNavigation?.Nombre)
-            .Where(n => !string.IsNullOrWhiteSpace(n))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(n => n)
-            .Cast<string>()
-            .ToList();
-
-        cargando = false;
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error en recorrido: {ex.Message}");
+            noEncontrado = true;
+        }
+        finally
+        {
+            cargando = false;
+        }
     }
 
     private static string FormatoTipoYNumero(string? tipo, string? numero)
@@ -187,14 +200,9 @@
         var tipoLimpio = tipo?.Trim();
         var numeroLimpio = numero?.Trim();
 
-        if (string.IsNullOrWhiteSpace(tipoLimpio) && string.IsNullOrWhiteSpace(numeroLimpio))
-            return "S/N";
-
-        if (string.IsNullOrWhiteSpace(tipoLimpio))
-            return numeroLimpio!;
-
-        if (string.IsNullOrWhiteSpace(numeroLimpio))
-            return tipoLimpio;
+        if (string.IsNullOrWhiteSpace(tipoLimpio) && string.IsNullOrWhiteSpace(numeroLimpio)) return "S/N";
+        if (string.IsNullOrWhiteSpace(tipoLimpio)) return numeroLimpio!;
+        if (string.IsNullOrWhiteSpace(numeroLimpio)) return tipoLimpio;
 
         return $"{tipoLimpio} {numeroLimpio}";
     }

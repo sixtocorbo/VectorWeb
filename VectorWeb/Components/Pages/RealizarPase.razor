@@ -10,6 +10,8 @@
 @using VectorWeb.Repositories
 @using VectorWeb.Services
 @using VectorWeb.Utils
+
+@* INYECCIÓN BLINDADA *@
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IRepository<CatOficina> RepoOficinas
@@ -18,7 +20,7 @@
 @inject DocumentoPlazosService DocumentoPlazosService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
-@inject SecretariaDbContext DbContext
+@inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -142,11 +144,11 @@
                                                 <input type="text"
                                                        class="form-control form-control-lg border-start-0"
                                                        placeholder="Buscar oficina..."
-                                                       value="@oficinaDestinoBusqueda"
-                                                       autocomplete="off"
+                                                       @bind="oficinaDestinoBusqueda"
                                                        @oninput="FiltrarOficinasDestino"
                                                        @onfocus="MostrarSugerenciasOficinaDestino"
-                                                       @onkeydown="ManejarTecladoOficinasDestino" />
+                                                       @onkeydown="ManejarTecladoOficinasDestino"
+                                                       autocomplete="off" />
                                             </div>
 
                                             @if (oficinasDestinoFiltradas.Any())
@@ -170,7 +172,6 @@
                                         <div class="form-text mt-2">
                                             Use <kbd class="bg-light text-dark border">↑</kbd> <kbd class="bg-light text-dark border">↓</kbd> y <kbd class="bg-light text-dark border">Enter</kbd> para navegar rápidamente.
                                         </div>
-                                        <ValidationMessage For="@(() => nuevoMovimiento.IdOficinaDestino)" class="text-danger mt-1 small fw-bold" />
                                     }
                                 </div>
 
@@ -244,8 +245,6 @@
     </div>
 </div>
 
-@* Mantenemos el bloque @code intacto *@
-
 @code {
     [Parameter] public long Id { get; set; }
     private bool cargando = true;
@@ -278,18 +277,25 @@
         try
         {
             cargando = true;
+
             var authState = await AuthStateProvider.GetAuthenticationStateAsync();
             var user = authState.User;
             if (int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var uid)) usuarioLogueadoId = uid;
             if (int.TryParse(user.FindFirst("IdOficina")?.Value, out var oid)) idOficinaUsuario = oid;
             usuarioSinOficinaAsignada = idOficinaUsuario <= 0;
 
-            oficinas = await RepoOficinas.GetQueryable().Where(o => usuarioSinOficinaAsignada || o.IdOficina != idOficinaUsuario).OrderBy(o => o.Nombre).ToListAsync();
-            estados = (await RepoEstados.GetAllAsync()).ToList();
-            idOficinaBandejaEntrada = (await RepoOficinas.GetQueryable().Where(o => o.Nombre.ToUpper() == "BANDEJA DE ENTRADA").Select(o => (int?)o.IdOficina).FirstOrDefaultAsync());
-            await CargarUsoOficinasAsync();
+            var listaOficinas = await RepoOficinas.GetFilteredAsync(o => usuarioSinOficinaAsignada || o.IdOficina != idOficinaUsuario);
+            oficinas = listaOficinas.OrderBy(o => o.Nombre).ToList();
 
+            var listaEstados = await RepoEstados.GetAllAsync();
+            estados = listaEstados.ToList();
+
+            var oficinasBandeja = await RepoOficinas.GetFilteredAsync(o => o.Nombre.ToUpper() == "BANDEJA DE ENTRADA");
+            idOficinaBandejaEntrada = oficinasBandeja.Select(o => (int?)o.IdOficina).FirstOrDefault();
+
+            await CargarUsoOficinasAsync();
             await AnalizarPaqueteAsync();
+
             nuevoMovimiento.ObservacionPase = "Se remite para su conocimiento, consideración y fines pertinentes.";
         }
         catch (Exception ex) { mensajeError = ex.Message; }
@@ -298,34 +304,124 @@
 
     private async Task AnalizarPaqueteAsync()
     {
-        var docBase = await RepoDocs.GetQueryable().FirstOrDefaultAsync(d => d.IdDocumento == Id);
+        var docsBase = await RepoDocs.GetFilteredAsync(d => d.IdDocumento == Id);
+        var docBase = docsBase.FirstOrDefault();
+
         if (docBase == null) { mensajeError = "Documento no existe."; return; }
+
         if (idOficinaUsuario == 0) idOficinaUsuario = docBase.IdOficinaActual;
         esPaseDesdeOficinaRemota = !usuarioSinOficinaAsignada && docBase.IdOficinaActual != idOficinaUsuario;
         idOficinaOrigenPaquete = docBase.IdOficinaActual;
-        if (esPaseDesdeOficinaRemota && idOficinaBandejaEntrada.HasValue) nuevoMovimiento.IdOficinaDestino = idOficinaBandejaEntrada.Value;
 
-        documentosAEnviar = await RepoDocs.GetQueryable("IdTipoNavigation")
-            .Where(d => d.IdHiloConversacion == docBase.IdHiloConversacion && (d.IdEstadoActual != 5 || d.IdDocumento == Id))
-            .Where(d => usuarioSinOficinaAsignada || d.IdOficinaActual == (esPaseDesdeOficinaRemota ? idOficinaOrigenPaquete : idOficinaUsuario))
-            .ToListAsync();
+        if (esPaseDesdeOficinaRemota && idOficinaBandejaEntrada.HasValue)
+            nuevoMovimiento.IdOficinaDestino = idOficinaBandejaEntrada.Value;
 
-        docPadre = documentosAEnviar.FirstOrDefault(d => d.IdDocumentoPadre == null) ?? documentosAEnviar.OrderBy(d => d.FechaCreacion).FirstOrDefault();
-        if (docPadre != null) documentosAdjuntos = documentosAEnviar.Where(d => d.IdDocumento != docPadre.IdDocumento).ToList();
+        var oficinaFiltro = esPaseDesdeOficinaRemota ? idOficinaOrigenPaquete : idOficinaUsuario;
+
+        var familia = await RepoDocs.GetFilteredAsync(d =>
+            d.IdHiloConversacion == docBase.IdHiloConversacion &&
+            (d.IdEstadoActual != 5 || d.IdDocumento == Id),
+            "IdTipoNavigation");
+
+        documentosAEnviar = familia
+            .Where(d => usuarioSinOficinaAsignada || d.IdOficinaActual == oficinaFiltro)
+            .ToList();
+
+        docPadre = documentosAEnviar.FirstOrDefault(d => d.IdDocumentoPadre == null)
+                   ?? documentosAEnviar.OrderBy(d => d.FechaCreacion).FirstOrDefault();
+
+        if (docPadre != null)
+            documentosAdjuntos = documentosAEnviar.Where(d => d.IdDocumento != docPadre.IdDocumento).ToList();
     }
 
+    private async Task GuardarPaseDesdeBotonAsync()
+    {
+        if (!editContextRealizarPase.Validate()) return;
+
+        if (!esPaseDesdeOficinaRemota && nuevoMovimiento.IdOficinaDestino == 0)
+        {
+            await JS.InvokeVoidAsync("alert", "Debe seleccionar una oficina de destino.");
+            return;
+        }
+
+        if (crearActuacionRemota)
+        {
+            var url = $"documentos/nuevo?IdPadre={docPadre?.IdDocumento ?? Id}&AutoPase" +
+                      (esPaseDesdeOficinaRemota ? "Bandeja=true" : $"Destino={nuevoMovimiento.IdOficinaDestino}");
+            Navegador.NavigateTo(url);
+            return;
+        }
+
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+        await using var trans = await db.Database.BeginTransactionAsync();
+
+        try
+        {
+            var idsAEnviar = documentosAEnviar.Select(doc => doc.IdDocumento).ToList();
+            var docsDb = await db.MaeDocumentos.Where(d => idsAEnviar.Contains(d.IdDocumento)).ToListAsync();
+
+            foreach (var doc in docsDb)
+            {
+                var oriAnterior = doc.IdOficinaActual;
+                doc.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
+                doc.IdEstadoActual = nuevoEstadoId;
+
+                if (docPadre != null && doc.IdDocumento == docPadre.IdDocumento)
+                    doc.Fojas = (doc.Fojas ?? 0) + fojasAgregadas;
+
+                db.TraMovimientos.Add(new TraMovimiento
+                {
+                    IdDocumento = doc.IdDocumento,
+                    IdOficinaOrigen = (usuarioSinOficinaAsignada || esPaseDesdeOficinaRemota) ? oriAnterior : idOficinaUsuario,
+                    IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
+                    FechaMovimiento = DateTime.Now,
+                    IdUsuarioResponsable = usuarioLogueadoId,
+                    IdEstadoEnEseMomento = nuevoEstadoId,
+                    ObservacionPase = nuevoMovimiento.ObservacionPase
+                });
+            }
+
+            await db.SaveChangesAsync();
+            await trans.CommitAsync();
+            Navegador.NavigateTo("documentos");
+        }
+        catch (Exception ex)
+        {
+            await trans.RollbackAsync();
+            mensajeError = $"Error al procesar el pase: {ex.Message}";
+        }
+    }
+
+    private async Task CargarUsoOficinasAsync()
+    {
+        await using var db = await DbContextFactory.CreateDbContextAsync();
+
+        // Obtenemos las estadísticas de uso por oficina
+        var stats = await db.TraMovimientos
+            .AsNoTracking()
+            .GroupBy(m => m.IdOficinaDestino)
+            .Select(g => new { Id = g.Key, Total = g.Count() })
+            .ToListAsync();
+
+        usoOficinas.Clear();
+        foreach (var s in stats)
+        {
+            // Si s.Id es mayor a 0, lo usamos directamente como llave del diccionario
+            if (s.Id > 0)
+            {
+                usoOficinas[s.Id] = s.Total; // <-- QUITAMOS EL .Value AQUÍ
+            }
+        }
+    }
     private void FiltrarOficinasDestino(ChangeEventArgs e)
     {
         oficinaDestinoBusqueda = e.Value?.ToString() ?? string.Empty;
         nuevoMovimiento.IdOficinaDestino = 0;
         indiceOficinaDestinoSeleccionada = -1;
         if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda))
-        {
             oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda).Take(8).ToList();
-            var exact = oficinas.FirstOrDefault(o => string.Equals(o.Nombre, oficinaDestinoBusqueda, StringComparison.OrdinalIgnoreCase));
-            if (exact != null) nuevoMovimiento.IdOficinaDestino = exact.IdOficina;
-        }
-        else { oficinasDestinoFiltradas.Clear(); }
+        else
+            oficinasDestinoFiltradas.Clear();
     }
 
     private void MostrarSugerenciasOficinaDestino() { if (!string.IsNullOrWhiteSpace(oficinaDestinoBusqueda)) oficinasDestinoFiltradas = BuscarOficinasDestino(oficinaDestinoBusqueda).Take(8).ToList(); }
@@ -341,181 +437,16 @@
 
     private void SeleccionarOficinaDestino(CatOficina oficina) { nuevoMovimiento.IdOficinaDestino = oficina.IdOficina; oficinaDestinoBusqueda = oficina.Nombre ?? ""; oficinasDestinoFiltradas.Clear(); indiceOficinaDestinoSeleccionada = -1; }
 
-    private async Task CargarUsoOficinasAsync()
-    {
-        var movimientos = await DbContext.TraMovimientos
-            .AsNoTracking()
-            .Select(m => new { m.IdOficinaOrigen, m.IdOficinaDestino })
-            .ToListAsync();
+    private IEnumerable<CatOficina> BuscarOficinasDestino(string t) =>
+        oficinas.Where(o => o.Nombre.Contains(t, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(o => PuntajeCoincidencia(o.Nombre, t))
+            .ThenByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina));
 
-        usoOficinas.Clear();
-        foreach (var movimiento in movimientos)
-        {
-            SumarUsoOficina(movimiento.IdOficinaOrigen);
-            SumarUsoOficina(movimiento.IdOficinaDestino);
-        }
-    }
+    private static int PuntajeCoincidencia(string? n, string t) =>
+        string.IsNullOrWhiteSpace(n) ? 0 : (n.Equals(t, StringComparison.OrdinalIgnoreCase) ? 3 : (n.StartsWith(t, StringComparison.OrdinalIgnoreCase) ? 2 : 1));
 
-    private void SumarUsoOficina(int? idOficina)
-    {
-        if (!idOficina.HasValue || idOficina.Value <= 0) return;
-        usoOficinas[idOficina.Value] = usoOficinas.GetValueOrDefault(idOficina.Value) + 1;
-    }
+    private static string FormatearNumeroConTipo(MaeDocumento doc) =>
+        $"{(doc.IdTipoNavigation?.Nombre ?? "DOC")} {(string.IsNullOrWhiteSpace(doc.NumeroOficial) ? "S/N" : doc.NumeroOficial)}";
 
-    private IEnumerable<CatOficina> BuscarOficinasDestino(string termino)
-    {
-        if (string.IsNullOrWhiteSpace(termino)) return Enumerable.Empty<CatOficina>();
-
-        return oficinas
-            .Where(o => o.Nombre.Contains(termino, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(o => PuntajeCoincidencia(o.Nombre, termino))
-            .ThenByDescending(o => usoOficinas.GetValueOrDefault(o.IdOficina))
-            .ThenBy(o => o.Nombre);
-    }
-
-    private static int PuntajeCoincidencia(string? nombreOficina, string termino)
-    {
-        if (string.IsNullOrWhiteSpace(nombreOficina)) return 0;
-        if (nombreOficina.Equals(termino, StringComparison.OrdinalIgnoreCase)) return 3;
-        if (nombreOficina.StartsWith(termino, StringComparison.OrdinalIgnoreCase)) return 2;
-        return 1;
-    }
-
-    private async Task GuardarPaseDesdeBotonAsync()
-    {
-        if (!editContextRealizarPase.Validate()) return;
-
-        var requiereOficinaDestino = !esPaseDesdeOficinaRemota;
-        if (requiereOficinaDestino && nuevoMovimiento.IdOficinaDestino == 0)
-        {
-            await JS.InvokeVoidAsync("alert", "Debe seleccionar una oficina de destino antes de confirmar el pase.");
-            return;
-        }
-
-        if (crearActuacionRemota)
-        {
-            var url = $"documentos/nuevo?IdPadre={docPadre?.IdDocumento ?? Id}&AutoPase" + (esPaseDesdeOficinaRemota ? "Bandeja=true" : $"Destino={nuevoMovimiento.IdOficinaDestino}");
-            Navegador.NavigateTo(url); return;
-        }
-
-        var fechaBaseVencimiento = DateTime.Now;
-        var diasPlazoPorTipo = await ObtenerDiasPlazoPorTipoAsync(documentosAEnviar);
-        var vencimientoPorTipo = diasPlazoPorTipo.ToDictionary(
-            kvp => kvp.Key,
-            kvp => (DateTime?)DocumentoPlazosService.CalcularFechaVencimiento(fechaBaseVencimiento, kvp.Value));
-
-        await using var trans = await DbContext.Database.BeginTransactionAsync();
-        try
-        {
-            var documentosPorId = await DbContext.MaeDocumentos
-                .Where(d => documentosAEnviar.Select(doc => doc.IdDocumento).Contains(d.IdDocumento))
-                .ToDictionaryAsync(d => d.IdDocumento);
-
-            var fechaVencimientoPorPadre = new Dictionary<long, DateTime?>();
-            foreach (var doc in documentosAEnviar
-                         .OrderBy(d => d.IdDocumentoPadre.HasValue)
-                         .ThenBy(d => d.FechaCreacion))
-            {
-                if (!documentosPorId.TryGetValue(doc.IdDocumento, out var documentoActualizar))
-                {
-                    continue;
-                }
-
-                var ori = documentoActualizar.IdOficinaActual;
-                documentoActualizar.IdOficinaActual = nuevoMovimiento.IdOficinaDestino;
-                documentoActualizar.IdEstadoActual = nuevoEstadoId;
-
-                if (documentoActualizar.IdDocumentoPadre.HasValue)
-                {
-                    documentoActualizar.FechaVencimiento = fechaVencimientoPorPadre.TryGetValue(documentoActualizar.IdDocumentoPadre.Value, out var fechaPadre)
-                        ? fechaPadre
-                        : null;
-                }
-                else
-                {
-                    var fechaVencimientoRaiz = ObtenerFechaVencimientoPorTipo(vencimientoPorTipo, documentoActualizar.IdTipo);
-                    documentoActualizar.FechaVencimiento = fechaVencimientoRaiz;
-                    fechaVencimientoPorPadre[documentoActualizar.IdDocumento] = fechaVencimientoRaiz;
-                }
-
-                if (docPadre != null && documentoActualizar.IdDocumento == docPadre.IdDocumento)
-                {
-                    documentoActualizar.Fojas = (documentoActualizar.Fojas ?? 0) + fojasAgregadas;
-                }
-
-                DbContext.TraMovimientos.Add(new TraMovimiento
-                {
-                    IdDocumento = documentoActualizar.IdDocumento,
-                    IdOficinaOrigen = (usuarioSinOficinaAsignada || esPaseDesdeOficinaRemota) ? ori : idOficinaUsuario,
-                    IdOficinaDestino = nuevoMovimiento.IdOficinaDestino,
-                    FechaMovimiento = DateTime.Now,
-                    IdUsuarioResponsable = usuarioLogueadoId,
-                    IdEstadoEnEseMomento = nuevoEstadoId,
-                    ObservacionPase = nuevoMovimiento.ObservacionPase
-                });
-            }
-
-            DbContext.EventosSistemas.Add(new EventosSistema
-            {
-                UsuarioId = usuarioLogueadoId,
-                FechaEvento = DateTime.Now,
-                Modulo = "PASE",
-                Descripcion = $"Pase de {documentosAEnviar.Count} docs."
-            });
-
-            await DbContext.SaveChangesAsync();
-            await trans.CommitAsync(); Navegador.NavigateTo("documentos");
-        }
-        catch (Exception ex) { await trans.RollbackAsync(); mensajeError = ex.Message; }
-    }
-    private Task IgnorarSubmitRealizarPase(EditContext _) => Task.CompletedTask;
-
-    private async Task<Dictionary<int, int>> ObtenerDiasPlazoPorTipoAsync(IEnumerable<MaeDocumento> documentos)
-    {
-        var tiposDocumento = documentos
-            .Select(d => d.IdTipo)
-            .Where(idTipo => idTipo > 0)
-            .Distinct()
-            .ToList();
-
-        if (!tiposDocumento.Any())
-        {
-            return new Dictionary<int, int>();
-        }
-
-        var configuracionesPorTipo = await DbContext.CfgTiemposRespuesta
-            .AsNoTracking()
-            .Where(c => tiposDocumento.Contains(c.IdTipoDocumento))
-            .GroupBy(c => c.IdTipoDocumento)
-            .Select(g => new
-            {
-                IdTipo = g.Key,
-                // CORRECCIÓN: Usamos operaciones nativas de SQL ( != null, .Trim() y .ToUpper() )
-                // que EF Core sabe traducir perfectamente a T-SQL.
-                Dias = g.Where(c => c.Prioridad != null && c.Prioridad.Trim().ToUpper() == "NORMAL")
-                        .Select(c => (int?)c.DiasMaximos)
-                        .FirstOrDefault() ?? g.Min(c => c.DiasMaximos)
-            })
-            .ToListAsync();
-
-        return configuracionesPorTipo.ToDictionary(x => x.IdTipo, x => x.Dias);
-    }
-    private static DateTime? ObtenerFechaVencimientoPorTipo(IReadOnlyDictionary<int, DateTime?> vencimientoPorTipo, int idTipoDocumento)
-    {
-        if (idTipoDocumento <= 0)
-        {
-            return null;
-        }
-
-        return vencimientoPorTipo.TryGetValue(idTipoDocumento, out var fechaVencimiento)
-            ? fechaVencimiento
-            : null;
-    }
-
-    private static string FormatearNumeroConTipo(MaeDocumento documento)
-    {
-        var numero = string.IsNullOrWhiteSpace(documento.NumeroOficial) ? "S/N" : documento.NumeroOficial;
-        var tipo = documento.IdTipoNavigation?.Nombre;
-        return string.IsNullOrWhiteSpace(tipo) ? numero : $"{tipo} {numero}";
-    }
+    private void IgnorarSubmitRealizarPase(EditContext _) { }
 }

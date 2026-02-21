@@ -382,43 +382,56 @@
     private async Task CargarDocumentos()
     {
         await using var db = await DbContextFactory.CreateDbContextAsync();
+
+        // 1. Definimos la consulta base: SÓLO documentos RAÍZ (sin padre)
+        // Esto asegura que no contemos actuaciones sueltas en los totales.
         var qBase = db.MaeDocumentos.AsNoTracking()
-            .Include(d => d.IdTipoNavigation).Include(d => d.IdOficinaActualNavigation).Include(d => d.IdEstadoActualNavigation).AsQueryable();
+            .Where(d => d.IdDocumentoPadre == null)
+            .Include(d => d.IdTipoNavigation)
+            .Include(d => d.IdOficinaActualNavigation)
+            .Include(d => d.IdEstadoActualNavigation)
+            .AsQueryable();
 
-        if (mostrarSoloMiBandeja && idOficinaUsuario > 0) qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
+        // 2. Filtro por Oficina (si está activo "Mi Bandeja")
+        if (mostrarSoloMiBandeja && idOficinaUsuario > 0)
+        {
+            qBase = qBase.Where(d => d.IdOficinaActual == idOficinaUsuario);
+        }
 
-        totalExpedientesPendientes = await qBase.Select(d => d.IdHiloConversacion).Distinct().CountAsync();
+        // El recuento total ahora es coherente (Solo padres/independientes)
+        totalExpedientesPendientes = await qBase.CountAsync();
 
+        // 3. Aplicamos la lógica de búsqueda (si el usuario escribió algo)
         var qConBusqueda = AplicarFiltroBusqueda(qBase);
+
         var fechaHoy = DateTime.Today;
         var fechaRiesgo = fechaHoy.AddDays(DiasRiesgoSemaforo);
 
+        // 4. RECUENTOS DEL SEMÁFORO (Basados exclusivamente en documentos raíz filtrados)
         totalRojo = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value < fechaHoy);
         totalAmarillo = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value >= fechaHoy && d.FechaVencimiento.Value <= fechaRiesgo);
         totalVerde = await qConBusqueda.CountAsync(d => d.FechaVencimiento.HasValue && d.FechaVencimiento.Value > fechaRiesgo);
 
+        // 5. Aplicamos el filtro del Semáforo seleccionado por el usuario (si eligió alguno)
         var q = AplicarFiltroSemaforo(qConBusqueda, fechaHoy, fechaRiesgo);
 
+        // 6. Paginación
         TotalRegistros = await q.CountAsync();
         if (paginaActual > TotalPaginas) paginaActual = TotalPaginas;
 
-        listaDocs = await q.OrderByDescending(d => d.FechaCreacion).ThenByDescending(d => d.IdDocumento).Skip((PaginaActualEfectiva - 1) * tamanoPagina).Take(tamanoPagina).ToListAsync();
+        // 7. Ejecución de la consulta final para la lista
+        listaDocs = await q.OrderByDescending(d => d.FechaCreacion)
+                           .ThenByDescending(d => d.IdDocumento)
+                           .Skip((PaginaActualEfectiva - 1) * tamanoPagina)
+                           .Take(tamanoPagina)
+                           .ToListAsync();
 
-        var idsPadre = listaDocs.Where(d => d.IdDocumentoPadre.HasValue).Select(d => d.IdDocumentoPadre!.Value).Distinct().ToList();
-        if (idsPadre.Any())
-        {
-            referenciasPadrePorId = await db.MaeDocumentos.AsNoTracking().Where(d => idsPadre.Contains(d.IdDocumento)).Include(d => d.IdTipoNavigation)
-                .Select(d => new { d.IdDocumento, n = d.NumeroOficial, t = d.IdTipoNavigation != null ? d.IdTipoNavigation.Nombre : null })
-                .ToDictionaryAsync(x => x.IdDocumento, x => (x.t + " " + x.n).Trim());
-        }
-        else
-        {
-            referenciasPadrePorId.Clear();
-        }
-
+        // 8. Lógica de referencias y conteo de hijos (para los iconos de la tabla)
         var idsVisibles = listaDocs.Select(d => d.IdDocumento).ToList();
+
         if (idsVisibles.Any())
         {
+            // Contamos cuántos hijos tiene cada uno de los documentos que estamos mostrando
             var conteos = await db.MaeDocumentos.AsNoTracking()
                 .Where(d => d.IdDocumentoPadre.HasValue && idsVisibles.Contains(d.IdDocumentoPadre.Value))
                 .GroupBy(d => d.IdDocumentoPadre!.Value)
@@ -426,15 +439,18 @@
                 .ToListAsync();
 
             cantidadHijosPorPadre = conteos.ToDictionary(k => k.IdPadre, v => v.Cantidad);
+
+            // Limpiamos referencias de padres ya que en esta vista nosotros SOMOS los padres (o independientes)
+            referenciasPadrePorId.Clear();
         }
         else
         {
             cantidadHijosPorPadre.Clear();
+            referenciasPadrePorId.Clear();
         }
 
         StateHasChanged();
     }
-
     private void ReiniciarTemporizadorBusqueda()
     {
         timerBusqueda?.Stop(); timerBusqueda?.Dispose();

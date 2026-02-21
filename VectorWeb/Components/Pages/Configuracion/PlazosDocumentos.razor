@@ -217,12 +217,9 @@
     private List<CfgTiemposRespuestum> plazos = new();
     private List<CatTipoDocumento> tipos = new();
 
-    // Modelo para crear nuevo
     private CfgTiemposRespuestum nuevoPlazo = new() { Prioridad = "NORMAL", DiasMaximos = 5 };
-
-    // Variables para control de edición de fila
-    private int idFilaEnEdicion = 0; // 0 significa ninguna
-    private CfgTiemposRespuestum filaEdicion = new(); // Copia temporal para editar
+    private int idFilaEnEdicion = 0;
+    private CfgTiemposRespuestum filaEdicion = new();
 
     private bool guardando;
     private string mensajeError = string.Empty;
@@ -237,16 +234,18 @@
     {
         try
         {
-            var tiposTask = RepoTipos.GetAllAsync();
-            var plazosTask = RepoPlazos.GetQueryable("IdTipoDocumentoNavigation")
+            // BLINDAJE: Cargamos los tipos de documento
+            var tiposData = await RepoTipos.GetAllAsync();
+            tipos = tiposData.OrderBy(t => t.Nombre).ToList();
+
+            // BLINDAJE: Cargamos los plazos usando el método seguro GetFilteredAsync
+            // Pasamos null en el filtro para traer todos, pero pedimos el Include de la navegación
+            var plazosData = await RepoPlazos.GetFilteredAsync(null, "IdTipoDocumentoNavigation");
+
+            plazos = plazosData
                 .OrderBy(x => x.IdTipoDocumento)
                 .ThenBy(x => x.Prioridad)
-                .ToListAsync();
-
-            await Task.WhenAll(tiposTask, plazosTask);
-
-            tipos = (await tiposTask).OrderBy(t => t.Nombre).ToList();
-            plazos = await plazosTask;
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -257,11 +256,9 @@
     private string NombreTipo(int idTipo)
         => tipos.FirstOrDefault(t => t.IdTipo == idTipo)?.Nombre ?? $"ID: {idTipo}";
 
-    // --- LÓGICA DE AGREGAR ---
     private async Task AgregarAsync()
     {
         LimpiarMensajes();
-
         if (!ValidarModelo(nuevoPlazo)) return;
         if (EsDuplicado(nuevoPlazo))
         {
@@ -275,13 +272,12 @@
             var entidad = new CfgTiemposRespuestum
             {
                 IdTipoDocumento = nuevoPlazo.IdTipoDocumento,
-                Prioridad = nuevoPlazo.Prioridad.Trim().ToUpperInvariant(),
+                Prioridad = nuevoPlazo.Prioridad?.Trim().ToUpperInvariant() ?? "NORMAL",
                 DiasMaximos = nuevoPlazo.DiasMaximos,
                 HorasMaximas = nuevoPlazo.HorasMaximas
             };
 
             await RepoPlazos.AddAsync(entidad);
-
             nuevoPlazo = new CfgTiemposRespuestum { Prioridad = "NORMAL", DiasMaximos = 5 };
             await CargarAsync();
             mensajeExito = "Regla agregada correctamente.";
@@ -290,19 +286,13 @@
         {
             mensajeError = $"No se pudo agregar: {ex.Message}";
         }
-        finally
-        {
-            guardando = false;
-        }
+        finally { guardando = false; }
     }
 
-    // --- LÓGICA DE EDICIÓN ---
     private void IniciarEdicion(CfgTiemposRespuestum item)
     {
         LimpiarMensajes();
         idFilaEnEdicion = item.IdConfig;
-
-        // Creamos una COPIA para editar, así no afectamos la lista visual hasta guardar
         filaEdicion = new CfgTiemposRespuestum
         {
             IdConfig = item.IdConfig,
@@ -317,16 +307,12 @@
     {
         idFilaEnEdicion = 0;
         filaEdicion = new();
-        LimpiarMensajes();
     }
 
     private async Task GuardarEdicionAsync()
     {
         LimpiarMensajes();
-
         if (!ValidarModelo(filaEdicion)) return;
-
-        // Verificamos duplicados excluyendo el propio ID que estamos editando
         if (EsDuplicado(filaEdicion, excluirId: filaEdicion.IdConfig))
         {
             mensajeError = "Conflicto: Ya existe otra regla con este tipo y prioridad.";
@@ -336,97 +322,60 @@
         guardando = true;
         try
         {
-            // Buscamos la entidad original (o usamos Repo para update directo)
-            // Aquí enviamos la copia con los datos nuevos
-            filaEdicion.Prioridad = filaEdicion.Prioridad.Trim().ToUpperInvariant();
-
+            filaEdicion.Prioridad = filaEdicion.Prioridad?.Trim().ToUpperInvariant() ?? "NORMAL";
             await RepoPlazos.UpdateAsync(filaEdicion);
-
             mensajeExito = "Cambios guardados exitosamente.";
-            idFilaEnEdicion = 0; // Salir de edición
-            await CargarAsync(); // Recargar lista
+            idFilaEnEdicion = 0;
+            await CargarAsync();
         }
         catch (Exception ex)
         {
             mensajeError = $"Error al guardar: {ex.Message}";
         }
-        finally
-        {
-            guardando = false;
-        }
+        finally { guardando = false; }
     }
 
-    // --- LÓGICA DE ELIMINAR ---
     private async Task EliminarAsync(CfgTiemposRespuestum fila)
     {
         LimpiarMensajes();
-
-        // Aquí podrías agregar un JS Confirm si lo deseas
-
         guardando = true;
         try
         {
             await RepoPlazos.DeleteAsync(fila.IdConfig);
-            plazos.Remove(fila);
+            await CargarAsync();
             mensajeExito = "Regla eliminada correctamente.";
         }
         catch (Exception ex)
         {
             mensajeError = $"No se pudo eliminar: {ex.Message}";
         }
-        finally
-        {
-            guardando = false;
-        }
+        finally { guardando = false; }
     }
 
-    // --- VALIDACIONES COMUNES ---
     private bool ValidarModelo(CfgTiemposRespuestum modelo)
     {
-        if (modelo.IdTipoDocumento <= 0)
-        {
-            mensajeError = "Seleccione un tipo de documento.";
-            return false;
-        }
-        if (string.IsNullOrWhiteSpace(modelo.Prioridad))
-        {
-            mensajeError = "La prioridad es obligatoria.";
-            return false;
-        }
-        if (modelo.DiasMaximos < 0)
-        {
-            mensajeError = "Los días máximos no pueden ser negativos.";
-            return false;
-        }
+        if (modelo.IdTipoDocumento <= 0) { mensajeError = "Seleccione un tipo."; return false; }
+        if (string.IsNullOrWhiteSpace(modelo.Prioridad)) { mensajeError = "Prioridad obligatoria."; return false; }
         return true;
     }
 
     private bool EsDuplicado(CfgTiemposRespuestum modelo, int excluirId = 0)
     {
-        var prioridad = modelo.Prioridad?.Trim();
+        // Usamos el operador de coalescencia (??) para asegurar que siempre comparemos cadenas, nunca nulos.
         return plazos.Any(x => x.IdConfig != excluirId &&
                                x.IdTipoDocumento == modelo.IdTipoDocumento &&
-                               string.Equals(x.Prioridad?.Trim(), prioridad, StringComparison.OrdinalIgnoreCase));
+                               string.Equals(
+                                   x.Prioridad?.Trim() ?? string.Empty,
+                                   modelo.Prioridad?.Trim() ?? string.Empty,
+                                   StringComparison.OrdinalIgnoreCase));
     }
+    private void LimpiarMensajes() { mensajeError = string.Empty; mensajeExito = string.Empty; }
 
-    private void LimpiarMensajes()
-    {
-        mensajeError = string.Empty;
-        mensajeExito = string.Empty;
-    }
-
-    // --- NUEVO: MÉTODO AUXILIAR PARA LA LEYENDA DEL DECRETO 500 ---
     private (string Texto, string ClaseColor) ObtenerLeyendaPlazo(int dias)
     {
         if (dias <= 0) return ("", "");
-
-        if (dias < 30)
-        {
-            return ($"Se contarán como DÍAS HÁBILES (Decreto 500).", "text-info");
-        }
-        else
-        {
-            return ($"Se contarán como DÍAS CORRIDOS (Decreto 500).", "text-warning fw-bold");
-        }
+        return dias < 30
+            ? ("Se contarán como DÍAS HÁBILES (Decreto 500).", "text-info")
+            : ("Se contarán como DÍAS CORRIDOS (Decreto 500).", "text-warning fw-bold");
     }
 }

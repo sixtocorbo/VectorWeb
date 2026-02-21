@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using System.Text.Json.Serialization; // Necesario para controlar nombres en JSON si se desea
 using VectorWeb.Models;
 using VectorWeb.Repositories;
 
 namespace VectorWeb.Services;
 
+// --- DTOs y Enums (Compatibilidad con UI) ---
 public sealed class SalidaGridDto
 {
     public int IdSalida { get; set; }
@@ -22,22 +22,12 @@ public sealed class SalidaGridDto
     public string? Autorizacion { get; set; }
 }
 
-public enum EstadoRenovacion
-{
-    Ok,
-    Alerta,
-    Vencida,
-    Inactiva
-}
+public enum EstadoRenovacion { Ok, Alerta, Vencida, Inactiva }
 
-// CORRECCIÓN: Renombradas las propiedades para coincidir con lo que espera EditarRenovacion.razor
 public sealed class ObservacionesRenovacionDto
 {
     public string Codigo { get; set; } = string.Empty;
     public string Descripcion { get; set; } = string.Empty;
-
-    // Mapeamos "Observacion" (Razor) a "ObservacionesUsuario" (Lógica interna) si prefieres, 
-    // o simplemente usamos "Observacion" para mantener compatibilidad total.
     public string Observacion { get; set; } = string.Empty;
 }
 
@@ -51,9 +41,10 @@ public sealed class DocumentoRespaldoDto
     public DateTime? FechaCreacion { get; set; }
 }
 
+// --- SERVICIO BLINDADO ---
 public sealed class RenovacionesService
 {
-    private readonly SecretariaDbContext context;
+    private readonly IDbContextFactory<SecretariaDbContext> _contextFactory;
     private readonly IRepository<CfgSistemaParametro> _repoParametros;
     private const string ClaveDiasAlertaRenovaciones = "RENOVACIONES_DIAS_ALERTA";
     private const int DiasAlertaDefecto = 30;
@@ -64,14 +55,15 @@ public sealed class RenovacionesService
         WriteIndented = false
     };
 
-    public RenovacionesService(SecretariaDbContext context, IRepository<CfgSistemaParametro> repoParametros)
+    public RenovacionesService(IDbContextFactory<SecretariaDbContext> contextFactory, IRepository<CfgSistemaParametro> repoParametros)
     {
-        this.context = context;
+        _contextFactory = contextFactory;
         _repoParametros = repoParametros;
     }
 
     public async Task<List<SalidaGridDto>> ObtenerSalidasAsync(bool soloActivas, string textoBuscar)
     {
+        using var context = await _contextFactory.CreateDbContextAsync();
         var hoy = DateTime.Today;
         var diasAlerta = await ObtenerDiasAlertaRenovacionesAsync();
 
@@ -81,44 +73,30 @@ public sealed class RenovacionesService
             .Include(s => s.TraSalidasLaboralesDocumentoRespaldos)
             .AsQueryable();
 
-        query = soloActivas
-            ? query.Where(s => s.Activo == true)
-            : query.Where(s => s.Activo != true);
+        query = soloActivas ? query.Where(s => s.Activo == true) : query.Where(s => s.Activo != true);
 
         if (!string.IsNullOrWhiteSpace(textoBuscar))
         {
-            var terminos = textoBuscar
-                .ToUpperInvariant()
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            foreach (var termino in terminos)
-            {
-                var filtro = termino;
-                query = query.Where(s =>
-                    s.IdReclusoNavigation.NombreCompleto.ToUpper().Contains(filtro) ||
-                    s.LugarTrabajo.ToUpper().Contains(filtro) ||
-                    (s.Observaciones != null && s.Observaciones.ToUpper().Contains(filtro)));
-            }
+            var filtro = textoBuscar.ToUpperInvariant();
+            query = query.Where(s =>
+                s.IdReclusoNavigation.NombreCompleto.ToUpper().Contains(filtro) ||
+                s.LugarTrabajo.ToUpper().Contains(filtro) ||
+                (s.Observaciones != null && s.Observaciones.ToUpper().Contains(filtro)));
         }
 
         var datos = await query
             .OrderBy(s => s.FechaVencimiento)
-            .Select(s => new
-            {
+            .Select(s => new {
                 Salida = s,
                 NombreRecluso = s.IdReclusoNavigation.NombreCompleto,
                 CantDocs = s.TraSalidasLaboralesDocumentoRespaldos.Count
             })
             .ToListAsync();
 
-        return datos.Select(x =>
-        {
+        return datos.Select(x => {
             var dias = (x.Salida.FechaVencimiento.Date - hoy).Days;
             var activa = x.Salida.Activo ?? true;
-            var estado = CalcularEstado(activa, dias, diasAlerta);
-
-            // Ahora devuelve el objeto DTO con las propiedades correctas
-            var autorizacionDto = ParsearObservaciones(x.Salida.Observaciones);
+            var obsDto = ParsearObservaciones(x.Salida.Observaciones);
 
             return new SalidaGridDto
             {
@@ -129,86 +107,58 @@ public sealed class RenovacionesService
                 FechaInicio = x.Salida.FechaInicio,
                 FechaVencimiento = x.Salida.FechaVencimiento,
                 DiasRestantes = dias,
-                Estado = estado,
+                Estado = CalcularEstado(activa, dias, diasAlerta),
                 Activo = activa,
                 CantidadDocumentos = x.CantDocs,
                 DetalleCustodia = x.Salida.DetalleCustodia,
-                Autorizacion = autorizacionDto.Codigo // Acceso corregido
+                Autorizacion = obsDto.Codigo
             };
         }).ToList();
     }
 
     public async Task<TraSalidasLaborale?> ObtenerPorIdAsync(int id)
     {
+        using var context = await _contextFactory.CreateDbContextAsync();
         return await context.TraSalidasLaborales
             .Include(s => s.IdReclusoNavigation)
             .Include(s => s.TraSalidasLaboralesDocumentoRespaldos)
             .FirstOrDefaultAsync(s => s.IdSalida == id);
     }
 
-    public async Task GuardarAsync(
-        TraSalidasLaborale entidad,
-        List<long> idsDocumentos,
-        string codAutorizacion,
-        string descAutorizacion,
-        string obsUsuario)
+    public async Task GuardarAsync(TraSalidasLaborale entidad, List<long> idsDocumentos, string cod, string desc, string obs)
     {
-        entidad.Observaciones = ConstruirObservaciones(codAutorizacion, descAutorizacion, obsUsuario);
+        using var context = await _contextFactory.CreateDbContextAsync();
+        entidad.Observaciones = ConstruirObservaciones(cod, desc, obs);
 
         await using var tx = await context.Database.BeginTransactionAsync();
         try
         {
-            if (entidad.IdSalida == 0)
-            {
-                context.TraSalidasLaborales.Add(entidad);
-            }
-            else
-            {
-                context.TraSalidasLaborales.Update(entidad);
-            }
+            if (entidad.IdSalida == 0) context.TraSalidasLaborales.Add(entidad);
+            else context.TraSalidasLaborales.Update(entidad);
 
             await context.SaveChangesAsync();
 
-            if (idsDocumentos != null) // Permitir lista vacía para limpiar, pero no null
+            if (idsDocumentos != null)
             {
-                var idsNormalizados = idsDocumentos
-                    .Where(x => x > 0)
-                    .Distinct()
-                    .ToList();
-
-                await ActualizarVinculosDocumentos(entidad.IdSalida, idsNormalizados);
+                var idsNormalizados = idsDocumentos.Where(x => x > 0).Distinct().ToList();
+                await ActualizarVinculosInternalAsync(context, entidad.IdSalida, idsNormalizados);
             }
 
             await tx.CommitAsync();
         }
-        catch
-        {
-            await tx.RollbackAsync();
-            throw;
-        }
+        catch { await tx.RollbackAsync(); throw; }
     }
 
-    private async Task ActualizarVinculosDocumentos(int idSalida, List<long> nuevosIds)
+    private async Task ActualizarVinculosInternalAsync(SecretariaDbContext context, int idSalida, List<long> nuevosIds)
     {
-        await ValidarIdsDocumentosAsync(nuevosIds);
-
         var existentes = await context.TraSalidasLaboralesDocumentoRespaldos
-            .Where(x => x.IdSalida == idSalida)
-            .ToListAsync();
+            .Where(x => x.IdSalida == idSalida).ToListAsync();
 
-        var aBorrar = existentes
-            .Where(x => !nuevosIds.Contains(x.IdDocumento))
-            .ToList();
-
-        if (aBorrar.Count > 0)
-        {
-            context.TraSalidasLaboralesDocumentoRespaldos.RemoveRange(aBorrar);
-        }
+        var aBorrar = existentes.Where(x => !nuevosIds.Contains(x.IdDocumento)).ToList();
+        if (aBorrar.Count > 0) context.TraSalidasLaboralesDocumentoRespaldos.RemoveRange(aBorrar);
 
         var idsExistentes = existentes.Select(x => x.IdDocumento).ToHashSet();
-        var aAgregar = nuevosIds.Where(id => !idsExistentes.Contains(id));
-
-        foreach (var idDoc in aAgregar)
+        foreach (var idDoc in nuevosIds.Where(id => !idsExistentes.Contains(id)))
         {
             context.TraSalidasLaboralesDocumentoRespaldos.Add(new TraSalidasLaboralesDocumentoRespaldo
             {
@@ -217,12 +167,13 @@ public sealed class RenovacionesService
                 FechaRegistro = DateTime.Now
             });
         }
-
         await context.SaveChangesAsync();
     }
 
+    // --- CORRECCIÓN FINAL PARA ERROR CS1061 EN PÁGINA RENOVACIONES ---
     public async Task CambiarEstadoAsync(int idSalida, bool activo, string motivo)
     {
+        using var context = await _contextFactory.CreateDbContextAsync();
         var entidad = await context.TraSalidasLaborales.FindAsync(idSalida);
         if (entidad is null) return;
 
@@ -230,126 +181,27 @@ public sealed class RenovacionesService
 
         if (!activo && !string.IsNullOrWhiteSpace(motivo))
         {
-            // Deserializamos para mantener la estructura JSON válida
             var dto = ParsearObservaciones(entidad.Observaciones);
             dto.Observacion += $"{Environment.NewLine}[{DateTime.Now:g}] Motivo cese: {motivo}";
-
-            // Volvemos a serializar
             entidad.Observaciones = JsonSerializer.Serialize(dto, _jsonOptions);
         }
 
         await context.SaveChangesAsync();
     }
 
-    public async Task<int> ObtenerDiasAlertaRenovacionesAsync()
+    public async Task<List<DocumentoRespaldoDto>> BuscarDocumentosCandidatos(int idRecluso, string filtroTexto)
     {
-        // Leemos sin tracking para evitar devolver valores en caché cuando el parámetro
-        // fue actualizado desde otro DbContext (p.ej. pantalla de Configuración > Semáforos).
-        var valorParametro = await context.CfgSistemaParametros
-            .AsNoTracking()
-            .Where(p => p.Clave == ClaveDiasAlertaRenovaciones)
-            .Select(p => p.Valor)
-            .FirstOrDefaultAsync();
+        using var context = await _contextFactory.CreateDbContextAsync();
+        var query = context.MaeDocumentos.AsNoTracking().AsQueryable();
 
-        return TryParseDiasAlerta(valorParametro, out var diasAlerta)
-            ? diasAlerta
-            : DiasAlertaDefecto;
-    }
-
-    private static bool TryParseDiasAlerta(string? valor, out int diasAlerta)
-    {
-        if (int.TryParse(valor, out var parsed) && parsed >= 0)
+        if (!string.IsNullOrWhiteSpace(filtroTexto))
         {
-            diasAlerta = parsed;
-            return true;
+            query = query.Where(d => d.Asunto.Contains(filtroTexto) ||
+                                     (d.NumeroOficial != null && d.NumeroOficial.Contains(filtroTexto)) ||
+                                     d.IdDocumento.ToString() == filtroTexto);
         }
 
-        diasAlerta = DiasAlertaDefecto;
-        return false;
-    }
-
-    private static EstadoRenovacion CalcularEstado(bool activa, int diasRestantes, int diasAlerta)
-    {
-        if (!activa) return EstadoRenovacion.Inactiva;
-        if (diasRestantes < 0) return EstadoRenovacion.Vencida;
-        if (diasRestantes <= diasAlerta) return EstadoRenovacion.Alerta;
-        return EstadoRenovacion.Ok;
-    }
-
-    public ObservacionesRenovacionDto ParsearObservaciones(string? obs)
-    {
-        if (string.IsNullOrWhiteSpace(obs))
-            return new ObservacionesRenovacionDto();
-
-        var obsTrimmed = obs.Trim();
-
-        // 1. Intento JSON
-        if (obsTrimmed.StartsWith("{") && obsTrimmed.EndsWith("}"))
-        {
-            try
-            {
-                var resultado = JsonSerializer.Deserialize<ObservacionesRenovacionDto>(obsTrimmed, _jsonOptions);
-                return resultado ?? new ObservacionesRenovacionDto();
-            }
-            catch
-            {
-                // Fallback silencioso
-            }
-        }
-
-        // 2. Fallback Legacy
-        return ParsearFormatoLegacy(obs);
-    }
-
-    private ObservacionesRenovacionDto ParsearFormatoLegacy(string obs)
-    {
-        var dto = new ObservacionesRenovacionDto();
-        var lineas = obs.Split(new[] { Environment.NewLine }, StringSplitOptions.None).ToList();
-        var index = 0;
-
-        if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION#:"))
-        {
-            dto.Codigo = lineas[index].Replace("#AUTORIZACION#:", string.Empty).Trim();
-            index++;
-        }
-
-        if (lineas.Count > index && lineas[index].StartsWith("#AUTORIZACION_DESC#:"))
-        {
-            dto.Descripcion = lineas[index].Replace("#AUTORIZACION_DESC#:", string.Empty).Trim();
-            index++;
-        }
-
-        if (index < lineas.Count)
-        {
-            dto.Observacion = string.Join(Environment.NewLine, lineas.Skip(index));
-        }
-
-        return dto;
-    }
-
-    private static string ConstruirObservaciones(string codigo, string descripcion, string observaciones)
-    {
-        var payload = new ObservacionesRenovacionDto
-        {
-            Codigo = codigo,
-            Descripcion = descripcion,
-            Observacion = observaciones
-        };
-
-        return JsonSerializer.Serialize(payload, _jsonOptions);
-    }
-
-    public async Task<List<DocumentoRespaldoDto>> BuscarDocumentosCandidatos(int idRecluso, string nombreRecluso)
-    {
-        var query = context.MaeDocumentos
-            .AsNoTracking()
-            .Where(d =>
-                d.TraSalidasLaborales.Any(s => s.IdRecluso == idRecluso) ||
-                d.Asunto.Contains(nombreRecluso) ||
-                (d.Descripcion != null && d.Descripcion.Contains(nombreRecluso))
-            )
-            .OrderByDescending(d => d.FechaCreacion)
-            .Take(20)
+        return await query.OrderByDescending(d => d.FechaCreacion).Take(20)
             .Select(d => new DocumentoRespaldoDto
             {
                 IdDocumento = d.IdDocumento,
@@ -358,23 +210,19 @@ public sealed class RenovacionesService
                 NumeroOficial = d.NumeroOficial,
                 FechaCreacion = d.FechaCreacion,
                 Texto = $"DOC {d.NumeroOficial ?? "S/N"} | {d.Asunto}"
-            });
-
-        return await query.ToListAsync();
+            }).ToListAsync();
     }
 
     public async Task<bool> ExisteDocumentoAsync(long idDocumento)
     {
-        if (idDocumento <= 0) return false;
-        return await context.MaeDocumentos.AsNoTracking().AnyAsync(x => x.IdDocumento == idDocumento);
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MaeDocumentos.AnyAsync(x => x.IdDocumento == idDocumento);
     }
 
     public async Task<DocumentoRespaldoDto?> ObtenerDocumentoPorIdAsync(long idDocumento)
     {
-        if (idDocumento <= 0) return null;
-
-        return await context.MaeDocumentos
-            .AsNoTracking()
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MaeDocumentos.AsNoTracking()
             .Where(d => d.IdDocumento == idDocumento)
             .Select(d => new DocumentoRespaldoDto
             {
@@ -384,24 +232,32 @@ public sealed class RenovacionesService
                 NumeroOficial = d.NumeroOficial,
                 FechaCreacion = d.FechaCreacion,
                 Texto = $"DOC {d.NumeroOficial ?? "S/N"} | {d.Asunto}"
-            })
-            .FirstOrDefaultAsync();
+            }).FirstOrDefaultAsync();
     }
 
-    private async Task ValidarIdsDocumentosAsync(List<long> idsDocumentos)
+    public async Task<int> ObtenerDiasAlertaRenovacionesAsync()
     {
-        if (idsDocumentos == null || idsDocumentos.Count == 0) return;
+        using var context = await _contextFactory.CreateDbContextAsync();
+        var valor = await context.CfgSistemaParametros.AsNoTracking()
+            .Where(p => p.Clave == ClaveDiasAlertaRenovaciones).Select(p => p.Valor).FirstOrDefaultAsync();
 
-        var existentes = await context.MaeDocumentos
-            .AsNoTracking()
-            .Where(d => idsDocumentos.Contains(d.IdDocumento))
-            .Select(d => d.IdDocumento)
-            .ToListAsync();
-
-        var faltantes = idsDocumentos.Except(existentes).ToList();
-        if (faltantes.Count > 0)
-        {
-            throw new InvalidOperationException($"No existen documentos con IDs: {string.Join(", ", faltantes)}");
-        }
+        return int.TryParse(valor, out var d) && d >= 0 ? d : DiasAlertaDefecto;
     }
+
+    private static EstadoRenovacion CalcularEstado(bool activa, int dias, int alerta)
+    {
+        if (!activa) return EstadoRenovacion.Inactiva;
+        if (dias < 0) return EstadoRenovacion.Vencida;
+        return (dias <= alerta) ? EstadoRenovacion.Alerta : EstadoRenovacion.Ok;
+    }
+
+    public ObservacionesRenovacionDto ParsearObservaciones(string? obs)
+    {
+        if (string.IsNullOrWhiteSpace(obs)) return new ObservacionesRenovacionDto();
+        try { return JsonSerializer.Deserialize<ObservacionesRenovacionDto>(obs, _jsonOptions) ?? new(); }
+        catch { return new(); }
+    }
+
+    private static string ConstruirObservaciones(string c, string d, string o) =>
+        JsonSerializer.Serialize(new ObservacionesRenovacionDto { Codigo = c, Descripcion = d, Observacion = o }, _jsonOptions);
 }

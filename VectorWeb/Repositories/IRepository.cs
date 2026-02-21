@@ -4,7 +4,7 @@ namespace VectorWeb.Repositories
 {
     public interface IRepository<T> where T : class
     {
-        IQueryable<T> GetQueryable(string includeProperties = "");
+        Task<IEnumerable<T>> GetFilteredAsync(Expression<Func<T, bool>>? filter = null, string includeProperties = "");
         Task<IEnumerable<T>> GetAllAsync();
         Task<T?> GetByIdAsync(int id);
         Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate);

@@ -5,11 +5,11 @@ namespace VectorWeb.Services;
 
 public sealed class DocumentoVinculacionService
 {
-    private readonly SecretariaDbContext context;
+    private readonly IDbContextFactory<SecretariaDbContext> _contextFactory;
 
-    public DocumentoVinculacionService(SecretariaDbContext context)
+    public DocumentoVinculacionService(IDbContextFactory<SecretariaDbContext> contextFactory)
     {
-        this.context = context;
+        _contextFactory = contextFactory;
     }
 
     public async Task<VinculacionResultado> VincularAsync(long idPadre, IEnumerable<long> idsHijos)
@@ -25,113 +25,113 @@ public sealed class DocumentoVinculacionService
             return VinculacionResultado.ConError("Debe seleccionar al menos un documento hijo para vincular.");
         }
 
+        using var context = await _contextFactory.CreateDbContextAsync();
         await using var tx = await context.Database.BeginTransactionAsync();
 
-        var esqueletoRelacional = await context.MaeDocumentos
-            .AsNoTracking()
-            .Select(d => new { d.IdDocumento, d.IdDocumentoPadre })
-            .ToListAsync();
-
-        var padresDict = esqueletoRelacional.ToDictionary(d => d.IdDocumento, d => d.IdDocumentoPadre);
-
-        if (!padresDict.ContainsKey(idPadre))
+        try
         {
-            return VinculacionResultado.ConError("No se encontró el documento padre seleccionado.");
-        }
+            // Cargamos el esqueleto para validar ciclos y subárboles
+            var esqueletoRelacional = await context.MaeDocumentos
+                .AsNoTracking()
+                .Select(d => new { d.IdDocumento, d.IdDocumentoPadre })
+                .ToListAsync();
 
-        var relacionesHijos = esqueletoRelacional
-            .Where(d => d.IdDocumentoPadre.HasValue)
-            .GroupBy(d => d.IdDocumentoPadre!.Value)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.IdDocumento).ToList());
+            var padresDict = esqueletoRelacional.ToDictionary(d => d.IdDocumento, d => d.IdDocumentoPadre);
 
-        var detalles = new List<VinculacionDetalle>();
-        var idsAModificar = new HashSet<long>();
-        var subarbolPorHijo = new Dictionary<long, List<long>>();
-
-        foreach (var idHijo in hijosSolicitados)
-        {
-            if (!padresDict.TryGetValue(idHijo, out var idPadreActualHijo))
+            if (!padresDict.ContainsKey(idPadre))
             {
-                detalles.Add(new VinculacionDetalle(idHijo, "Documento inexistente.", 0, false));
-                continue;
+                return VinculacionResultado.ConError("No se encontró el documento padre seleccionado.");
             }
 
-            if (GeneraCiclo(idPadre, idHijo, padresDict))
+            var relacionesHijos = esqueletoRelacional
+                .Where(d => d.IdDocumentoPadre.HasValue)
+                .GroupBy(d => d.IdDocumentoPadre!.Value)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.IdDocumento).ToList());
+
+            var detalles = new List<VinculacionDetalle>();
+            var idsAModificar = new HashSet<long>();
+            var subarbolPorHijo = new Dictionary<long, List<long>>();
+
+            foreach (var idHijo in hijosSolicitados)
             {
-                detalles.Add(new VinculacionDetalle(idHijo, "Operación omitida: generaría una relación circular.", 0, false));
-                continue;
-            }
-
-            var idsSubarbol = ObtenerSubarbol(idHijo, relacionesHijos);
-            subarbolPorHijo[idHijo] = idsSubarbol;
-            var cantidadDescendientes = Math.Max(0, idsSubarbol.Count - 1);
-
-            var mensajeEstado = idPadreActualHijo.HasValue
-                ? $"Reasignado desde padre #{idPadreActualHijo.Value}."
-                : "Vinculado sin padre previo.";
-
-            foreach (var id in idsSubarbol)
-            {
-                idsAModificar.Add(id);
-            }
-
-            detalles.Add(new VinculacionDetalle(idHijo, mensajeEstado, cantidadDescendientes, true));
-        }
-
-        if (idsAModificar.Count == 0)
-        {
-            return VinculacionResultado.ConError("No se aplicaron cambios. Revise las validaciones de consistencia.", detalles);
-        }
-
-        idsAModificar.Add(idPadre);
-
-        var documentosParaActualizar = await context.MaeDocumentos
-            .Where(d => idsAModificar.Contains(d.IdDocumento))
-            .ToDictionaryAsync(d => d.IdDocumento);
-
-        if (!documentosParaActualizar.TryGetValue(idPadre, out var padre))
-        {
-            return VinculacionResultado.ConError("No se encontró el documento padre seleccionado.");
-        }
-
-        foreach (var idHijo in hijosSolicitados.Where(id => subarbolPorHijo.ContainsKey(id)))
-        {
-            if (!documentosParaActualizar.TryGetValue(idHijo, out var hijo))
-            {
-                continue;
-            }
-
-            hijo.IdDocumentoPadre = idPadre;
-
-            foreach (var idDescendiente in subarbolPorHijo[idHijo])
-            {
-                if (documentosParaActualizar.TryGetValue(idDescendiente, out var desc))
+                if (!padresDict.TryGetValue(idHijo, out var idPadreActualHijo))
                 {
-                    desc.IdHiloConversacion = padre.IdHiloConversacion;
+                    detalles.Add(new VinculacionDetalle(idHijo, "Documento inexistente.", 0, false));
+                    continue;
+                }
+
+                // Validación anti-ciclos
+                if (GeneraCiclo(idPadre, idHijo, padresDict))
+                {
+                    detalles.Add(new VinculacionDetalle(idHijo, "Operación omitida: generaría una relación circular.", 0, false));
+                    continue;
+                }
+
+                var idsSubarbol = ObtenerSubarbol(idHijo, relacionesHijos);
+                subarbolPorHijo[idHijo] = idsSubarbol;
+
+                foreach (var id in idsSubarbol) idsAModificar.Add(id);
+
+                var mensajeEstado = idPadreActualHijo.HasValue
+                    ? $"Reasignado desde padre #{idPadreActualHijo.Value}."
+                    : "Vinculado sin padre previo.";
+
+                detalles.Add(new VinculacionDetalle(idHijo, mensajeEstado, idsSubarbol.Count - 1, true));
+            }
+
+            if (idsAModificar.Count == 0)
+            {
+                return VinculacionResultado.ConError("No se aplicaron cambios. Revise las validaciones.", detalles);
+            }
+
+            idsAModificar.Add(idPadre);
+
+            // Obtenemos los documentos reales para actualizar
+            var documentosParaActualizar = await context.MaeDocumentos
+                .Where(d => idsAModificar.Contains(d.IdDocumento))
+                .ToDictionaryAsync(d => d.IdDocumento);
+
+            if (!documentosParaActualizar.TryGetValue(idPadre, out var padre))
+            {
+                return VinculacionResultado.ConError("No se encontró el documento padre.");
+            }
+
+            foreach (var idHijo in hijosSolicitados.Where(id => subarbolPorHijo.ContainsKey(id)))
+            {
+                if (!documentosParaActualizar.TryGetValue(idHijo, out var hijo)) continue;
+
+                hijo.IdDocumentoPadre = idPadre;
+
+                // Propagación del Hilo de Conversación a toda la rama descendiente
+                foreach (var idDescendiente in subarbolPorHijo[idHijo])
+                {
+                    if (documentosParaActualizar.TryGetValue(idDescendiente, out var desc))
+                    {
+                        desc.IdHiloConversacion = padre.IdHiloConversacion;
+                    }
                 }
             }
+
+            await context.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return VinculacionResultado.Ok(detalles, idsAModificar.Count - 1);
         }
-
-        await context.SaveChangesAsync();
-        await tx.CommitAsync();
-
-        return VinculacionResultado.Ok(detalles, idsAModificar.Count - 1);
+        catch (Exception ex)
+        {
+            await tx.RollbackAsync();
+            return VinculacionResultado.ConError($"Error técnico durante la vinculación: {ex.Message}");
+        }
     }
 
     private static bool GeneraCiclo(long idPadre, long idCandidatoHijo, IReadOnlyDictionary<long, long?> padresDict)
     {
         var cursor = idPadre;
-
         while (padresDict.TryGetValue(cursor, out var idDocumentoPadre) && idDocumentoPadre.HasValue)
         {
-            if (idDocumentoPadre.Value == idCandidatoHijo)
-            {
-                return true;
-            }
-
+            if (idDocumentoPadre.Value == idCandidatoHijo) return true;
             cursor = idDocumentoPadre.Value;
         }
-
         return false;
     }
 
@@ -144,27 +144,25 @@ public sealed class DocumentoVinculacionService
         while (pila.Count > 0)
         {
             var actual = pila.Pop();
-            if (!visitados.Add(actual))
-            {
-                continue;
-            }
+            if (!visitados.Add(actual)) continue;
 
-            if (!relacionesHijos.TryGetValue(actual, out var hijos))
+            if (relacionesHijos.TryGetValue(actual, out var hijos))
             {
-                continue;
-            }
-
-            foreach (var hijo in hijos)
-            {
-                pila.Push(hijo);
+                foreach (var hijo in hijos) pila.Push(hijo);
             }
         }
-
         return visitados.ToList();
     }
 }
 
-public sealed record VinculacionDetalle(long IdDocumento, string Estado, int CantidadDescendientes, bool Aplicado);
+// --- CLASES DE SOPORTE (MODELOS) ---
+
+public sealed record VinculacionDetalle(
+    long IdDocumento,
+    string Estado,
+    int CantidadDescendientes,
+    bool Aplicado
+);
 
 public sealed class VinculacionResultado
 {

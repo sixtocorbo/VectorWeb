@@ -11,6 +11,7 @@
 <PageTitle>Dashboard 2026 - Vector</PageTitle>
 
 <style>
+    /* ... (Tus estilos se mantienen exactamente igual, están excelentes) ... */
     .dashboard-hero {
         background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 45%, #084298 100%);
         border-radius: 1rem;
@@ -103,6 +104,20 @@
         line-height: 1;
         margin-bottom: 0.25rem;
     }
+
+    .spin {
+        animation: fa-spin 2s infinite linear;
+    }
+
+    @@keyframes fa-spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(359deg);
+        }
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -136,7 +151,6 @@
     }
 
     <div class="row g-4 mb-4">
-        @* Renderizamos las métricas como enlaces para navegación rápida *@
         @foreach (var metric in metricas)
         {
             <div class="col-12 col-sm-6 col-lg-4">
@@ -305,7 +319,6 @@
     private List<ModuloActivo> modulosActivos = new();
     private string puntosTendencia = "";
 
-    // Semáforos consolidados
     private int semaforoVerde, semaforoAmarillo, semaforoRojo;
 
     protected override async Task OnInitializedAsync()
@@ -322,112 +335,85 @@
         try
         {
             await using var db = await DbContextFactory.CreateDbContextAsync();
-            // Optimización de lectura
-            db.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
             var hoy = DateTime.Today;
             var inicio2026 = new DateTime(2026, 1, 1);
             var fin2026 = new DateTime(2026, 12, 31);
 
-            // 1. MÉTRICAS GENERALES (Filtradas por 2026 o estado actual relevante para 2026)
+            // 1. MÉTRICAS GENERALES
+            var totalDocs2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026);
 
-            // Total documentos creados en 2026
-            var docs2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026);
-
-            // Documentos Activos/Archivados (creados en 2026)
-            // No hardcodeamos el ID de estado porque Cat_Estado es configurable por ambiente.
-            var idsEstadoArchivado = await db.CatEstados
-                .Where(e => e.Nombre != null &&
-                           (EF.Functions.Like(e.Nombre, "%ARCHIV%") ||
-                            EF.Functions.Like(e.Nombre, "%FINALIZ%")))
+            // Determinamos estados de cierre de forma segura
+            var idsArchivados = await db.CatEstados
+                .Where(e => e.Nombre != null && (e.Nombre.Contains("ARCHIV") || e.Nombre.Contains("FINALIZ")))
                 .Select(e => e.IdEstado)
                 .ToListAsync();
 
-            // Fallback por compatibilidad histórica.
-            if (idsEstadoArchivado.Count == 0)
-            {
-                idsEstadoArchivado.Add(5);
-            }
+            if (!idsArchivados.Any()) idsArchivados.Add(5); // Fallback
 
-            var docsActivos2026 = await db.MaeDocumentos
-                                    .CountAsync(d => d.FechaCreacion >= inicio2026 &&
-                                                     d.FechaCreacion <= fin2026 &&
-                                                     !idsEstadoArchivado.Contains(d.IdEstadoActual));
-
-            var docsArchivados2026 = await db.MaeDocumentos
-                                    .CountAsync(d => d.FechaCreacion >= inicio2026 &&
-                                                     d.FechaCreacion <= fin2026 &&
-                                                     idsEstadoArchivado.Contains(d.IdEstadoActual));
+            var activos2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026 && !idsArchivados.Contains(d.IdEstadoActual));
+            var archivados2026 = await db.MaeDocumentos.CountAsync(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026 && idsArchivados.Contains(d.IdEstadoActual));
 
             metricas = new List<MetricaResumen>
             {
-                new("Ingresados 2026", docs2026.ToString("N0"), "Total Anual", "bi bi-folder-plus", "bg-primary text-white", "documentos", "bi bi-calendar-check"),
-                new("En Trámite", docsActivos2026.ToString("N0"), "Pendientes de cierre", "bi bi-hourglass-split", "bg-info text-white", "documentos?filtro=activos", "bi bi-activity"),
-                new("Archivados", docsArchivados2026.ToString("N0"), "Finalizados este año", "bi bi-archive-fill", "bg-secondary text-white", "documentos?filtro=archivados", "bi bi-check-circle")
+                new("Ingresados 2026", totalDocs2026.ToString("N0"), "Total Anual", "bi bi-folder-plus", "bg-primary text-white", "documentos", "bi bi-calendar-check"),
+                new("En Trámite", activos2026.ToString("N0"), "Pendientes de cierre", "bi bi-hourglass-split", "bg-info text-white", "documentos", "bi bi-activity"),
+                new("Archivados", archivados2026.ToString("N0"), "Finalizados este año", "bi bi-archive-fill", "bg-secondary text-white", "documentos", "bi bi-check-circle")
             };
 
-            // 2. SEMÁFORO (Solo Documentos Activos, independientemente del año para alertas reales, o filtramos 2026 si se desea estricto)
-            // Nota: Para alertas de vencimiento, solemos querer ver todo lo activo.
-            // Pero dado el pedido "estadísticas para el año 2026", nos centraremos en documentos creados en 2026 o vigentes en 2026.
-            // Usaremos "Activos" generales para el semáforo para no perder alertas importantes, pero solo de tipo Documento.
-
-            var docsSemaforo = await db.MaeDocumentos
-                .Where(x => x.FechaVencimiento != null && !idsEstadoArchivado.Contains(x.IdEstadoActual)) // Excluir Archivados
-                .GroupBy(x => x.EstadoSemaforo)
+            // 2. SEMÁFORO (Basado en la propiedad de BD EstadoSemaforo)
+            var statsSemaforo = await db.MaeDocumentos
+                .Where(d => !idsArchivados.Contains(d.IdEstadoActual))
+                .GroupBy(d => d.EstadoSemaforo)
                 .Select(g => new { Estado = g.Key, Total = g.Count() })
                 .ToListAsync();
 
-            semaforoVerde = docsSemaforo.Where(x => x.Estado == "VERDE").Sum(x => x.Total);
-            semaforoAmarillo = docsSemaforo.Where(x => x.Estado == "AMARILLO").Sum(x => x.Total);
-            semaforoRojo = docsSemaforo.Where(x => x.Estado == "ROJO").Sum(x => x.Total);
+            semaforoVerde = statsSemaforo.FirstOrDefault(x => x.Estado == "VERDE")?.Total ?? 0;
+            semaforoAmarillo = statsSemaforo.FirstOrDefault(x => x.Estado == "AMARILLO")?.Total ?? 0;
+            semaforoRojo = statsSemaforo.FirstOrDefault(x => x.Estado == "ROJO")?.Total ?? 0;
 
-            // 3. TENDENCIA 2026 (Enero a Diciembre)
-            var tendenciaRaw = await db.MaeDocumentos
-                .Where(d => d.FechaCreacion != null && d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
-                .Select(d => d.FechaCreacion!.Value)
+            // 3. TENDENCIA MENSUAL
+            var ingresosMes = await db.MaeDocumentos
+                .Where(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
+                .GroupBy(d => d.FechaCreacion!.Value.Month)
+                .Select(g => new { Mes = g.Key, Total = g.Count() })
                 .ToListAsync();
 
-            var tendenciaAgrupada = tendenciaRaw
-                .GroupBy(d => new { d.Year, d.Month })
-                .Select(g => new { g.Key.Year, g.Key.Month, Total = g.Count() })
-                .ToList();
-
-            // Generamos los 12 meses de 2026
-            var meses = Enumerable.Range(0, 12).Select(i => inicio2026.AddMonths(i)).ToList();
-
-            tendenciaMensual = meses.Select(m =>
+            tendenciaMensual = new List<SerieMes>();
+            for (int i = 1; i <= 12; i++)
             {
-                var val = tendenciaAgrupada.FirstOrDefault(x => x.Year == m.Year && x.Month == m.Month)?.Total ?? 0;
-                // Usamos solo las primeras 3 letras del mes
-                return new SerieMes(m.ToString("MMM", CultureInfo.CurrentCulture).ToUpper(), val);
-            }).ToList();
+                var nombreMes = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(i).ToUpper().Replace(".", "");
+                var total = ingresosMes.FirstOrDefault(x => x.Mes == i)?.Total ?? 0;
+                tendenciaMensual.Add(new SerieMes(nombreMes, total));
+            }
 
             puntosTendencia = GenerarPuntosSparkline(tendenciaMensual.Select(x => x.Valor).ToList(), 600, 120, 10);
 
-            // 4. CARGA POR OFICINA (Filtrado por documentos de 2026)
+            // 4. CARGA POR OFICINA
             cargaPorOficina = await db.MaeDocumentos
-                .Where(d => d.IdOficinaActualNavigation != null && d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
+                .Where(d => d.FechaCreacion >= inicio2026 && d.FechaCreacion <= fin2026)
                 .GroupBy(d => d.IdOficinaActualNavigation.Nombre)
-                .Select(g => new BarraOficina { Nombre = g.Key, Total = g.Count() })
+                .Select(g => new BarraOficina { Nombre = g.Key ?? "Sin Oficina", Total = g.Count() })
                 .OrderByDescending(x => x.Total)
                 .Take(5)
                 .ToListAsync();
 
-            var maxDocs = cargaPorOficina.FirstOrDefault()?.Total ?? 1;
-            cargaPorOficina.ForEach(c => c.Porcentaje = (decimal)c.Total * 100 / maxDocs);
+            var maxOficina = cargaPorOficina.FirstOrDefault()?.Total ?? 1;
+            foreach (var ofi in cargaPorOficina) ofi.Porcentaje = (decimal)ofi.Total * 100 / maxOficina;
 
-            // 5. MÓDULOS ACTIVOS (Mantenemos auditoría reciente general o filtramos 2026, lo dejamos reciente "hace 30 días" para relevancia operativa)
+            // 5. AUDITORÍA
             var hace30Dias = hoy.AddDays(-30);
             modulosActivos = await db.EventosSistemas
                 .Where(e => e.FechaEvento >= hace30Dias)
-                .GroupBy(e => e.Modulo ?? "General")
+                .GroupBy(e => e.Modulo ?? "GENERAL")
                 .Select(g => new ModuloActivo { Nombre = g.Key, Total = g.Count() })
                 .OrderByDescending(x => x.Total)
                 .Take(5)
                 .ToListAsync();
 
-            var totalEventos = modulosActivos.Sum(x => x.Total);
-            modulosActivos.ForEach(m => m.Peso = totalEventos == 0 ? 0 : Math.Round((decimal)m.Total * 100 / totalEventos, 1));
+            var totalAudit = modulosActivos.Sum(x => x.Total);
+            foreach (var mod in modulosActivos) mod.Peso = totalAudit > 0 ? Math.Round((decimal)mod.Total * 100 / totalAudit, 1) : 0;
+
         }
         catch (Exception ex)
         {
@@ -444,10 +430,8 @@
         if (!valores.Any()) return "";
         var max = valores.Max();
         if (max == 0) max = 1;
-
-        var step = valores.Count <= 1 ? 0 : (double)(w - 2 * m) / (valores.Count - 1);
+        var step = (double)(w - 2 * m) / (valores.Count - 1);
         var points = new List<string>();
-
         for (int i = 0; i < valores.Count; i++)
         {
             var x = m + (i * step);

@@ -32,7 +32,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 
         var userName = context.User.Identity?.Name ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "desconocido";
         var role = context.User.FindFirstValue(ClaimTypes.Role);
-        var permisos = await _rolePermissionService.ObtenerPermisosPorRolAsync(role);
+        var permisos = await _rolePermissionService.ObtenerPermisosPorRolAsync(role ?? string.Empty);
 
         if (permisos.Contains(requirement.Permission, StringComparer.OrdinalIgnoreCase))
         {

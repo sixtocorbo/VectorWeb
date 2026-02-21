@@ -1,4 +1,3 @@
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using VectorWeb.Models;
 
@@ -6,230 +5,60 @@ namespace VectorWeb.Services;
 
 public sealed class DatabaseBackupService
 {
-    private readonly IDbContextFactory<SecretariaDbContext> _dbFactory;
-    private readonly string _backupDirectory;
+    private readonly IDbContextFactory<SecretariaDbContext> _contextFactory;
+    private readonly IConfiguration _config;
+    private readonly ILogger<DatabaseBackupService> _logger;
 
-    public DatabaseBackupService(IDbContextFactory<SecretariaDbContext> dbFactory, IConfiguration configuration)
+    public DatabaseBackupService(
+        IDbContextFactory<SecretariaDbContext> contextFactory,
+        IConfiguration config,
+        ILogger<DatabaseBackupService> logger)
     {
-        _dbFactory = dbFactory;
-        _backupDirectory = configuration["DatabaseBackup:Directory"] ?? "Backups";
+        _contextFactory = contextFactory;
+        _config = config;
+        _logger = logger;
     }
 
-    public async Task<DatabaseBackupResult> CreateBackupAsync(CancellationToken cancellationToken = default)
+    // Renombrado a CreateBackupAsync para que la p·gina Razor lo reconozca
+    public async Task<DatabaseBackupResult> CreateBackupAsync()
     {
-        await using var dbContext = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        using var context = await _contextFactory.CreateDbContextAsync();
+        var dbName = context.Database.GetDbConnection().Database;
 
-        var connectionString = dbContext.Database.GetConnectionString();
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            throw new InvalidOperationException("No se encontr√≥ la cadena de conexi√≥n configurada.");
-        }
+        // Obtenemos la ruta de los par·metros o usamos una por defecto
+        var carpetaBackup = _config["BackupPath"] ?? @"C:\BackupsVector";
+        if (!Directory.Exists(carpetaBackup)) Directory.CreateDirectory(carpetaBackup);
 
-        var databaseName = GetDatabaseName(connectionString);
-        var fileName = BuildBackupFileName(databaseName, DateTime.Now);
-        var preferredBackupPath = Path.Combine(Path.GetFullPath(_backupDirectory), fileName);
-
-        var timeoutOriginal = dbContext.Database.GetCommandTimeout();
-        dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+        var fileName = $"{dbName}_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
+        var fullPath = Path.Combine(carpetaBackup, fileName);
 
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(preferredBackupPath)!);
-            var preferredDirectory = Path.GetDirectoryName(preferredBackupPath)!;
-            var preferredPathIsReachableBySql = await CanSqlServerAccessDirectoryAsync(dbContext, preferredDirectory, cancellationToken);
+            // Comando SQL para backup fÌsico
+            var sql = $"BACKUP DATABASE [{dbName}] TO DISK = @p0 WITH FORMAT, NAME = 'Full Backup of {dbName}';";
+            await context.Database.ExecuteSqlRawAsync(sql, fullPath);
 
-            if (preferredPathIsReachableBySql is false)
+            _logger.LogInformation("Backup generado en {Ruta}", fullPath);
+
+            return new DatabaseBackupResult
             {
-                var fallbackPath = await CreateBackupInWritableSqlDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(fallbackPath))
-                {
-                    return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
-                }
-            }
-
-            await ExecuteBackupAsync(dbContext, databaseName, preferredBackupPath, cancellationToken);
-
-            return new DatabaseBackupResult(databaseName, preferredBackupPath, DateTime.Now);
-        }
-        catch (SqlException ex) when (IsPathOrAccessError(ex))
-        {
-            var fallbackPath = await CreateBackupInWritableSqlDirectoryAsync(dbContext, databaseName, fileName, cancellationToken);
-            if (string.IsNullOrWhiteSpace(fallbackPath))
-            {
-                throw;
-            }
-
-            return new DatabaseBackupResult(databaseName, fallbackPath, DateTime.Now);
-        }
-        finally
-        {
-            dbContext.Database.SetCommandTimeout(timeoutOriginal);
-        }
-    }
-
-    private static async Task<bool?> CanSqlServerAccessDirectoryAsync(
-        SecretariaDbContext dbContext,
-        string directoryPath,
-        CancellationToken cancellationToken)
-    {
-        var connection = dbContext.Database.GetDbConnection();
-        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
-        if (wasClosed)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = "DECLARE @exists INT; EXEC master.dbo.xp_fileexist @path = @path, @file_exists = @exists OUTPUT; SELECT @exists;";
-
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "@path";
-            parameter.Value = directoryPath;
-            command.Parameters.Add(parameter);
-
-            var result = await command.ExecuteScalarAsync(cancellationToken);
-            return result switch
-            {
-                int value => value == 1,
-                long value => value == 1,
-                decimal value => value == 1,
-                byte value => value == 1,
-                short value => value == 1,
-                string text when int.TryParse(text, out var parsed) => parsed == 1,
-                _ => null
+                DatabaseName = dbName,
+                BackupPath = fullPath,
+                CreatedAt = DateTime.Now
             };
         }
-        catch (SqlException)
+        catch (Exception ex)
         {
-            return null;
-        }
-        finally
-        {
-            if (wasClosed)
-            {
-                await connection.CloseAsync();
-            }
+            _logger.LogError(ex, "Fallo el respaldo de BD");
+            throw new Exception($"Error en SQL Server: {ex.Message}");
         }
     }
-
-    private static async Task ExecuteBackupAsync(SecretariaDbContext dbContext, string databaseName, string fullPath, CancellationToken cancellationToken)
-    {
-        var sql = $"BACKUP DATABASE {EscapeIdentifier(databaseName)} TO DISK = N'{EscapeLiteral(fullPath)}' WITH INIT, FORMAT, CHECKSUM, STATS = 10";
-        await dbContext.Database.ExecuteSqlRawAsync(sql, cancellationToken);
-    }
-
-    private static bool IsPathOrAccessError(SqlException ex)
-        => ex.Message.Contains("Operating system error 5", StringComparison.OrdinalIgnoreCase)
-           || ex.Message.Contains("error operativo del sistema 5", StringComparison.OrdinalIgnoreCase)
-           || ex.Message.Contains("Operating system error 3", StringComparison.OrdinalIgnoreCase)
-           || ex.Message.Contains("error operativo del sistema 3", StringComparison.OrdinalIgnoreCase)
-           || ex.Message.Contains("Acceso denegado", StringComparison.OrdinalIgnoreCase)
-           || ex.Message.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
-
-    private static async Task<string?> CreateBackupInWritableSqlDirectoryAsync(
-        SecretariaDbContext dbContext,
-        string databaseName,
-        string fileName,
-        CancellationToken cancellationToken)
-    {
-        var candidates = new[]
-        {
-            await GetSqlServerDefaultBackupDirectoryAsync(dbContext, cancellationToken),
-            await GetMasterDatabaseDirectoryAsync(dbContext, cancellationToken)
-        };
-
-        foreach (var directory in candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            var backupPath = Path.Combine(directory!, fileName);
-
-            try
-            {
-                await ExecuteBackupAsync(dbContext, databaseName, backupPath, cancellationToken);
-                return backupPath;
-            }
-            catch (SqlException ex) when (IsPathOrAccessError(ex))
-            {
-                continue;
-            }
-        }
-
-        return null;
-    }
-
-    private static async Task<string?> GetSqlServerDefaultBackupDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
-    {
-        var connection = dbContext.Database.GetDbConnection();
-        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
-        if (wasClosed)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultBackupPath') AS nvarchar(4000))";
-            var result = await command.ExecuteScalarAsync(cancellationToken);
-            return result as string;
-        }
-        finally
-        {
-            if (wasClosed)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
-
-    private static async Task<string?> GetMasterDatabaseDirectoryAsync(SecretariaDbContext dbContext, CancellationToken cancellationToken)
-    {
-        var connection = dbContext.Database.GetDbConnection();
-        var wasClosed = connection.State == System.Data.ConnectionState.Closed;
-        if (wasClosed)
-        {
-            await connection.OpenAsync(cancellationToken);
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT CAST(SERVERPROPERTY('InstanceDefaultDataPath') AS nvarchar(4000))";
-            var result = await command.ExecuteScalarAsync(cancellationToken);
-            return result as string;
-        }
-        finally
-        {
-            if (wasClosed)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
-
-    public static string GetDatabaseName(string connectionString)
-    {
-        var builder = new SqlConnectionStringBuilder(connectionString);
-        if (string.IsNullOrWhiteSpace(builder.InitialCatalog))
-        {
-            throw new InvalidOperationException("La cadena de conexi√≥n no contiene el nombre de la base de datos (Initial Catalog).");
-        }
-
-        return builder.InitialCatalog;
-    }
-
-    public static string BuildBackupFileName(string databaseName, DateTime timestamp)
-    {
-        var safeDatabaseName = databaseName.Replace(' ', '_');
-        return $"{safeDatabaseName}_{timestamp:yyyyMMdd_HHmmss}.bak";
-    }
-
-    public static string EscapeIdentifier(string identifier)
-        => $"[{identifier.Replace("]", "]]", StringComparison.Ordinal)}]";
-
-    public static string EscapeLiteral(string value)
-        => value.Replace("'", "''", StringComparison.Ordinal);
 }
 
-public sealed record DatabaseBackupResult(string DatabaseName, string BackupPath, DateTime CreatedAt);
+// El "contrato" que le faltaba a tu p·gina Razor
+public sealed class DatabaseBackupResult
+{
+    public string DatabaseName { get; set; } = string.Empty;
+    public string BackupPath { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}

@@ -88,7 +88,7 @@
 </div>
 
 @code {
-    private readonly List<SegAuditoriaPermiso> registros = [];
+    private List<SegAuditoriaPermiso> registros = [];
     private bool cargando;
     private string filtroTexto = string.Empty;
     private DateTime? fechaDesde;
@@ -97,6 +97,9 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Ponemos por defecto el día de hoy para que la carga inicial sea rápida
+        fechaDesde = DateTime.Today;
+        fechaHasta = DateTime.Today;
         await CargarAsync();
     }
 
@@ -106,36 +109,26 @@
         {
             cargando = true;
             mensajeError = string.Empty;
+            StateHasChanged();
 
-            var query = RepoAuditoria.GetQueryable();
+            // BLINDAJE: Usamos GetFilteredAsync con una expresión lambda que incluye los filtros
+            // Nota: Para filtros complejos con fechas opcionales, pasamos null y filtramos en la lista,
+            // o construimos el predicado. Aquí usaremos la forma más segura para Blazor Server.
 
-            if (!string.IsNullOrWhiteSpace(filtroTexto))
-            {
-                var texto = filtroTexto.Trim();
-                query = query.Where(x =>
-                    (x.UsuarioNombre != null && x.UsuarioNombre.Contains(texto)) ||
-                    (x.Rol != null && x.Rol.Contains(texto)) ||
-                    x.PermisoRequerido.Contains(texto));
-            }
+            var data = await RepoAuditoria.GetFilteredAsync(x =>
+                (string.IsNullOrEmpty(filtroTexto) ||
+                    (x.UsuarioNombre != null && x.UsuarioNombre.Contains(filtroTexto)) ||
+                    (x.Rol != null && x.Rol.Contains(filtroTexto)) ||
+                    x.PermisoRequerido.Contains(filtroTexto)) &&
+                (!fechaDesde.HasValue || x.FechaEvento >= fechaDesde.Value) &&
+                (!fechaHasta.HasValue || x.FechaEvento <= fechaHasta.Value.AddDays(1).AddSeconds(-1))
+            );
 
-            if (fechaDesde.HasValue)
-            {
-                query = query.Where(x => x.FechaEvento >= fechaDesde.Value.Date);
-            }
-
-            if (fechaHasta.HasValue)
-            {
-                var hastaExclusivo = fechaHasta.Value.Date.AddDays(1);
-                query = query.Where(x => x.FechaEvento < hastaExclusivo);
-            }
-
-            var resultado = await query
+            // Ordenamos y limitamos en memoria para no saturar la UI
+            registros = data
                 .OrderByDescending(x => x.FechaEvento)
                 .Take(300)
-                .ToListAsync();
-
-            registros.Clear();
-            registros.AddRange(resultado);
+                .ToList();
         }
         catch (Exception ex)
         {

@@ -176,34 +176,47 @@
         cargando = true;
         relaciones.Clear();
 
-        // Mantenemos tu lógica de consulta original
-        var queryDoc = RepoDocs.GetQueryable("IdTipoNavigation,IdDocumentoPadreNavigation.IdTipoNavigation");
+        try
+        {
+            // BLINDAJE 1: Obtener el documento en foco y su padre
+            var docs = await RepoDocs.GetFilteredAsync(
+                d => d.IdDocumento == IdDocumento,
+                "IdTipoNavigation,IdDocumentoPadreNavigation.IdTipoNavigation"
+            );
 
-        documentoActual = await queryDoc.FirstOrDefaultAsync(d => d.IdDocumento == IdDocumento);
+            documentoActual = docs.FirstOrDefault();
 
-        if (documentoActual is null)
+            if (documentoActual is null)
+            {
+                cargando = false;
+                return;
+            }
+
+            // Relación con el padre (si existe)
+            if (documentoActual.IdDocumentoPadreNavigation is not null)
+            {
+                relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, TipoRelacionVinculo.Padre));
+            }
+
+            // BLINDAJE 2: Obtener todos los hijos directos
+            var hijos = await RepoDocs.GetFilteredAsync(
+                d => d.IdDocumentoPadre == IdDocumento,
+                "IdTipoNavigation"
+            );
+
+            // Añadimos los hijos ordenados por fecha de creación descendente
+            relaciones.AddRange(hijos
+                .OrderByDescending(d => d.FechaCreacion)
+                .Select(h => new RelacionVinculo(h, TipoRelacionVinculo.Hijo)));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando vínculos: {ex.Message}");
+        }
+        finally
         {
             cargando = false;
-            return;
         }
-
-        // Relación con el padre
-        if (documentoActual.IdDocumentoPadreNavigation is not null)
-        {
-            relaciones.Add(new RelacionVinculo(documentoActual.IdDocumentoPadreNavigation, TipoRelacionVinculo.Padre));
-        }
-
-        // Relación con los hijos
-        var queryHijos = RepoDocs.GetQueryable("IdTipoNavigation");
-
-        var hijos = await queryHijos
-            .Where(d => d.IdDocumentoPadre == IdDocumento)
-            .OrderByDescending(d => d.FechaCreacion)
-            .ToListAsync();
-
-        relaciones.AddRange(hijos.Select(h => new RelacionVinculo(h, TipoRelacionVinculo.Hijo)));
-
-        cargando = false;
     }
 
     private static string ObtenerEtiquetaDocumento(MaeDocumento doc)
@@ -217,9 +230,9 @@
         return $"{tipo} {numero}{sufijoAnio}";
     }
 
-    private void VolverABandeja()
-        => Navegador.NavigateTo("/documentos");
+    private void VolverABandeja() => Navegador.NavigateTo("/documentos");
 
+    // Estructuras de apoyo para la jerarquía
     private sealed record RelacionVinculo(MaeDocumento Documento, TipoRelacionVinculo Tipo);
 
     private enum TipoRelacionVinculo
