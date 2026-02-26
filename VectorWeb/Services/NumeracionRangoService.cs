@@ -47,11 +47,26 @@ public class NumeracionRangoService
         using var context = await _contextFactory.CreateDbContextAsync();
         return await context.MaeNumeracionRangos
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.IdTipo == idTipo &&
-                                     r.IdOficina == idOficina &&
-                                     r.Anio == anio &&
-                                     r.Activo == true &&
-                                     r.UltimoUtilizado < r.NumeroFin);
+            .Where(r => r.IdTipo == idTipo &&
+                        r.IdOficina == idOficina &&
+                        r.Anio == anio &&
+                        r.Activo == true &&
+                        r.UltimoUtilizado < r.NumeroFin)
+            .OrderBy(r => r.NumeroInicio)
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<MaeNumeracionRango>> ObtenerRangosActivosAsync(int idTipo, int idOficina, int anio)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MaeNumeracionRangos
+            .AsNoTracking()
+            .Where(r => r.IdTipo == idTipo &&
+                        r.IdOficina == idOficina &&
+                        r.Anio == anio &&
+                        r.Activo)
+            .OrderBy(r => r.NumeroInicio)
+            .ToListAsync();
     }
 
     public async Task<List<CupoLibroMayorItem>> ObtenerLibroMayorCuposAsync()
@@ -87,23 +102,29 @@ public class NumeracionRangoService
         try
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            var rango = await context.MaeNumeracionRangos
-                .FirstOrDefaultAsync(r => r.IdTipo == idTipo && r.IdOficina == idOficina && r.Anio == anio && r.Activo);
+            var rangos = await context.MaeNumeracionRangos
+                .Where(r => r.IdTipo == idTipo && r.IdOficina == idOficina && r.Anio == anio && r.Activo)
+                .OrderBy(r => r.NumeroInicio)
+                .ToListAsync();
 
-            if (rango == null) return OperacionResultado<MaeNumeracionRango>.Fail("No hay rango configurado o activo.");
-            if (rango.UltimoUtilizado >= rango.NumeroFin) return OperacionResultado<MaeNumeracionRango>.Fail("El rango de numeración se ha agotado.");
+            foreach (var rango in rangos)
+            {
+                if (rango.UltimoUtilizado >= rango.NumeroFin) continue;
 
-            var pId = new SqlParameter("@Id", rango.IdRango);
-            var result = await context.Database.SqlQueryRaw<int>(@"
-                UPDATE Mae_NumeracionRangos 
-                SET UltimoUtilizado = UltimoUtilizado + 1 
-                OUTPUT INSERTED.UltimoUtilizado
-                WHERE IdRango = @Id AND Activo = 1 AND UltimoUtilizado < NumeroFin", pId).ToListAsync();
+                var pId = new SqlParameter("@Id", rango.IdRango);
+                var result = await context.Database.SqlQueryRaw<int>(@"
+                    UPDATE Mae_NumeracionRangos 
+                    SET UltimoUtilizado = UltimoUtilizado + 1 
+                    OUTPUT INSERTED.UltimoUtilizado
+                    WHERE IdRango = @Id AND Activo = 1 AND UltimoUtilizado < NumeroFin", pId).ToListAsync();
 
-            if (!result.Any()) return OperacionResultado<MaeNumeracionRango>.Fail("Error al incrementar el número.");
+                if (!result.Any()) continue;
 
-            rango.UltimoUtilizado = result.First();
-            return OperacionResultado<MaeNumeracionRango>.Ok(rango);
+                rango.UltimoUtilizado = result.First();
+                return OperacionResultado<MaeNumeracionRango>.Ok(rango);
+            }
+
+            return OperacionResultado<MaeNumeracionRango>.Fail("No hay rango configurado o activo.");
         }
         catch (Exception ex)
         {
@@ -118,6 +139,29 @@ public class NumeracionRangoService
             using var context = await _contextFactory.CreateDbContextAsync();
             string accionBitacora;
             string detalleBitacora;
+
+            var existeSolapamiento = await context.MaeNumeracionRangos.AnyAsync(r =>
+                r.IdTipo == rango.IdTipo &&
+                r.Anio == rango.Anio &&
+                r.IdRango != rango.IdRango &&
+                rango.NumeroInicio <= r.NumeroFin &&
+                rango.NumeroFin >= r.NumeroInicio);
+
+            if (existeSolapamiento)
+                return OperacionResultado.Fail("El rango se superpone con otro rango ya asignado para este tipo y año.");
+
+            if (rango.Activo && rango.IdOficina.HasValue)
+            {
+                var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
+                    r.IdTipo == rango.IdTipo &&
+                    r.Anio == rango.Anio &&
+                    r.IdOficina == rango.IdOficina &&
+                    r.Activo &&
+                    r.IdRango != rango.IdRango);
+
+                if (cantidadActivosOficina >= 2)
+                    return OperacionResultado.Fail("La oficina ya tiene 2 rangos activos para este tipo y año.");
+            }
 
             if (rango.IdRango == 0)
             {
@@ -222,6 +266,15 @@ public class NumeracionRangoService
             .Where(r => r.IdTipo == idTipo && r.Anio == anio && (!idRangoActual.HasValue || r.IdRango != idRangoActual.Value))
             .OrderBy(r => r.NumeroInicio).ToListAsync();
 
+        var cantidadActivosOficina = idOficina.HasValue
+            ? rangosExistentes.Count(r => r.IdOficina == idOficina.Value && r.Activo)
+            : 0;
+        var oficinaTieneActivos = cantidadActivosOficina > 0;
+        var oficinaTieneActivosDisponibles = idOficina.HasValue && rangosExistentes.Any(r =>
+            r.IdOficina == idOficina.Value &&
+            r.Activo &&
+            r.UltimoUtilizado < r.NumeroFin);
+
         var consumoActual = rangosExistentes.Sum(r => r.NumeroFin - r.NumeroInicio + 1);
         var saldo = Math.Max(0, cupoTotal - consumoActual);
 
@@ -242,7 +295,10 @@ public class NumeracionRangoService
             NumeroInicioSugerido = inicioSugerido,
             NumeroFinSugerido = inicioSugerido + cantidad - 1,
             CantidadSugerida = cantidad,
-            SugerenciaRecortadaPorSaldo = (cantidad < (cantidadSolicitada ?? 50))
+            SugerenciaRecortadaPorSaldo = (cantidad < (cantidadSolicitada ?? 50)),
+            OficinaTieneRangoActivo = oficinaTieneActivos,
+            RangoActivoAgotado = oficinaTieneActivos && !oficinaTieneActivosDisponibles,
+            CantidadRangosActivosOficina = cantidadActivosOficina
         };
     }
 
@@ -307,4 +363,5 @@ public sealed class SugerenciaRangoNumeracion
     public bool SugerenciaRecortadaPorSaldo { get; set; }
     public bool OficinaTieneRangoActivo { get; set; }
     public bool RangoActivoAgotado { get; set; }
+    public int CantidadRangosActivosOficina { get; set; }
 }

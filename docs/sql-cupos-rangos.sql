@@ -26,7 +26,7 @@ BEGIN
         ON dbo.Mae_CuposSecretaria(IdTipo, Anio);
 END;
 
--- 2) Rangos: año dinámico y unicidad de rango activo por tipo+oficina+año.
+-- 2) Rangos: año dinámico y límite de hasta 2 rangos activos por tipo+oficina+año.
 DECLARE @dfAnioRango SYSNAME;
 SELECT @dfAnioRango = dc.name
 FROM sys.default_constraints dc
@@ -43,15 +43,43 @@ END;
 ALTER TABLE dbo.Mae_NumeracionRangos
 ADD CONSTRAINT DF_Mae_NumeracionRangos_Anio DEFAULT (DATEPART(YEAR, GETDATE())) FOR Anio;
 
-IF NOT EXISTS (
+
+
+-- Reemplaza índice único por validación en trigger para permitir hasta 2 rangos activos.
+IF EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = 'UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio'
       AND object_id = OBJECT_ID('dbo.Mae_NumeracionRangos')
 )
 BEGIN
-    CREATE UNIQUE INDEX UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio
-        ON dbo.Mae_NumeracionRangos(IdTipo, Anio, IdOficina)
-        WHERE Activo = 1;
+    DROP INDEX UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio ON dbo.Mae_NumeracionRangos;
+END;
+
+CREATE OR ALTER TRIGGER dbo.TRG_Mae_NumeracionRangos_MaxDosActivos
+ON dbo.Mae_NumeracionRangos
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.Mae_NumeracionRangos r
+        INNER JOIN (
+            SELECT DISTINCT IdTipo, Anio, IdOficina
+            FROM inserted
+            WHERE Activo = 1 AND IdOficina IS NOT NULL
+        ) i
+            ON i.IdTipo = r.IdTipo
+           AND i.Anio = r.Anio
+           AND i.IdOficina = r.IdOficina
+        WHERE r.Activo = 1
+        GROUP BY r.IdTipo, r.Anio, r.IdOficina
+        HAVING COUNT(*) > 2
+    )
+    BEGIN
+        THROW 50001, 'No se permiten más de 2 rangos activos por oficina/tipo/año.', 1;
+    END
 END;
 
 -- 3) Bitácora de cambios para cupos y rangos.
