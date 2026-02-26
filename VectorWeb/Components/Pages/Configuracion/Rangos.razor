@@ -543,7 +543,7 @@ else
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Tipo de Documento</label>
-                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-select" @oninput="OnCupoFiltroCambio">
+                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-select" @onchange="OnCupoParametrosCambio">
                             <option value="0">-- Seleccione --</option>
                             @foreach (var tipo in tipos)
                             {
@@ -553,11 +553,11 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Año</label>
-                        <InputNumber @bind-Value="cupoAnio" class="form-control" />
+                        <InputNumber @bind-Value="cupoAnio" @bind-Value:event="oninput" @oninput="OnCupoParametrosCambio" class="form-control" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Cantidad Total (Cupo)</label>
-                        <InputNumber @bind-Value="cupoCantidad" class="form-control form-control-lg" />
+                        <InputNumber @bind-Value="cupoCantidad" @bind-Value:event="oninput" class="form-control form-control-lg" />
                     </div>
 
                     @if (cupoTipoSeleccionado > 0)
@@ -990,7 +990,7 @@ else
     {
         cupoTipoSeleccionado = rangoActual.IdTipo;
         cupoAnio = rangoActual.Anio > 0 ? rangoActual.Anio : DateTime.Now.Year;
-        _ = OnCupoFiltroCambio(new ChangeEventArgs { Value = cupoTipoSeleccionado.ToString() });
+        _ = OnCupoParametrosCambio();
         mensajeOk = "Complete y guarde el cupo sugerido para continuar con la asignación del rango.";
         tabActiva = TabConfig.Cupos;
         mostrarModalCupo = true;
@@ -1069,20 +1069,30 @@ else
             mensajeOk = "Cupo guardado correctamente.";
             mostrarModalCupo = false;
             await CargarTodo();
+            await RefrescarSugerenciaRangoAsync();
         }
         finally { procesando = false; }
     }
 
-    private async Task OnCupoFiltroCambio(ChangeEventArgs e)
+    private async Task OnCupoParametrosCambio(ChangeEventArgs? e = null)
     {
-        if (e.Value is string val && int.TryParse(val, out int id))
+        if (e?.Value is not null)
         {
-            cupoTipoSeleccionado = id;
-            if (id > 0)
+            var texto = e.Value?.ToString();
+            if (!string.IsNullOrWhiteSpace(texto) && int.TryParse(texto, out int id))
             {
-                cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(id, cupoAnio) ?? 0;
-                cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(id, cupoAnio);
+                cupoTipoSeleccionado = id;
             }
+        }
+
+        if (cupoTipoSeleccionado > 0)
+        {
+            cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(cupoTipoSeleccionado, cupoAnio) ?? 0;
+            cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(cupoTipoSeleccionado, cupoAnio);
+        }
+        else
+        {
+            cupoConsumido = 0;
         }
     }
 
