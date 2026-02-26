@@ -48,6 +48,7 @@ public sealed class RenovacionesService
     private readonly IRepository<CfgSistemaParametro> _repoParametros;
     private const string ClaveDiasAlertaRenovaciones = "RENOVACIONES_DIAS_ALERTA";
     private const int DiasAlertaDefecto = 30;
+    private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -77,11 +78,16 @@ public sealed class RenovacionesService
 
         if (!string.IsNullOrWhiteSpace(textoBuscar))
         {
-            var filtro = textoBuscar.ToUpperInvariant();
-            query = query.Where(s =>
-                s.IdReclusoNavigation.NombreCompleto.ToUpper().Contains(filtro) ||
-                s.LugarTrabajo.ToUpper().Contains(filtro) ||
-                (s.Observaciones != null && s.Observaciones.ToUpper().Contains(filtro)));
+            var terminos = textoBuscar.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            foreach (var termino in terminos)
+            {
+                var patron = $"%{termino}%";
+                query = query.Where(s =>
+                    (s.IdReclusoNavigation.NombreCompleto != null && EF.Functions.Like(EF.Functions.Collate(s.IdReclusoNavigation.NombreCompleto, CollationBusquedaSinAcentos), patron)) ||
+                    (s.LugarTrabajo != null && EF.Functions.Like(EF.Functions.Collate(s.LugarTrabajo, CollationBusquedaSinAcentos), patron)) ||
+                    (s.Observaciones != null && EF.Functions.Like(EF.Functions.Collate(s.Observaciones, CollationBusquedaSinAcentos), patron)));
+            }
         }
 
         var datos = await query
