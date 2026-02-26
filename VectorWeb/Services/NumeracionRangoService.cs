@@ -150,34 +150,7 @@ public class NumeracionRangoService
                     numeroFin >= r.NumeroInicio);
             }
 
-            async Task<int> ObtenerSaldoDisponibleAsync()
-            {
-                var cupoTotal = await context.MaeCuposSecretaria
-                    .Where(c => c.IdTipo == rango.IdTipo && c.Anio == rango.Anio)
-                    .Select(c => (int?)c.Cantidad)
-                    .FirstOrDefaultAsync() ?? 0;
-
-                var consumoActual = await context.MaeNumeracionRangos
-                    .Where(r => r.IdTipo == rango.IdTipo && r.Anio == rango.Anio)
-                    .Select(r => r.NumeroFin - r.NumeroInicio + 1)
-                    .SumAsync();
-
-                return Math.Max(0, cupoTotal - consumoActual);
-            }
-
-            const int maximoActivosPorOficina = 2;
-
-            int BuscarInicioDisponible(List<(int Inicio, int Fin)> ocupados)
-            {
-                int inicioSugerido = 1;
-                foreach (var bloque in ocupados.OrderBy(r => r.Inicio))
-                {
-                    if (inicioSugerido < bloque.Inicio) break;
-                    inicioSugerido = bloque.Fin + 1;
-                }
-
-                return inicioSugerido;
-            }
+            const int maximoActivosPorOficina = 1;
 
             var existeSolapamiento = await ExisteSolapamientoAsync(rango.NumeroInicio, rango.NumeroFin, rango.IdRango == 0 ? null : rango.IdRango);
 
@@ -199,63 +172,9 @@ public class NumeracionRangoService
 
             if (rango.IdRango == 0)
             {
-                var rangosCreados = new List<(int Inicio, int Fin)> { (rango.NumeroInicio, rango.NumeroFin) };
                 context.MaeNumeracionRangos.Add(rango);
                 accionBitacora = "APERTURA";
                 detalleBitacora = $"Creación de nuevo rango: {rango.NumeroInicio}-{rango.NumeroFin}";
-
-                if (rango.Activo && rango.IdOficina.HasValue)
-                {
-                    var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
-                        r.IdTipo == rango.IdTipo &&
-                        r.Anio == rango.Anio &&
-                        r.IdOficina == rango.IdOficina &&
-                        r.Activo);
-
-                    var puedeCrearSegundoActivo = cantidadActivosOficina < 1;
-                    var cantidadSolicitada = rango.NumeroFin - rango.NumeroInicio + 1;
-
-                    if (puedeCrearSegundoActivo && cantidadSolicitada > 0)
-                    {
-                        var saldoDisponible = await ObtenerSaldoDisponibleAsync();
-                        var saldoRestanteTrasPrimerRango = Math.Max(0, saldoDisponible - cantidadSolicitada);
-                        var cantidadSegundoRango = Math.Min(cantidadSolicitada, saldoRestanteTrasPrimerRango);
-
-                        if (cantidadSegundoRango > 0)
-                        {
-                            var ocupados = await context.MaeNumeracionRangos
-                                .Where(r => r.IdTipo == rango.IdTipo && r.Anio == rango.Anio)
-                                .Select(r => new { r.NumeroInicio, r.NumeroFin })
-                                .ToListAsync();
-
-                            var ocupadosConNuevo = ocupados
-                                .Select(r => (r.NumeroInicio, r.NumeroFin))
-                                .Concat(rangosCreados)
-                                .ToList();
-
-                            var inicioSegundoRango = BuscarInicioDisponible(ocupadosConNuevo);
-                            var finSegundoRango = inicioSegundoRango + cantidadSegundoRango - 1;
-
-                            if (!await ExisteSolapamientoAsync(inicioSegundoRango, finSegundoRango, null))
-                            {
-                                var segundoRango = new MaeNumeracionRango
-                                {
-                                    IdTipo = rango.IdTipo,
-                                    IdOficina = rango.IdOficina,
-                                    Anio = rango.Anio,
-                                    NombreRango = $"{rango.NombreRango} (Auto 2)",
-                                    NumeroInicio = inicioSegundoRango,
-                                    NumeroFin = finSegundoRango,
-                                    UltimoUtilizado = Math.Max(inicioSegundoRango - 1, 0),
-                                    Activo = true
-                                };
-
-                                context.MaeNumeracionRangos.Add(segundoRango);
-                                detalleBitacora += $" | Auto-generado segundo rango: {inicioSegundoRango}-{finSegundoRango}";
-                            }
-                        }
-                    }
-                }
             }
             else
             {
