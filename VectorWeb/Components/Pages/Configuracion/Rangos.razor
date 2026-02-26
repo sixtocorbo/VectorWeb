@@ -1054,6 +1054,7 @@ else
         mostrarModalCupo = true;
     }
 
+    // Reemplaza tu método actual (línea 644 aprox.) por este:
     private async Task GuardarCupo()
     {
         mensajeErrorModalCupo = string.Empty;
@@ -1063,13 +1064,25 @@ else
             if (cupoTipoSeleccionado <= 0) { MostrarErrorModalCupo("Seleccione un tipo."); return; }
             if (cupoAnio < 2000) { MostrarErrorModalCupo("Año inválido."); return; }
 
+            // Llamada al servicio
             var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, CupoCantidadSegura);
-            if (!resultado.Exitoso) { MostrarErrorModalCupo(resultado.Mensaje); return; }
+
+            if (!resultado.Exitoso)
+            {
+                // Esto ahora capturará el error de SQL y lo mostrará en el modal
+                MostrarErrorModalCupo(resultado.Mensaje);
+                return;
+            }
 
             mensajeOk = "Cupo guardado correctamente.";
             mostrarModalCupo = false;
             await CargarTodo();
             await RefrescarSugerenciaRangoAsync();
+        }
+        catch (Exception ex)
+        {
+            // Captura errores inesperados de comunicación o renderizado
+            MostrarErrorModalCupo("Error inesperado: " + ex.Message);
         }
         finally { procesando = false; }
     }
