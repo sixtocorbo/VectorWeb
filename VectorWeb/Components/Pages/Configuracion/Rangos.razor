@@ -320,6 +320,76 @@ else
                         <DataAnnotationsValidator />
 
                         <div class="row g-3">
+                            <div class="col-12">
+                                <div class="alert alert-info border mb-0">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                        <h6 class="mb-0 fw-bold"><i class="bi bi-lightbulb me-1"></i>Sugerencia de asignación</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AplicarSugerenciaRango" disabled="@(!PuedeAplicarSugerencia)">
+                                            <i class="bi bi-magic me-1"></i>Aplicar sugerencia
+                                        </button>
+                                    </div>
+
+                                    @if (!string.IsNullOrWhiteSpace(mensajeErrorSugerenciaRango))
+                                    {
+                                        <div class="text-danger small mb-2">@mensajeErrorSugerenciaRango</div>
+                                    }
+
+                                    @if (rangoActual.IdTipo <= 0 || rangoActual.Anio <= 0)
+                                    {
+                                        <div class="small text-muted">
+                                            Seleccione primero el tipo de documento y año para calcular una sugerencia automática.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="row g-2 small">
+                                            <div class="col-md-3"><span class="text-muted">Cupo total:</span> <strong>@sugerenciaRango.CupoTotal.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3"><span class="text-muted">Asignado:</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-3 text-success"><span class="text-muted">Disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
+                                        </div>
+
+                                        <hr class="my-2" />
+
+                                        <div class="row g-2 small">
+                                            <div class="col-md-4"><span class="text-muted">Inicio sugerido:</span> <strong>@sugerenciaRango.NumeroInicioSugerido.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-4"><span class="text-muted">Cantidad:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
+                                        </div>
+                                        @* Avisos varios de lógica de negocio *@
+                                        @if (MostrarAvisoExisteRangoActivo)
+                                        {
+                                            <div class="small text-primary mt-2"><i class="bi bi-info-circle me-1"></i>Oficina ya tiene @sugerenciaRango.CantidadRangosActivosOficina rango(s) activo(s).</div>
+                                        }
+                                        @if (sugerenciaRango.CantidadRangosActivosOficina >= 2)
+                                        {
+                                            <div class="small text-danger mt-2"><i class="bi bi-exclamation-octagon me-1"></i>La oficina alcanzó el máximo de 2 rangos activos para este tipo/año.</div>
+                                        }
+                                        @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
+                                        {
+                                            <div class="small text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>Ajustado por saldo disponible.</div>
+                                        }
+                                    }
+
+                                    @if (MostrarAccionesSugeridas)
+                                    {
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            @if (DebeSugerirCrearCupo)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-success" @onclick="CrearCupoDesdeSugerencia">
+                                                    <i class="bi bi-plus-circle me-1"></i>Crear cupo para este tipo/año
+                                                </button>
+                                            }
+                                            @if (DebeSugerirCrearRango)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-primary" @onclick="PrepararNuevoRangoDesdeSugerencia">
+                                                    <i class="bi bi-arrow-repeat me-1"></i>Crear nuevo rango con estos parámetros
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Tipo de Documento</label>
                                 <InputSelect @bind-Value="rangoActual.IdTipo" @bind-Value:after="OnParametrosSugerenciaRangoCambio" class="form-select">
@@ -431,51 +501,6 @@ else
                                 </div>
                             </div>
 
-                            @if (rangoActual.IdTipo > 0 && rangoActual.Anio > 0)
-                            {
-                                <div class="col-12">
-                                    <div class="alert alert-info border mb-0">
-                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                            <h6 class="mb-0 fw-bold"><i class="bi bi-lightbulb me-1"></i>Sugerencia de asignación</h6>
-                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="AplicarSugerenciaRango" disabled="@(!PuedeAplicarSugerencia)">
-                                                <i class="bi bi-magic me-1"></i>Aplicar sugerencia
-                                            </button>
-                                        </div>
-
-                                        @if (!string.IsNullOrWhiteSpace(mensajeErrorSugerenciaRango))
-                                        {
-                                            <div class="text-danger small mb-2">@mensajeErrorSugerenciaRango</div>
-                                        }
-
-                                        <div class="row g-2 small">
-                                            <div class="col-md-3"><span class="text-muted">Cupo total:</span> <strong>@sugerenciaRango.CupoTotal.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-3"><span class="text-muted">Asignado:</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-3 text-success"><span class="text-muted">Disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
-                                        </div>
-
-                                        <hr class="my-2" />
-
-                                        <div class="row g-2 small">
-                                            <div class="col-md-4"><span class="text-muted">Inicio sugerido:</span> <strong>@sugerenciaRango.NumeroInicioSugerido.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
-                                            <div class="col-md-4"><span class="text-muted">Cantidad:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
-                                        </div>
-                                        @* Avisos varios de lógica de negocio *@
-                                        @if (MostrarAvisoExisteRangoActivo)
-                                        {
-                                            <div class="small text-primary mt-2"><i class="bi bi-info-circle me-1"></i>Oficina ya tiene @sugerenciaRango.CantidadRangosActivosOficina rango(s) activo(s).</div>
-                                        }
-                                        @if (sugerenciaRango.CantidadRangosActivosOficina >= 2)
-                                        {
-                                            <div class="small text-danger mt-2"><i class="bi bi-exclamation-octagon me-1"></i>La oficina alcanzó el máximo de 2 rangos activos para este tipo/año.</div>
-                                        }
-                                        @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
-                                        {
-                                            <div class="small text-warning mt-2"><i class="bi bi-exclamation-triangle me-1"></i>Ajustado por saldo disponible.</div>
-                                        }
-                                    </div>
-                                </div>
-                            }
                         </div>
 
                         <div class="mt-4 form-check form-switch">
@@ -961,6 +986,27 @@ else
         RecalcularNumeroFinDesdeCantidad();
     }
 
+    private void CrearCupoDesdeSugerencia()
+    {
+        cupoTipoSeleccionado = rangoActual.IdTipo;
+        cupoAnio = rangoActual.Anio > 0 ? rangoActual.Anio : DateTime.Now.Year;
+        _ = OnCupoFiltroCambio(new ChangeEventArgs { Value = cupoTipoSeleccionado.ToString() });
+        mensajeOk = "Complete y guarde el cupo sugerido para continuar con la asignación del rango.";
+        tabActiva = TabConfig.Cupos;
+        mostrarModalCupo = true;
+    }
+
+    private void PrepararNuevoRangoDesdeSugerencia()
+    {
+        if (sugerenciaRango.NumeroInicioSugerido <= 0) return;
+        rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
+        cantidadSugeridaSolicitada = sugerenciaRango.CantidadSugerida > 0
+            ? sugerenciaRango.CantidadSugerida
+            : cantidadSugeridaSolicitada;
+        numeroInicioEditadoManualmente = false;
+        RecalcularNumeroFinDesdeCantidad();
+    }
+
     private void AplicarCantidadRapida(int cantidad)
     {
         cantidadSugeridaSolicitada = Math.Max(0, cantidad);
@@ -1087,6 +1133,9 @@ else
 
     private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
     private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
+    private bool DebeSugerirCrearCupo => rangoActual.IdTipo > 0 && rangoActual.Anio > 0 && sugerenciaRango.CupoTotal == 0;
+    private bool DebeSugerirCrearRango => rangoActual.IdTipo > 0 && rangoActual.Anio > 0 && sugerenciaRango.CupoTotal > 0 && !PuedeAplicarSugerencia;
+    private bool MostrarAccionesSugeridas => DebeSugerirCrearCupo || DebeSugerirCrearRango;
     private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
     private string MensajeSolapamientoEnTiempoReal
