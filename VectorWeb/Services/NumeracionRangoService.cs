@@ -165,22 +165,7 @@ public class NumeracionRangoService
                 return Math.Max(0, cupoTotal - consumoActual);
             }
 
-            async Task<int> ObtenerMaximoActivosPorOficinaAsync()
-            {
-                var indiceUnicoActivo = await context.Database.SqlQueryRaw<int>(@"
-                    SELECT CASE
-                        WHEN EXISTS (
-                            SELECT 1
-                            FROM sys.indexes
-                            WHERE name = 'UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio'
-                              AND object_id = OBJECT_ID('dbo.Mae_NumeracionRangos')
-                        )
-                        THEN 1
-                        ELSE 0
-                    END AS [Value]").SingleAsync();
-
-                return indiceUnicoActivo == 1 ? 1 : 2;
-            }
+            const int maximoActivosPorOficina = 2;
 
             int BuscarInicioDisponible(List<(int Inicio, int Fin)> ocupados)
             {
@@ -198,8 +183,6 @@ public class NumeracionRangoService
 
             if (existeSolapamiento)
                 return OperacionResultado.Fail("El rango se superpone con otro rango ya asignado para este tipo y año.");
-
-            var maximoActivosPorOficina = await ObtenerMaximoActivosPorOficinaAsync();
 
             if (rango.Activo && rango.IdOficina.HasValue)
             {
@@ -221,7 +204,7 @@ public class NumeracionRangoService
                 accionBitacora = "APERTURA";
                 detalleBitacora = $"Creación de nuevo rango: {rango.NumeroInicio}-{rango.NumeroFin}";
 
-                if (maximoActivosPorOficina > 1 && rango.Activo && rango.IdOficina.HasValue)
+                if (rango.Activo && rango.IdOficina.HasValue)
                 {
                     var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
                         r.IdTipo == rango.IdTipo &&
@@ -235,7 +218,8 @@ public class NumeracionRangoService
                     if (puedeCrearSegundoActivo && cantidadSolicitada > 0)
                     {
                         var saldoDisponible = await ObtenerSaldoDisponibleAsync();
-                        var cantidadSegundoRango = Math.Min(cantidadSolicitada, saldoDisponible);
+                        var saldoRestanteTrasPrimerRango = Math.Max(0, saldoDisponible - cantidadSolicitada);
+                        var cantidadSegundoRango = Math.Min(cantidadSolicitada, saldoRestanteTrasPrimerRango);
 
                         if (cantidadSegundoRango > 0)
                         {
