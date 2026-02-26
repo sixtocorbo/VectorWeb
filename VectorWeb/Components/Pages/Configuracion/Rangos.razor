@@ -553,7 +553,7 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Año</label>
-                        <InputNumber @bind-Value="cupoAnio" @bind-Value:event="oninput" @oninput="OnCupoParametrosCambio" class="form-control" />
+                        <InputNumber @bind-Value="cupoAnio" @bind-Value:event="oninput" @bind-Value:after="OnCupoParametrosCambio" class="form-control" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Cantidad Total (Cupo)</label>
