@@ -165,6 +165,23 @@ public class NumeracionRangoService
                 return Math.Max(0, cupoTotal - consumoActual);
             }
 
+            async Task<int> ObtenerMaximoActivosPorOficinaAsync()
+            {
+                var indiceUnicoActivo = await context.Database.SqlQueryRaw<int>(@"
+                    SELECT CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM sys.indexes
+                            WHERE name = 'UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio'
+                              AND object_id = OBJECT_ID('dbo.Mae_NumeracionRangos')
+                        )
+                        THEN 1
+                        ELSE 0
+                    END").SingleAsync();
+
+                return indiceUnicoActivo == 1 ? 1 : 2;
+            }
+
             int BuscarInicioDisponible(List<(int Inicio, int Fin)> ocupados)
             {
                 int inicioSugerido = 1;
@@ -182,6 +199,8 @@ public class NumeracionRangoService
             if (existeSolapamiento)
                 return OperacionResultado.Fail("El rango se superpone con otro rango ya asignado para este tipo y año.");
 
+            var maximoActivosPorOficina = await ObtenerMaximoActivosPorOficinaAsync();
+
             if (rango.Activo && rango.IdOficina.HasValue)
             {
                 var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
@@ -191,8 +210,8 @@ public class NumeracionRangoService
                     r.Activo &&
                     r.IdRango != rango.IdRango);
 
-                if (cantidadActivosOficina >= 2)
-                    return OperacionResultado.Fail("La oficina ya tiene 2 rangos activos para este tipo y año.");
+                if (cantidadActivosOficina >= maximoActivosPorOficina)
+                    return OperacionResultado.Fail($"La oficina ya tiene {maximoActivosPorOficina} rango(s) activo(s) para este tipo y año.");
             }
 
             if (rango.IdRango == 0)
@@ -202,7 +221,7 @@ public class NumeracionRangoService
                 accionBitacora = "APERTURA";
                 detalleBitacora = $"Creación de nuevo rango: {rango.NumeroInicio}-{rango.NumeroFin}";
 
-                if (rango.Activo && rango.IdOficina.HasValue)
+                if (maximoActivosPorOficina > 1 && rango.Activo && rango.IdOficina.HasValue)
                 {
                     var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
                         r.IdTipo == rango.IdTipo &&
