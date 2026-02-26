@@ -423,18 +423,54 @@ else
                                 <label class="form-label fw-bold">Desde</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroInicio" @bind-Value:after="OnNumeroInicioChanged" class="form-control" />
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Cantidad a Asignar</label>
-                                <input type="number"
-                                       class="form-control"
-                                       min="0"
-                                       value="@cantidadSugeridaSolicitada"
-                                       @oninput="OnCantidadSugeridaInput" />
-                                <div class="form-text">El sistema calcula automáticamente el Hasta.</div>
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold d-flex justify-content-between align-items-center">
+                                    <span>Cantidad a Asignar</span>
+                                    @if (rangoActual.IdTipo > 0 && rangoActual.Anio > 0)
+                                    {
+                                        <span class="badge bg-light text-dark border">Máx. sugerido: @CantidadMaximaSugerida.ToString("N0", CulturaUi)</span>
+                                    }
+                                </label>
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-4">
+                                        <input type="number"
+                                               class="form-control"
+                                               min="0"
+                                               max="@CantidadMaximaSugerida"
+                                               step="1"
+                                               value="@cantidadSugeridaSolicitada"
+                                               @oninput="OnCantidadSugeridaInput" />
+                                    </div>
+                                    <div class="col-md-8">
+                                        <input type="range"
+                                               class="form-range"
+                                               min="0"
+                                               max="@CantidadMaximaSugerida"
+                                               step="1"
+                                               value="@CantidadSolicitadaSegura"
+                                               @oninput="OnCantidadSugeridaInput" />
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-2">
+                                    @foreach (var cantidadRapida in CantidadesRapidasSugeridas)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="() => AplicarCantidadRapida(cantidadRapida)">+@cantidadRapida</button>
+                                    }
+                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="UsarCantidadMaximaDisponible">Usar máximo disponible</button>
+                                </div>
+                                <div class="form-text">El sistema calcula automáticamente el Hasta y limita la cantidad al saldo disponible.</div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Hasta (calculado)</label>
                                 <input type="number" class="form-control bg-light" value="@rangoActual.NumeroFin" readonly />
+                            </div>
+                            <div class="col-12">
+                                <div class="alert alert-light border mb-0 small">
+                                    <i class="bi bi-gear-wide-connected me-1"></i>
+                                    Se asignarán <strong>@CantidadSolicitadaSegura.ToString("N0", CulturaUi)</strong> números desde
+                                    <strong>@rangoActual.NumeroInicio.ToString("N0", CulturaUi)</strong> hasta
+                                    <strong>@rangoActual.NumeroFin.ToString("N0", CulturaUi)</strong>.
+                                </div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Último Utilizado</label>
@@ -805,7 +841,7 @@ else
     {
         if (int.TryParse(e.Value?.ToString(), out int valor))
         {
-            cantidadSugeridaSolicitada = Math.Max(0, valor);
+            cantidadSugeridaSolicitada = AjustarCantidadDentroDeLimite(valor);
             RecalcularNumeroFinDesdeCantidad();
             _busquedaOficinaPendiente = false;
             _debounceTimer.Stop();
@@ -914,15 +950,41 @@ else
         RecalcularNumeroFinDesdeCantidad();
     }
 
+    private void AplicarCantidadRapida(int cantidad)
+    {
+        cantidadSugeridaSolicitada = Math.Max(0, cantidad);
+        RecalcularNumeroFinDesdeCantidad();
+        _busquedaOficinaPendiente = false;
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
+    }
+
+    private void UsarCantidadMaximaDisponible()
+    {
+        AplicarCantidadRapida(CantidadMaximaSugerida);
+    }
+
     private void RecalcularNumeroFinDesdeCantidad()
     {
         var inicio = Math.Max(1, rangoActual.NumeroInicio);
         rangoActual.NumeroInicio = inicio;
 
-        var cantidad = cantidadSugeridaSolicitada.GetValueOrDefault();
+        var cantidad = AjustarCantidadDentroDeLimite(cantidadSugeridaSolicitada.GetValueOrDefault());
+        cantidadSugeridaSolicitada = cantidad;
         rangoActual.NumeroFin = cantidad > 0
             ? inicio + cantidad - 1
             : inicio;
+    }
+
+    private int AjustarCantidadDentroDeLimite(int valor)
+    {
+        var cantidad = Math.Max(0, valor);
+        if (CantidadMaximaSugerida > 0)
+        {
+            cantidad = Math.Min(cantidad, CantidadMaximaSugerida);
+        }
+
+        return cantidad;
     }
 
     // --- GESTIÓN DE CUPOS ---
@@ -1014,6 +1076,14 @@ else
 
     private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
     private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
+    private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
+    private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
+    private IReadOnlyList<int> CantidadesRapidasSugeridas => [
+        25,
+        50,
+        100,
+        250
+    ].Where(c => c <= Math.Max(CantidadMaximaSugerida, 250)).ToList();
 
     private string ObtenerColorAccion(string accion) => accion switch
     {
