@@ -177,7 +177,7 @@ public class NumeracionRangoService
                         )
                         THEN 1
                         ELSE 0
-                    END").SingleAsync();
+                    END AS [Value]").SingleAsync();
 
                 return indiceUnicoActivo == 1 ? 1 : 2;
             }
