@@ -68,13 +68,36 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Interno / Recluso</label>
-                                <select class="form-select shadow-none" @bind="modelo.IdRecluso" disabled="@(Id > 0)">
-                                    <option value="0">-- Seleccione --</option>
-                                    @foreach (var r in reclusos)
+                                @if (Id > 0)
+                                {
+                                    <InputText class="form-control shadow-none" Value="@textoBusquedaRecluso" disabled />
+                                }
+                                else
+                                {
+                                    <input type="text"
+                                           class="form-control shadow-none"
+                                           placeholder="Buscar recluso por nombre o documento..."
+                                           @bind="textoBusquedaRecluso"
+                                           @bind:event="oninput" />
+                                    @if (sugerenciasReclusos.Any())
                                     {
-                                        <option value="@r.IdRecluso">@r.NombreCompleto</option>
+                                        <div class="list-group mt-2" style="max-height: 220px; overflow-y: auto;">
+                                            @foreach (var r in sugerenciasReclusos)
+                                            {
+                                                var seleccionado = modelo.IdRecluso == r.IdRecluso;
+                                                <button type="button"
+                                                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(seleccionado ? "active" : string.Empty)"
+                                                        @onclick="() => SeleccionarRecluso(r)">
+                                                    <span>@r.NombreCompleto</span>
+                                                    @if (!string.IsNullOrWhiteSpace(r.Documento))
+                                                    {
+                                                        <small class="text-muted">CI: @r.Documento</small>
+                                                    }
+                                                </button>
+                                            }
+                                        </div>
                                     }
-                                </select>
+                                }
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Lugar de Trabajo</label>
@@ -271,6 +294,7 @@
     };
 
     private IEnumerable<MaeRecluso> reclusos = [];
+    private string textoBusquedaRecluso = string.Empty;
     private string codigoAutorizacion = string.Empty;
     private string descAutorizacion = string.Empty;
     private string observacionesUsuario = string.Empty;
@@ -280,16 +304,19 @@
     private string filtroDocumento = string.Empty;
     private List<DocumentoRespaldoDto> documentosCandidatos = [];
     private DocumentoRespaldoDto? docVistaPrevia;
+    private IEnumerable<MaeRecluso> sugerenciasReclusos => ObtenerReclusosFiltrados();
 
     protected override async Task OnInitializedAsync()
     {
         reclusos = await RepoReclusos.GetAllAsync();
+        textoBusquedaRecluso = ObtenerDescripcionRecluso(modelo.IdRecluso);
         if (Id <= 0) return;
 
         var existente = await Service.ObtenerPorIdAsync(Id);
         if (existente is null) return;
 
         modelo = existente;
+        textoBusquedaRecluso = ObtenerDescripcionRecluso(modelo.IdRecluso);
         var parsed = Service.ParsearObservaciones(modelo.Observaciones);
         codigoAutorizacion = parsed.Codigo;
         descAutorizacion = parsed.Descripcion;
@@ -299,6 +326,58 @@
             .Select(x => x.IdDocumento)
             .ToList();
 
+        await BuscarCandidatos();
+    }
+
+    private IEnumerable<MaeRecluso> ObtenerReclusosFiltrados()
+    {
+        if (Id > 0) return [];
+
+        var termino = textoBusquedaRecluso?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(termino))
+        {
+            return reclusos
+                .OrderBy(r => r.NombreCompleto)
+                .Take(15);
+        }
+
+        var tokens = termino
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToLowerInvariant())
+            .ToArray();
+
+        return reclusos
+            .Where(r => CoincideRecluso(r, tokens))
+            .OrderBy(r => r.NombreCompleto)
+            .Take(15);
+    }
+
+    private static bool CoincideRecluso(MaeRecluso recluso, string[] tokens)
+    {
+        if (tokens.Length == 0) return true;
+
+        var texto = $"{recluso.NombreCompleto} {recluso.Documento}".ToLowerInvariant();
+        return tokens.All(texto.Contains);
+    }
+
+    private string ObtenerDescripcionRecluso(int idRecluso)
+    {
+        if (idRecluso <= 0) return string.Empty;
+
+        var recluso = reclusos.FirstOrDefault(r => r.IdRecluso == idRecluso);
+        if (recluso is null) return string.Empty;
+
+        return string.IsNullOrWhiteSpace(recluso.Documento)
+            ? recluso.NombreCompleto
+            : $"{recluso.NombreCompleto} ({recluso.Documento})";
+    }
+
+    private async Task SeleccionarRecluso(MaeRecluso recluso)
+    {
+        if (Id > 0) return;
+
+        modelo.IdRecluso = recluso.IdRecluso;
+        textoBusquedaRecluso = ObtenerDescripcionRecluso(recluso.IdRecluso);
         await BuscarCandidatos();
     }
 
