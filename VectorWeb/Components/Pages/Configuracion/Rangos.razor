@@ -1078,12 +1078,13 @@ else
     private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
     private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
-    private IReadOnlyList<int> CantidadesRapidasSugeridas => [
+    private IReadOnlyList<int> CantidadesRapidasSugeridas => new[]
+    {
         25,
         50,
         100,
         250
-    ].Where(c => c <= Math.Max(CantidadMaximaSugerida, 250)).ToList();
+    }.Where(c => c <= Math.Max(CantidadMaximaSugerida, 250)).ToList();
 
     private string ObtenerColorAccion(string accion) => accion switch
     {
