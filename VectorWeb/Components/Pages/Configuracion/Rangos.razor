@@ -422,6 +422,10 @@ else
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Desde</label>
                                 <InputNumber @bind-Value="rangoActual.NumeroInicio" @bind-Value:after="OnNumeroInicioChanged" class="form-control" />
+                                @if (!string.IsNullOrWhiteSpace(MensajeSolapamientoEnTiempoReal))
+                                {
+                                    <div class="text-danger small mt-1">@MensajeSolapamientoEnTiempoReal</div>
+                                }
                             </div>
                             <div class="col-md-8">
                                 <label class="form-label fw-bold d-flex justify-content-between align-items-center">
@@ -459,10 +463,14 @@ else
                                     <button type="button" class="btn btn-sm btn-outline-primary" @onclick="UsarCantidadMaximaDisponible">Usar máximo disponible</button>
                                 </div>
                                 <div class="form-text">El sistema calcula automáticamente el Hasta y limita la cantidad al saldo disponible.</div>
+                                @if (!string.IsNullOrWhiteSpace(MensajeSolapamientoEnTiempoReal))
+                                {
+                                    <div class="text-danger small mt-1">@MensajeSolapamientoEnTiempoReal</div>
+                                }
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Hasta (calculado)</label>
-                                <input type="number" class="form-control bg-light" value="@rangoActual.NumeroFin" readonly />
+                                <label class="form-label fw-bold">Último Utilizado</label>
+                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
                             </div>
                             <div class="col-12">
                                 <div class="alert alert-light border mb-0 small">
@@ -471,10 +479,6 @@ else
                                     <strong>@rangoActual.NumeroInicio.ToString("N0", CulturaUi)</strong> hasta
                                     <strong>@rangoActual.NumeroFin.ToString("N0", CulturaUi)</strong>.
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">Último Utilizado</label>
-                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
                             </div>
                         </div>
 
@@ -617,6 +621,7 @@ else
     private int? cantidadSugeridaSolicitada;
     private SugerenciaRangoNumeracion sugerenciaRango = new();
     private string mensajeErrorSugerenciaRango = string.Empty;
+    private bool numeroInicioEditadoManualmente;
     private static readonly CultureInfo CulturaUi = CultureInfo.GetCultureInfo("es-DO");
     private bool contextoPreseleccionAplicado;
 
@@ -753,6 +758,7 @@ else
         };
         ResetearBusquedaOficina();
         cantidadSugeridaSolicitada = 50;
+        numeroInicioEditadoManualmente = false;
         RecalcularNumeroFinDesdeCantidad();
         sugerenciaRango = new SugerenciaRangoNumeracion();
         mostrarModal = true;
@@ -778,6 +784,7 @@ else
         oficinasRangoFiltradas.Clear();
         indiceOficinaRangoSeleccionada = -1;
         cantidadSugeridaSolicitada = rangoActual.NumeroFin - rangoActual.NumeroInicio + 1;
+        numeroInicioEditadoManualmente = false;
         RecalcularNumeroFinDesdeCantidad();
         mostrarModal = true;
         _ = RefrescarSugerenciaRangoAsync();
@@ -860,6 +867,7 @@ else
     private Task OnNumeroInicioChanged()
     {
         rangoActual.NumeroInicio = Math.Max(1, rangoActual.NumeroInicio);
+        numeroInicioEditadoManualmente = true;
         RecalcularNumeroFinDesdeCantidad();
         _busquedaOficinaPendiente = false;
         _debounceTimer.Stop();
@@ -930,6 +938,12 @@ else
             rangoActual.IdTipo, rangoActual.Anio, rangoActual.IdOficina,
             rangoActual.IdRango == 0 ? null : rangoActual.IdRango, cantidadSugeridaSolicitada);
 
+        if (!numeroInicioEditadoManualmente && sugerenciaRango.NumeroInicioSugerido > 0)
+        {
+            rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
+            RecalcularNumeroFinDesdeCantidad();
+        }
+
         if (sugerenciaRango.CupoTotal == 0)
             mensajeErrorSugerenciaRango = "No existe cupo configurado para este tipo y año.";
 
@@ -946,6 +960,7 @@ else
         await RefrescarSugerenciaRangoAsync();
         if (!PuedeAplicarSugerencia) return;
         rangoActual.NumeroInicio = sugerenciaRango.NumeroInicioSugerido;
+        numeroInicioEditadoManualmente = false;
         cantidadSugeridaSolicitada = sugerenciaRango.CantidadSugerida;
         RecalcularNumeroFinDesdeCantidad();
     }
@@ -1078,6 +1093,25 @@ else
     private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;
     private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
+    private string MensajeSolapamientoEnTiempoReal
+    {
+        get
+        {
+            if (rangoActual.IdTipo <= 0 || rangoActual.Anio <= 0 || rangoActual.NumeroInicio <= 0 || rangoActual.NumeroFin <= 0)
+                return string.Empty;
+
+            var haySolapamiento = listaRangos.Any(r =>
+                r.IdTipo == rangoActual.IdTipo &&
+                r.Anio == rangoActual.Anio &&
+                r.IdRango != rangoActual.IdRango &&
+                rangoActual.NumeroInicio <= r.NumeroFin &&
+                rangoActual.NumeroFin >= r.NumeroInicio);
+
+            return haySolapamiento
+                ? "El rango se superpone con otro rango ya asignado para este tipo y año."
+                : string.Empty;
+        }
+    }
     private IReadOnlyList<int> CantidadesRapidasSugeridas => new[]
     {
         25,
