@@ -569,7 +569,7 @@ else
                             </div>
                             <div class="d-flex justify-content-between mt-1 text-success">
                                 <span>Disponible si guarda:</span>
-                                <strong>@(Math.Max(0, cupoCantidad - cupoConsumido))</strong>
+                                <strong>@(Math.Max(0, CupoCantidadSegura - cupoConsumido))</strong>
                             </div>
                         </div>
                     }
@@ -635,7 +635,7 @@ else
     // Cupo
     private int cupoTipoSeleccionado;
     private int cupoAnio = DateTime.Now.Year;
-    private int cupoCantidad;
+    private int? cupoCantidad;
     private int cupoConsumido;
 
     // Sugerencias
@@ -1063,7 +1063,7 @@ else
             if (cupoTipoSeleccionado <= 0) { MostrarErrorModalCupo("Seleccione un tipo."); return; }
             if (cupoAnio < 2000) { MostrarErrorModalCupo("Año inválido."); return; }
 
-            var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, cupoCantidad);
+            var resultado = await RangoService.GuardarCupoAsync(cupoTipoSeleccionado, cupoAnio, CupoCantidadSegura);
             if (!resultado.Exitoso) { MostrarErrorModalCupo(resultado.Mensaje); return; }
 
             mensajeOk = "Cupo guardado correctamente.";
@@ -1139,6 +1139,7 @@ else
     private bool MostrarAccionesSugeridas => DebeSugerirCrearCupo || DebeSugerirCrearRango;
     private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
+    private int CupoCantidadSegura => Math.Max(0, cupoCantidad.GetValueOrDefault());
     private string MensajeSolapamientoEnTiempoReal
     {
         get
