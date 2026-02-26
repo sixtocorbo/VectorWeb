@@ -543,7 +543,7 @@ else
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Tipo de Documento</label>
-                        <InputSelect @bind-Value="cupoTipoSeleccionado" class="form-select" @onchange="OnCupoParametrosCambio">
+                        <InputSelect @bind-Value="cupoTipoSeleccionado" @bind-Value:after="OnCupoParametrosCambio" class="form-select">
                             <option value="0">-- Seleccione --</option>
                             @foreach (var tipo in tipos)
                             {
@@ -1074,17 +1074,8 @@ else
         finally { procesando = false; }
     }
 
-    private async Task OnCupoParametrosCambio(ChangeEventArgs? e = null)
+    private async Task OnCupoParametrosCambio()
     {
-        if (e?.Value is not null)
-        {
-            var texto = e.Value?.ToString();
-            if (!string.IsNullOrWhiteSpace(texto) && int.TryParse(texto, out int id))
-            {
-                cupoTipoSeleccionado = id;
-            }
-        }
-
         if (cupoTipoSeleccionado > 0)
         {
             cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(cupoTipoSeleccionado, cupoAnio) ?? 0;
