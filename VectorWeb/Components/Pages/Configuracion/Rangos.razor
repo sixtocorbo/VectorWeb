@@ -1091,12 +1091,36 @@ else
     {
         if (cupoTipoSeleccionado > 0)
         {
-            cupoCantidad = await RangoService.ObtenerCantidadCupoAsync(cupoTipoSeleccionado, cupoAnio) ?? 0;
-            cupoConsumido = await RangoService.ObtenerConsumoAcumuladoAsync(cupoTipoSeleccionado, cupoAnio);
+            var tipoSeleccionado = cupoTipoSeleccionado;
+            var anioSeleccionado = cupoAnio;
+            procesando = true;
+
+            try
+            {
+                var cantidad = await RangoService.ObtenerCantidadCupoAsync(tipoSeleccionado, anioSeleccionado) ?? 0;
+                var consumido = await RangoService.ObtenerConsumoAcumuladoAsync(tipoSeleccionado, anioSeleccionado);
+
+                if (tipoSeleccionado != cupoTipoSeleccionado || anioSeleccionado != cupoAnio)
+                {
+                    return;
+                }
+
+                cupoCantidad = cantidad;
+                cupoConsumido = consumido;
+            }
+            finally
+            {
+                if (tipoSeleccionado == cupoTipoSeleccionado && anioSeleccionado == cupoAnio)
+                {
+                    procesando = false;
+                }
+            }
         }
         else
         {
             cupoConsumido = 0;
+            cupoCantidad = 0;
+            procesando = false;
         }
     }
 
