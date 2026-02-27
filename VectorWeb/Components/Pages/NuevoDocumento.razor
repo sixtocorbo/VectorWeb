@@ -342,9 +342,6 @@
                                         }
                                     </div>
                                     <div class="col-md-5 d-flex gap-2">
-                                        <button type="button" class="btn btn-primary btn-sm px-3 shadow-sm" @onclick="InsertarReclusosEnAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
-                                            <i class="bi bi-pencil-square me-1"></i> Insertar
-                                        </button>
                                         <button type="button" class="btn btn-light btn-sm px-3 border" @onclick="LimpiarReclusosAsunto" disabled="@(!reclusosSeleccionadosAsunto.Any())">
                                             Limpiar
                                         </button>
@@ -1089,6 +1086,7 @@
             .Where(r => NormalizarTextoBusqueda(r.NombreCompleto).Contains(busquedaNormalizada, StringComparison.OrdinalIgnoreCase))
             .Take(8)
             .ToList();
+        indicePPLSeleccionado = reclusosFiltradosAsunto.Any() ? 0 : -1;
         mostrarSugerenciasPPL = true;
     }
 
@@ -1118,14 +1116,77 @@
 
     private Task ManejarTecladoPPL(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter" && indicePPLSeleccionado >= 0) AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
+        if (!reclusosFiltradosAsunto.Any()) return Task.CompletedTask;
+
+        if (e.Key == "ArrowDown")
+        {
+            indicePPLSeleccionado = indicePPLSeleccionado < reclusosFiltradosAsunto.Count - 1 ? indicePPLSeleccionado + 1 : 0;
+        }
+        else if (e.Key == "ArrowUp")
+        {
+            indicePPLSeleccionado = indicePPLSeleccionado > 0 ? indicePPLSeleccionado - 1 : reclusosFiltradosAsunto.Count - 1;
+        }
+        else if (e.Key == "Enter" && indicePPLSeleccionado >= 0)
+        {
+            AgregarReclusoAsunto(reclusosFiltradosAsunto[indicePPLSeleccionado]);
+        }
+
         return Task.CompletedTask;
     }
 
-    private void AgregarReclusoAsunto(MaeRecluso r) { if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso)) reclusosSeleccionadosAsunto.Add(r); busquedaReclusoAsunto = ""; reclusosFiltradosAsunto.Clear(); mostrarSugerenciasPPL = false; }
-    private void QuitarReclusoAsunto(int id) => reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
-    private void LimpiarReclusosAsunto() => reclusosSeleccionadosAsunto.Clear();
-    private void InsertarReclusosEnAsunto() { if (reclusosSeleccionadosAsunto.Any()) nuevoDoc.Asunto += $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}"; }
+    private void AgregarReclusoAsunto(MaeRecluso r)
+    {
+        if (!reclusosSeleccionadosAsunto.Any(s => s.IdRecluso == r.IdRecluso))
+        {
+            reclusosSeleccionadosAsunto.Add(r);
+            SincronizarBloquePPLEnTexto();
+        }
+
+        busquedaReclusoAsunto = "";
+        reclusosFiltradosAsunto.Clear();
+        indicePPLSeleccionado = -1;
+        mostrarSugerenciasPPL = false;
+    }
+
+    private void QuitarReclusoAsunto(int id)
+    {
+        reclusosSeleccionadosAsunto.RemoveAll(r => r.IdRecluso == id);
+        SincronizarBloquePPLEnTexto();
+    }
+
+    private void LimpiarReclusosAsunto()
+    {
+        reclusosSeleccionadosAsunto.Clear();
+        SincronizarBloquePPLEnTexto();
+    }
+
+    private void SincronizarBloquePPLEnTexto()
+    {
+        var bloqueReclusos = ConstruirBloqueReclusosSeleccionados();
+        nuevoDoc.Asunto = ReemplazarBloqueReclusos(nuevoDoc.Asunto, bloqueReclusos);
+        nuevoDoc.Descripcion = ReemplazarBloqueReclusos(nuevoDoc.Descripcion, bloqueReclusos);
+    }
+
+    private string ConstruirBloqueReclusosSeleccionados()
+    {
+        if (!reclusosSeleccionadosAsunto.Any()) return string.Empty;
+        return $" | PPL(s): {string.Join(", ", reclusosSeleccionadosAsunto.Select(r => r.NombreCompleto))}";
+    }
+
+    private static string ReemplazarBloqueReclusos(string? texto, string bloqueReclusos)
+    {
+        var textoSinBloque = QuitarBloqueReclusos(texto);
+        return ConstruirAsuntoConReclusos(textoSinBloque, bloqueReclusos);
+    }
+
+    private static string QuitarBloqueReclusos(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto)) return string.Empty;
+
+        const string marcador = " | PPL(s): ";
+        var indice = texto.IndexOf(marcador, StringComparison.OrdinalIgnoreCase);
+        return indice < 0 ? texto.Trim() : texto[..indice].Trim();
+    }
 
     private static string? ExtraerBloqueReclusos(string? asunto)
     {
