@@ -51,7 +51,7 @@ public static class ExpedienteMovimientoSimplificador
                 var documentos = g
                     .OrderBy(m => m.IdDocumento == idDocumentoPrincipal ? 0 : 1)
                     .ThenBy(m => m.IdDocumentoNavigation?.IdTipoNavigation?.Nombre)
-                    .ThenBy(m => m.IdDocumentoNavigation?.NumeroOficial)
+                    .ThenBy(m => ObtenerNumeroMostrable(m.IdDocumentoNavigation))
                     .Select(m => FormatearDocumento(m.IdDocumentoNavigation))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -89,12 +89,25 @@ public static class ExpedienteMovimientoSimplificador
     private static string FormatearDocumento(MaeDocumento? documento)
     {
         var tipo = documento?.IdTipoNavigation?.Nombre?.Trim();
-        var numero = documento?.NumeroOficial?.Trim();
+        var numero = ObtenerNumeroMostrable(documento);
 
         if (string.IsNullOrWhiteSpace(tipo) && string.IsNullOrWhiteSpace(numero)) return DocumentoSinNumero;
         if (string.IsNullOrWhiteSpace(tipo)) return numero!;
-        if (string.IsNullOrWhiteSpace(numero)) return tipo;
+        if (string.IsNullOrWhiteSpace(numero)) return $"{tipo} S/N";
         return $"{tipo} {numero}";
+    }
+
+    private static string? ObtenerNumeroMostrable(MaeDocumento? documento)
+    {
+        if (documento is null) return null;
+
+        var numeroOficial = documento.NumeroOficial?.Trim();
+        if (!string.IsNullOrWhiteSpace(numeroOficial)) return numeroOficial;
+
+        var numeroInterno = documento.NumeroInterno?.Trim();
+        if (!string.IsNullOrWhiteSpace(numeroInterno)) return numeroInterno;
+
+        return null;
     }
 
     private static string ConstruirResumenUsuario(string origen, string destino, string observacion, bool esActuacionInterna)
