@@ -89,25 +89,25 @@ public static class ExpedienteMovimientoSimplificador
     private static string FormatearDocumento(MaeDocumento? documento)
     {
         var tipo = documento?.IdTipoNavigation?.Nombre?.Trim();
-        var numero = ObtenerNumeroMostrable(documento);
+        var (numero, esNumeroInterno) = ObtenerNumeroMostrable(documento);
 
         if (string.IsNullOrWhiteSpace(tipo) && string.IsNullOrWhiteSpace(numero)) return DocumentoSinNumero;
-        if (string.IsNullOrWhiteSpace(tipo)) return numero!;
+        if (string.IsNullOrWhiteSpace(tipo)) return esNumeroInterno ? $"ID {numero}" : numero!;
         if (string.IsNullOrWhiteSpace(numero)) return $"{tipo} S/N";
-        return $"{tipo} {numero}";
+        return esNumeroInterno ? $"{tipo} (ID {numero})" : $"{tipo} {numero}";
     }
 
-    private static string? ObtenerNumeroMostrable(MaeDocumento? documento)
+    private static (string? Numero, bool EsNumeroInterno) ObtenerNumeroMostrable(MaeDocumento? documento)
     {
-        if (documento is null) return null;
+        if (documento is null) return (null, false);
 
         var numeroOficial = documento.NumeroOficial?.Trim();
-        if (!string.IsNullOrWhiteSpace(numeroOficial)) return numeroOficial;
+        if (!string.IsNullOrWhiteSpace(numeroOficial)) return (numeroOficial, false);
 
         var numeroInterno = documento.NumeroInterno?.Trim();
-        if (!string.IsNullOrWhiteSpace(numeroInterno)) return numeroInterno;
+        if (!string.IsNullOrWhiteSpace(numeroInterno)) return (numeroInterno, true);
 
-        return null;
+        return (null, false);
     }
 
     private static string ConstruirResumenUsuario(string origen, string destino, string observacion, bool esActuacionInterna)
