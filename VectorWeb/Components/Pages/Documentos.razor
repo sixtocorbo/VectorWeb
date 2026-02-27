@@ -10,7 +10,6 @@
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
-@inject IJSRuntime JS
 @inject DocumentosService DocumentoService
 @rendermode InteractiveServer
 @implements IDisposable
@@ -321,6 +320,69 @@
     }
 </div>
 
+@if (mostrarModalResumenEliminacion && resumenEliminacionActual is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar eliminación total</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CancelarEliminacion" disabled="@procesandoEliminacion"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Se eliminará el documento <strong>#@resumenEliminacionActual.IdDocumento</strong>@(!string.IsNullOrWhiteSpace(resumenEliminacionActual.NumeroOficial) ? $" ({resumenEliminacionActual.NumeroOficial})" : string.Empty).</p>
+                    @if (!string.IsNullOrWhiteSpace(resumenEliminacionActual.Asunto))
+                    {
+                        <p class="text-muted small mb-3">Asunto: @resumenEliminacionActual.Asunto</p>
+                    }
+
+                    <div class="alert alert-warning mb-3" role="alert">
+                        <i class="bi bi-shield-exclamation me-2"></i>Esta acción es irreversible y también eliminará todos los elementos relacionados.
+                    </div>
+
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-file-earmark-text me-2 text-primary"></i>Documentos totales</span>
+                            <span class="badge bg-primary rounded-pill">@resumenEliminacionActual.TotalDocumentos</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-diagram-2 me-2 text-secondary"></i>Documentos hijos</span>
+                            <span class="badge bg-secondary rounded-pill">@resumenEliminacionActual.TotalDocumentosHijos</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-send me-2 text-warning"></i>Pases / movimientos</span>
+                            <span class="badge bg-warning text-dark rounded-pill">@resumenEliminacionActual.TotalPases</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-paperclip me-2 text-info"></i>Adjuntos</span>
+                            <span class="badge bg-info text-dark rounded-pill">@resumenEliminacionActual.TotalAdjuntos</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-link-45deg me-2 text-dark"></i>Vínculos de respaldo</span>
+                            <span class="badge bg-dark rounded-pill">@resumenEliminacionActual.TotalVinculos</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-box-arrow-in-right me-2 text-danger"></i>Salidas afectadas</span>
+                            <span class="badge bg-danger rounded-pill">@resumenEliminacionActual.TotalSalidasAfectadas</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-secondary" @onclick="CancelarEliminacion" disabled="@procesandoEliminacion">Cancelar</button>
+                    <button class="btn btn-danger" @onclick="EjecutarEliminacion" disabled="@procesandoEliminacion">
+                        @if (procesandoEliminacion)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Sí, eliminar todo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
 @code {
     // ... (El bloque @code se mantiene igual, no hay cambios en la lógica)
     private List<MaeDocumento>? listaDocs;
@@ -339,7 +401,9 @@
     private int totalAmarillo;
     private int totalVerde;
     private bool procesandoEliminacion;
+    private bool mostrarModalResumenEliminacion;
     private string? mensajeError;
+    private ResumenEliminacionDocumento? resumenEliminacionActual;
     private const int DiasRiesgoSemaforo = 3;
     private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
@@ -515,10 +579,29 @@
     }
     private async Task ConfirmarEliminacion(long idDocumento)
     {
-        var confirmado = await JS.InvokeAsync<bool>("confirm",
-            "¡ATENCIÓN! ¿Está seguro que desea eliminar este documento? Se eliminarán TODOS sus movimientos, archivos adjuntos y documentos hijos. Esta acción no se puede deshacer.");
+        mensajeError = null;
+        procesandoEliminacion = false;
+        resumenEliminacionActual = await DocumentoService.ObtenerResumenEliminacionAsync(idDocumento);
 
-        if (!confirmado) return;
+        if (resumenEliminacionActual is null)
+        {
+            mensajeError = "No se pudo obtener el resumen del documento a eliminar.";
+            return;
+        }
+
+        mostrarModalResumenEliminacion = true;
+    }
+
+    private void CancelarEliminacion()
+    {
+        if (procesandoEliminacion) return;
+        mostrarModalResumenEliminacion = false;
+        resumenEliminacionActual = null;
+    }
+
+    private async Task EjecutarEliminacion()
+    {
+        if (resumenEliminacionActual is null) return;
 
         procesandoEliminacion = true;
         mensajeError = null;
@@ -530,13 +613,15 @@
             var user = authState.User;
             var idUsuario = int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 1;
 
-            var resultado = await DocumentoService.EliminarDocumentoTotalAsync(idDocumento, idUsuario);
+            var resultado = await DocumentoService.EliminarDocumentoTotalAsync(resumenEliminacionActual.IdDocumento, idUsuario);
             if (!resultado.Exitoso)
             {
                 mensajeError = resultado.Mensaje;
                 return;
             }
 
+            mostrarModalResumenEliminacion = false;
+            resumenEliminacionActual = null;
             await CargarDocumentos();
         }
         finally
