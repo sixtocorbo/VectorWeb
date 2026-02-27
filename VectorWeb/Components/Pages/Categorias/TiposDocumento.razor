@@ -95,7 +95,7 @@
             await RepoTipo.DeleteAsync(id);
             await Cargar();
         }
-        catch (DbUpdateException ex) when (EsErrorPorRegistroRelacionado(ex))
+        catch (Exception ex) when (EsErrorPorRegistroRelacionado(ex))
         {
             var nombreTipo = tipo?.Nombre ?? "seleccionado";
             mensajeError = $"No se puede eliminar el tipo de documento '{nombreTipo}' porque está siendo utilizado en la configuración de plazos u otros registros relacionados.";
