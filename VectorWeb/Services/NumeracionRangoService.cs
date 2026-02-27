@@ -402,14 +402,42 @@ public class NumeracionRangoService
         var consumoActual = rangosExistentes.Sum(r => r.NumeroFin - r.NumeroInicio + 1);
         var saldo = Math.Max(0, cupoTotal - consumoActual);
 
-        int inicioSugerido = 1;
-        foreach (var r in rangosExistentes)
+        var objetivoOriginal = Math.Max(1, cantidadSolicitada ?? 50);
+        var objetivoAjustadoPorSaldo = Math.Min(objetivoOriginal, saldo);
+
+        var bloquesDisponibles = ObtenerBloquesDisponibles(rangosExistentes, cupoTotal);
+        var maximoConsecutivoDisponible = bloquesDisponibles.Count > 0
+            ? bloquesDisponibles.Max(b => b.Longitud)
+            : 0;
+
+        var bloqueSeleccionado = objetivoAjustadoPorSaldo > 0
+            ? bloquesDisponibles.FirstOrDefault(b => b.Longitud >= objetivoAjustadoPorSaldo)
+            : null;
+
+        int inicioSugerido;
+        int cantidad;
+
+        if (bloqueSeleccionado is not null)
         {
-            if (inicioSugerido < r.NumeroInicio) break;
-            inicioSugerido = r.NumeroFin + 1;
+            inicioSugerido = bloqueSeleccionado.Inicio;
+            cantidad = objetivoAjustadoPorSaldo;
+        }
+        else if (bloquesDisponibles.Count > 0)
+        {
+            var primerBloque = bloquesDisponibles[0];
+            inicioSugerido = primerBloque.Inicio;
+            cantidad = Math.Min(primerBloque.Longitud, objetivoAjustadoPorSaldo);
+        }
+        else
+        {
+            inicioSugerido = 1;
+            cantidad = 0;
         }
 
-        int cantidad = Math.Min(cantidadSolicitada ?? 50, saldo);
+        var numeroFinSugerido = cantidad > 0
+            ? inicioSugerido + cantidad - 1
+            : inicioSugerido;
+        var sugerenciaRecortada = cantidad < objetivoOriginal;
 
         return new SugerenciaRangoNumeracion
         {
@@ -417,13 +445,43 @@ public class NumeracionRangoService
             SaldoDisponible = saldo,
             ConsumoTotalAsignado = consumoActual,
             NumeroInicioSugerido = inicioSugerido,
-            NumeroFinSugerido = inicioSugerido + cantidad - 1,
+            NumeroFinSugerido = numeroFinSugerido,
             CantidadSugerida = cantidad,
-            SugerenciaRecortadaPorSaldo = (cantidad < (cantidadSolicitada ?? 50)),
+            SugerenciaRecortadaPorSaldo = sugerenciaRecortada,
             OficinaTieneRangoActivo = oficinaTieneActivos,
             RangoActivoAgotado = oficinaTieneActivos && !oficinaTieneActivosDisponibles,
-            CantidadRangosActivosOficina = cantidadActivosOficina
+            CantidadRangosActivosOficina = cantidadActivosOficina,
+            MaximoConsecutivoDisponible = maximoConsecutivoDisponible
         };
+    }
+
+    private static List<BloqueDisponible> ObtenerBloquesDisponibles(List<MaeNumeracionRango> rangosExistentes, int cupoTotal)
+    {
+        var bloques = new List<BloqueDisponible>();
+        if (cupoTotal <= 0) return bloques;
+
+        var cursor = 1;
+        foreach (var rango in rangosExistentes.OrderBy(r => r.NumeroInicio))
+        {
+            if (rango.NumeroInicio > cursor)
+            {
+                var finBloque = Math.Min(cupoTotal, rango.NumeroInicio - 1);
+                if (finBloque >= cursor)
+                {
+                    bloques.Add(new BloqueDisponible(cursor, finBloque - cursor + 1));
+                }
+            }
+
+            cursor = Math.Max(cursor, rango.NumeroFin + 1);
+            if (cursor > cupoTotal) break;
+        }
+
+        if (cursor <= cupoTotal)
+        {
+            bloques.Add(new BloqueDisponible(cursor, cupoTotal - cursor + 1));
+        }
+
+        return bloques;
     }
 
     public async Task<int?> ObtenerCantidadCupoAsync(int idTipo, int anio)
@@ -516,4 +574,7 @@ public sealed class SugerenciaRangoNumeracion
     public bool OficinaTieneRangoActivo { get; set; }
     public bool RangoActivoAgotado { get; set; }
     public int CantidadRangosActivosOficina { get; set; }
+    public int MaximoConsecutivoDisponible { get; set; }
 }
+
+internal sealed record BloqueDisponible(int Inicio, int Longitud);
