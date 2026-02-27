@@ -17,6 +17,12 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3><i class="bi bi-sliders"></i> Gestión de Rangos y Cupos</h3>
+    @if (!string.IsNullOrWhiteSpace(VolverUrlDecodificada))
+    {
+        <a href="@VolverUrlDecodificada" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Regresar
+        </a>
+    }
 </div>
 
 @* --- MENSAJES DE ALERTA (Sin Toast, integrados) --- *@
@@ -391,7 +397,7 @@ else
 
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Tipo de Documento</label>
-                                <InputSelect @bind-Value="rangoActual.IdTipo" @bind-Value:after="OnParametrosSugerenciaRangoCambio" class="form-select">
+                                <InputSelect @bind-Value="rangoActual.IdTipo" @bind-Value:after="OnParametrosSugerenciaRangoCambio" class="form-select" disabled="@BloquearTipoEnModalRango">
                                     <option value="0">-- Seleccione --</option>
                                     @foreach (var tipo in tipos)
                                     {
@@ -412,7 +418,8 @@ else
                                                value="@oficinaBusquedaRango"
                                                @oninput="OnBusquedaOficinaInput"
                                                @onfocus="MostrarSugerenciasOficinaRango"
-                                               @onkeydown="ManejarTecladoOficinasRango" />
+                                               @onkeydown="ManejarTecladoOficinasRango"
+                                               disabled="@BloquearOficinaEnModalRango" />
                                         @* MEJORA: Usamos oninput para el debounce *@
                                     </div>
 
@@ -599,6 +606,18 @@ else
     [SupplyParameterFromQuery(Name = "anio")]
     public int? AnioPreseleccionado { get; set; }
 
+    [SupplyParameterFromQuery(Name = "bloquearTipo")]
+    public int? BloquearTipoQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "bloquearOficina")]
+    public int? BloquearOficinaQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "abrirNuevoRango")]
+    public int? AbrirNuevoRangoQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "volver")]
+    public string? VolverUrl { get; set; }
+
     // --- VARIABLES DE ESTADO ---
     private enum TabConfig { Rangos, Cupos, Bitacora }
     private TabConfig tabActiva = TabConfig.Rangos;
@@ -644,6 +663,7 @@ else
     private bool numeroInicioEditadoManualmente;
     private static readonly CultureInfo CulturaUi = CultureInfo.GetCultureInfo("es-DO");
     private bool contextoPreseleccionAplicado;
+    private bool redireccionDesdeNuevoDocumento;
 
     // Lógica de filtrado en memoria para la tabla de rangos
     private IEnumerable<MaeNumeracionRango> RangosFiltrados =>
@@ -717,21 +737,39 @@ else
         var oficina = oficinas.FirstOrDefault(o => o.IdOficina == OficinaPreseleccionada.Value);
         if (!tipoExiste || oficina is null) return;
 
-        AbrirNuevoRango();
-        rangoActual.IdTipo = TipoPreseleccionado.Value;
-        rangoActual.IdOficina = oficina.IdOficina;
-        oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
-        oficinasRangoFiltradas.Clear();
-        indiceOficinaRangoSeleccionada = -1;
+        redireccionDesdeNuevoDocumento = !string.IsNullOrWhiteSpace(VolverUrlDecodificada);
 
-        if (AnioPreseleccionado.HasValue && AnioPreseleccionado.Value >= 2000)
+        if (AbrirNuevoRangoQuery == 1)
         {
-            rangoActual.Anio = AnioPreseleccionado.Value;
+            AbrirNuevoRango();
+            rangoActual.IdTipo = TipoPreseleccionado.Value;
+            rangoActual.IdOficina = oficina.IdOficina;
+            oficinaBusquedaRango = oficina.Nombre ?? string.Empty;
+            oficinasRangoFiltradas.Clear();
+            indiceOficinaRangoSeleccionada = -1;
+
+            if (AnioPreseleccionado.HasValue && AnioPreseleccionado.Value >= 2000)
+            {
+                rangoActual.Anio = AnioPreseleccionado.Value;
+            }
+
+            tabActiva = TabConfig.Rangos;
+            contextoPreseleccionAplicado = true;
+            _ = RefrescarSugerenciaRangoAsync();
+            return;
         }
 
-        tabActiva = TabConfig.Rangos;
+        tabActiva = TabConfig.Cupos;
+        cupoTipoSeleccionado = TipoPreseleccionado.Value;
+        cupoAnio = AnioPreseleccionado.HasValue && AnioPreseleccionado.Value >= 2000
+            ? AnioPreseleccionado.Value
+            : DateTime.Now.Year;
+        cupoCantidad = 0;
+        cupoConsumido = 0;
+        mostrarModalCupo = true;
+        mensajeOk = "No existe cupo configurado para este tipo y año. Primero cree el cupo para luego configurar el rango.";
         contextoPreseleccionAplicado = true;
-        _ = RefrescarSugerenciaRangoAsync();
+        _ = OnCupoParametrosCambio();
     }
 
     // --- CARGA DE DATOS ---
@@ -990,7 +1028,7 @@ else
         cupoTipoSeleccionado = rangoActual.IdTipo;
         cupoAnio = rangoActual.Anio > 0 ? rangoActual.Anio : DateTime.Now.Year;
         _ = OnCupoParametrosCambio();
-        mensajeOk = "Complete y guarde el cupo sugerido para continuar con la asignación del rango.";
+        mensajeOk = "Complete y guarde el cupo sugerido. Al terminar, volverá al alta de rango para continuar.";
         tabActiva = TabConfig.Cupos;
         mostrarModalCupo = true;
     }
@@ -1076,6 +1114,22 @@ else
             mensajeOk = "Cupo guardado correctamente.";
             mostrarModalCupo = false;
             await CargarTodo();
+
+            if (redireccionDesdeNuevoDocumento && TipoPreseleccionado.HasValue && OficinaPreseleccionada.HasValue)
+            {
+                var oficina = oficinas.FirstOrDefault(o => o.IdOficina == OficinaPreseleccionada.Value);
+                AbrirNuevoRango();
+                rangoActual.IdTipo = TipoPreseleccionado.Value;
+                rangoActual.IdOficina = OficinaPreseleccionada.Value;
+                oficinaBusquedaRango = oficina?.Nombre ?? string.Empty;
+                if (AnioPreseleccionado.HasValue && AnioPreseleccionado.Value >= 2000)
+                {
+                    rangoActual.Anio = AnioPreseleccionado.Value;
+                }
+
+                tabActiva = TabConfig.Rangos;
+            }
+
             await RefrescarSugerenciaRangoAsync();
         }
         catch (Exception ex)
@@ -1174,6 +1228,10 @@ else
     private string MensajeOficinaRango => rangoActual.IdOficina is not null
         ? "Oficina seleccionada correctamente."
         : "Seleccione una oficina específica.";
+
+    private bool BloquearTipoEnModalRango => BloquearTipoQuery == 1;
+    private bool BloquearOficinaEnModalRango => BloquearOficinaQuery == 1;
+    private string? VolverUrlDecodificada => string.IsNullOrWhiteSpace(VolverUrl) ? null : Uri.UnescapeDataString(VolverUrl);
 
     private bool PuedeAplicarSugerencia => sugerenciaRango.CantidadSugerida > 0 && sugerenciaRango.SaldoDisponible > 0;
     private bool MostrarAvisoExisteRangoActivo => sugerenciaRango.OficinaTieneRangoActivo && !sugerenciaRango.RangoActivoAgotado;

@@ -891,11 +891,16 @@
 
     private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
 
-    private void AbrirGestionRangosConContexto()
+    private async Task AbrirGestionRangosConContexto()
     {
         if (!MostrarAccesoGestionRangos) return;
-        var destino = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}";
-        Navegador.NavigateTo(destino);
+
+        var cupoConfigurado = (await RangoService.ObtenerCantidadCupoAsync(nuevoDoc.IdTipo, anioNumeracionSeleccionado) ?? 0) > 0;
+        var abrirNuevoRango = cupoConfigurado ? 1 : 0;
+
+        var volver = Uri.EscapeDataString(Navegador.Uri);
+        var destino = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}&bloquearTipo=1&bloquearOficina=1&abrirNuevoRango={abrirNuevoRango}&volver={volver}";
+        await JS.InvokeVoidAsync("open", destino, "_blank");
     }
 
     private void FiltrarOficinas(ChangeEventArgs e)
