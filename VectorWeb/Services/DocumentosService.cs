@@ -89,6 +89,47 @@ public sealed class DocumentosService
             })
             .ToListAsync();
 
+        var adjuntos = await context.TraAdjuntoDocumentos.AsNoTracking()
+            .Where(a => ids.Contains(a.IdDocumento))
+            .OrderByDescending(a => a.AddedAt)
+            .ThenByDescending(a => a.IdAdjunto)
+            .Select(a => new DetalleAdjuntoRelacionado
+            {
+                IdAdjunto = a.IdAdjunto,
+                IdDocumento = a.IdDocumento,
+                DisplayName = a.DisplayName,
+                FechaRegistro = a.AddedAt
+            })
+            .ToListAsync();
+
+        var vinculosRespaldo = await context.TraSalidasLaboralesDocumentoRespaldos.AsNoTracking()
+            .Where(v => ids.Contains(v.IdDocumento))
+            .OrderByDescending(v => v.FechaRegistro)
+            .ThenByDescending(v => v.IdSalidaDocumentoRespaldo)
+            .Select(v => new DetalleVinculoRespaldoRelacionado
+            {
+                IdSalidaDocumentoRespaldo = v.IdSalidaDocumentoRespaldo,
+                IdSalida = v.IdSalida,
+                IdDocumento = v.IdDocumento,
+                FechaRegistro = v.FechaRegistro
+            })
+            .ToListAsync();
+
+        var salidasAfectadas = await context.TraSalidasLaborales.AsNoTracking()
+            .Where(s => s.IdDocumentoRespaldo.HasValue && ids.Contains(s.IdDocumentoRespaldo.Value))
+            .OrderByDescending(s => s.IdSalida)
+            .Select(s => new DetalleSalidaAfectadaRelacionada
+            {
+                IdSalida = s.IdSalida,
+                IdDocumentoRespaldo = s.IdDocumentoRespaldo,
+                LugarTrabajo = s.LugarTrabajo,
+                FechaInicio = s.FechaInicio,
+                FechaVencimiento = s.FechaVencimiento,
+                Activo = s.Activo,
+                Observaciones = s.Observaciones
+            })
+            .ToListAsync();
+
         return new ResumenEliminacionDocumento
         {
             IdDocumento = documentoPrincipal.IdDocumento,
@@ -101,7 +142,10 @@ public sealed class DocumentosService
             TotalVinculos = totalVinculos,
             TotalSalidasAfectadas = totalSalidasAfectadas,
             DocumentosHijos = documentosHijos,
-            Movimientos = movimientos
+            Movimientos = movimientos,
+            Adjuntos = adjuntos,
+            VinculosRespaldo = vinculosRespaldo,
+            SalidasAfectadas = salidasAfectadas
         };
     }
 
@@ -189,6 +233,9 @@ public sealed class ResumenEliminacionDocumento
     public int TotalSalidasAfectadas { get; set; }
     public List<DetalleDocumentoRelacionado> DocumentosHijos { get; set; } = [];
     public List<DetalleMovimientoRelacionado> Movimientos { get; set; } = [];
+    public List<DetalleAdjuntoRelacionado> Adjuntos { get; set; } = [];
+    public List<DetalleVinculoRespaldoRelacionado> VinculosRespaldo { get; set; } = [];
+    public List<DetalleSalidaAfectadaRelacionada> SalidasAfectadas { get; set; } = [];
 }
 
 public sealed class DetalleDocumentoRelacionado
@@ -206,4 +253,31 @@ public sealed class DetalleMovimientoRelacionado
     public string OficinaOrigen { get; set; } = string.Empty;
     public string OficinaDestino { get; set; } = string.Empty;
     public string? Observacion { get; set; }
+}
+
+public sealed class DetalleAdjuntoRelacionado
+{
+    public long IdAdjunto { get; set; }
+    public long IdDocumento { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public DateTime FechaRegistro { get; set; }
+}
+
+public sealed class DetalleVinculoRespaldoRelacionado
+{
+    public int IdSalidaDocumentoRespaldo { get; set; }
+    public int IdSalida { get; set; }
+    public long IdDocumento { get; set; }
+    public DateTime FechaRegistro { get; set; }
+}
+
+public sealed class DetalleSalidaAfectadaRelacionada
+{
+    public int IdSalida { get; set; }
+    public long? IdDocumentoRespaldo { get; set; }
+    public string LugarTrabajo { get; set; } = string.Empty;
+    public DateTime FechaInicio { get; set; }
+    public DateTime FechaVencimiento { get; set; }
+    public bool? Activo { get; set; }
+    public string? Observaciones { get; set; }
 }

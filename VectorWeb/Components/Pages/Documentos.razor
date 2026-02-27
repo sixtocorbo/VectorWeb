@@ -341,84 +341,194 @@
                     </div>
 
                     <ul class="list-group">
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-file-earmark-text me-2 text-primary"></i>Documentos totales</span>
-                            <span class="badge bg-primary rounded-pill">@resumenEliminacionActual.TotalDocumentos</span>
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("documentos-totales")'>
+                                <span><i class="bi bi-file-earmark-text me-2 text-primary"></i>Documentos totales</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary rounded-pill">@resumenEliminacionActual.TotalDocumentos</span>
+                                    <i class="bi @(EstaDetalleExpandido("documentos-totales") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("documentos-totales"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    <div class="fw-semibold">Documento principal #@resumenEliminacionActual.IdDocumento@(!string.IsNullOrWhiteSpace(resumenEliminacionActual.NumeroOficial) ? $" ({resumenEliminacionActual.NumeroOficial})" : string.Empty)</div>
+                                    @if (!string.IsNullOrWhiteSpace(resumenEliminacionActual.Asunto))
+                                    {
+                                        <div class="text-muted">Asunto: @resumenEliminacionActual.Asunto</div>
+                                    }
+                                    @if (resumenEliminacionActual.DocumentosHijos.Count > 0)
+                                    {
+                                        <hr class="my-2" />
+                                        @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
+                                        {
+                                            <div>• Hijo #@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-diagram-2 me-2 text-secondary"></i>Documentos hijos</span>
-                            <span class="badge bg-secondary rounded-pill">@resumenEliminacionActual.TotalDocumentosHijos</span>
+
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("documentos-hijos")'>
+                                <span><i class="bi bi-diagram-2 me-2 text-secondary"></i>Documentos hijos</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-secondary rounded-pill">@resumenEliminacionActual.TotalDocumentosHijos</span>
+                                    <i class="bi @(EstaDetalleExpandido("documentos-hijos") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("documentos-hijos"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    @if (resumenEliminacionActual.DocumentosHijos.Count == 0)
+                                    {
+                                        <div class="text-muted">Sin documentos hijos.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
+                                        {
+                                            <div class="mb-1">
+                                                <div class="fw-semibold">#@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
+                                                @if (!string.IsNullOrWhiteSpace(hijo.Asunto))
+                                                {
+                                                    <div class="text-muted">Asunto: @hijo.Asunto</div>
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-send me-2 text-warning"></i>Pases / movimientos</span>
-                            <span class="badge bg-warning text-dark rounded-pill">@resumenEliminacionActual.TotalPases</span>
+
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("movimientos")'>
+                                <span><i class="bi bi-send me-2 text-warning"></i>Pases / movimientos</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-warning text-dark rounded-pill">@resumenEliminacionActual.TotalPases</span>
+                                    <i class="bi @(EstaDetalleExpandido("movimientos") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("movimientos"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    @if (resumenEliminacionActual.Movimientos.Count == 0)
+                                    {
+                                        <div class="text-muted">Sin movimientos.</div>
+                                    }
+                                    else
+                                    {
+                                        <div class="table-responsive border rounded bg-white">
+                                            <table class="table table-sm table-striped align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>ID</th><th>Documento</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Observación</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var movimiento in resumenEliminacionActual.Movimientos)
+                                                    {
+                                                        <tr>
+                                                            <td>#@movimiento.IdMovimiento</td>
+                                                            <td>#@movimiento.IdDocumento</td>
+                                                            <td>@(movimiento.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
+                                                            <td>@movimiento.OficinaOrigen</td>
+                                                            <td>@movimiento.OficinaDestino</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.Observacion) ? "-" : movimiento.Observacion)</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+                            }
                         </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-paperclip me-2 text-info"></i>Adjuntos</span>
-                            <span class="badge bg-info text-dark rounded-pill">@resumenEliminacionActual.TotalAdjuntos</span>
+
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("adjuntos")'>
+                                <span><i class="bi bi-paperclip me-2 text-info"></i>Adjuntos</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-info text-dark rounded-pill">@resumenEliminacionActual.TotalAdjuntos</span>
+                                    <i class="bi @(EstaDetalleExpandido("adjuntos") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("adjuntos"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    @if (resumenEliminacionActual.Adjuntos.Count == 0)
+                                    {
+                                        <div class="text-muted">Sin adjuntos.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var adjunto in resumenEliminacionActual.Adjuntos)
+                                        {
+                                            <div>• #@adjunto.IdAdjunto · Doc #@adjunto.IdDocumento · @adjunto.DisplayName · @adjunto.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-link-45deg me-2 text-dark"></i>Vínculos de respaldo</span>
-                            <span class="badge bg-dark rounded-pill">@resumenEliminacionActual.TotalVinculos</span>
+
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("vinculos")'>
+                                <span><i class="bi bi-link-45deg me-2 text-dark"></i>Vínculos de respaldo</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-dark rounded-pill">@resumenEliminacionActual.TotalVinculos</span>
+                                    <i class="bi @(EstaDetalleExpandido("vinculos") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("vinculos"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    @if (resumenEliminacionActual.VinculosRespaldo.Count == 0)
+                                    {
+                                        <div class="text-muted">Sin vínculos de respaldo.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var vinculo in resumenEliminacionActual.VinculosRespaldo)
+                                        {
+                                            <div>• Vínculo #@vinculo.IdSalidaDocumentoRespaldo · Salida #@vinculo.IdSalida · Doc #@vinculo.IdDocumento · @vinculo.FechaRegistro.ToString("dd/MM/yyyy HH:mm")</div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-box-arrow-in-right me-2 text-danger"></i>Salidas afectadas</span>
-                            <span class="badge bg-danger rounded-pill">@resumenEliminacionActual.TotalSalidasAfectadas</span>
+
+                        <li class="list-group-item p-0">
+                            <button type="button" class="btn btn-link text-decoration-none text-dark w-100 d-flex justify-content-between align-items-center px-3 py-2"
+                                    @onclick='() => ToggleDetalleEliminacion("salidas")'>
+                                <span><i class="bi bi-box-arrow-in-right me-2 text-danger"></i>Salidas afectadas</span>
+                                <span class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-danger rounded-pill">@resumenEliminacionActual.TotalSalidasAfectadas</span>
+                                    <i class="bi @(EstaDetalleExpandido("salidas") ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </span>
+                            </button>
+                            @if (EstaDetalleExpandido("salidas"))
+                            {
+                                <div class="border-top px-3 py-2 bg-light small">
+                                    @if (resumenEliminacionActual.SalidasAfectadas.Count == 0)
+                                    {
+                                        <div class="text-muted">Sin salidas afectadas.</div>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var salida in resumenEliminacionActual.SalidasAfectadas)
+                                        {
+                                            <div class="mb-1">• Salida #@salida.IdSalida · Resp: #@salida.IdDocumentoRespaldo · @salida.LugarTrabajo · @salida.FechaInicio.ToString("dd/MM/yyyy") - @salida.FechaVencimiento.ToString("dd/MM/yyyy") · @(salida.Activo == true ? "Activa" : "Inactiva")</div>
+                                        }
+                                    }
+                                </div>
+                            }
                         </li>
                     </ul>
-
-                    @if (resumenEliminacionActual.DocumentosHijos.Count > 0)
-                    {
-                        <div class="mt-4">
-                            <h6 class="fw-bold mb-2"><i class="bi bi-diagram-2 me-2 text-secondary"></i>Detalle de documentos hijos</h6>
-                            <div class="list-group list-group-flush border rounded">
-                                @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
-                                {
-                                    <div class="list-group-item">
-                                        <div class="fw-semibold">Documento #@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
-                                        @if (!string.IsNullOrWhiteSpace(hijo.Asunto))
-                                        {
-                                            <div class="small text-muted">Asunto: @hijo.Asunto</div>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    }
-
-                    @if (resumenEliminacionActual.Movimientos.Count > 0)
-                    {
-                        <div class="mt-4">
-                            <h6 class="fw-bold mb-2"><i class="bi bi-send me-2 text-warning"></i>Detalle de pases / movimientos</h6>
-                            <div class="table-responsive border rounded">
-                                <table class="table table-sm table-striped align-middle mb-0">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Documento</th>
-                                            <th>Fecha</th>
-                                            <th>Origen</th>
-                                            <th>Destino</th>
-                                            <th>Observación</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var movimiento in resumenEliminacionActual.Movimientos)
-                                        {
-                                            <tr>
-                                                <td>#@movimiento.IdMovimiento</td>
-                                                <td>#@movimiento.IdDocumento</td>
-                                                <td>@(movimiento.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm") ?? "-" )</td>
-                                                <td>@movimiento.OficinaOrigen</td>
-                                                <td>@movimiento.OficinaDestino</td>
-                                                <td class="small">@(string.IsNullOrWhiteSpace(movimiento.Observacion) ? "-" : movimiento.Observacion)</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline-secondary" @onclick="CancelarEliminacion" disabled="@procesandoEliminacion">Cancelar</button>
@@ -457,6 +567,7 @@
     private bool mostrarModalResumenEliminacion;
     private string? mensajeError;
     private ResumenEliminacionDocumento? resumenEliminacionActual;
+    private readonly HashSet<string> detallesEliminacionExpandidos = [];
     private const int DiasRiesgoSemaforo = 3;
     private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
@@ -642,6 +753,7 @@
             return;
         }
 
+        detallesEliminacionExpandidos.Clear();
         mostrarModalResumenEliminacion = true;
     }
 
@@ -650,6 +762,7 @@
         if (procesandoEliminacion) return;
         mostrarModalResumenEliminacion = false;
         resumenEliminacionActual = null;
+        detallesEliminacionExpandidos.Clear();
     }
 
     private async Task EjecutarEliminacion()
@@ -675,6 +788,7 @@
 
             mostrarModalResumenEliminacion = false;
             resumenEliminacionActual = null;
+            detallesEliminacionExpandidos.Clear();
             await CargarDocumentos();
         }
         finally
@@ -683,6 +797,17 @@
             StateHasChanged();
         }
     }
+
+
+    private void ToggleDetalleEliminacion(string clave)
+    {
+        if (!detallesEliminacionExpandidos.Add(clave))
+        {
+            detallesEliminacionExpandidos.Remove(clave);
+        }
+    }
+
+    private bool EstaDetalleExpandido(string clave) => detallesEliminacionExpandidos.Contains(clave);
 
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
 
