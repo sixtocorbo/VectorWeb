@@ -25,16 +25,16 @@ public sealed class DocumentosService
 BEGIN TRY
     BEGIN TRAN;
 
-    SELECT IdDocumento INTO #DocsAEliminar FROM (
-        WITH CTE_Docs AS (
-            SELECT IdDocumento FROM Mae_Documento WHERE IdDocumento = @IdDocumento
-            UNION ALL
-            SELECT d.IdDocumento
-            FROM Mae_Documento d
-            INNER JOIN CTE_Docs c ON d.IdDocumentoPadre = c.IdDocumento
-        )
-        SELECT IdDocumento FROM CTE_Docs
-    ) AS T;
+    ;WITH CTE_Docs AS (
+        SELECT IdDocumento FROM Mae_Documento WHERE IdDocumento = @IdDocumento
+        UNION ALL
+        SELECT d.IdDocumento
+        FROM Mae_Documento d
+        INNER JOIN CTE_Docs c ON d.IdDocumentoPadre = c.IdDocumento
+    )
+    SELECT IdDocumento
+    INTO #DocsAEliminar
+    FROM CTE_Docs;
 
     DELETE FROM Tra_SalidasLaboralesDocumentoRespaldo
     WHERE IdDocumento IN (SELECT IdDocumento FROM #DocsAEliminar);
