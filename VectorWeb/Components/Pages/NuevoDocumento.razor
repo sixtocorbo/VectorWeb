@@ -58,6 +58,11 @@
         font-size: 0.9rem;
     }
 
+    .label-important {
+        color: #b02a37;
+        font-weight: 700;
+    }
+
     .modal-backdrop-custom {
         background-color: rgba(0,0,0,.5);
         backdrop-filter: blur(4px);
@@ -189,7 +194,10 @@
                             @if (!esActuacion)
                             {
                                 <div class="col-md-6">
-                                    <label class="label-custom mb-1">Oficina de Ubicación Inicial</label>
+                                    <label class="label-custom label-important mb-1">
+                                        Procedencia del Documento
+                                        <span class="badge bg-danger ms-2 align-middle">Paso clave</span>
+                                    </label>
                                     <div class="position-relative" @ref="contenedorSugerenciasOficinaRef">
                                         <div class="input-group">
                                             <span class="input-group-text bg-white text-muted"><i class="bi bi-building"></i></span>
