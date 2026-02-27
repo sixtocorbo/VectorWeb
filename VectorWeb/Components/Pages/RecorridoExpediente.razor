@@ -147,7 +147,8 @@
                     ($"{string.Join(" ", m.Documentos)} {m.ResumenUsuario} {m.OficinaOrigen} {m.OficinaDestino} {m.ObservacionOriginal}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
         .Where(m => !filtroDesde.HasValue || m.FechaMovimiento.Date >= filtroDesde.Value.Date)
         .Where(m => !filtroHasta.HasValue || m.FechaMovimiento.Date <= filtroHasta.Value.Date)
-        .OrderByDescending(m => m.FechaMovimiento);
+        .OrderByDescending(m => m.FechaMovimiento)
+        .ThenByDescending(m => m.UltimoIdMovimiento);
 
     protected override async Task OnParametersSetAsync()
     {
