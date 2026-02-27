@@ -7,10 +7,12 @@
 @using System.Timers
 @using VectorWeb.Models
 @using VectorWeb.Services
+@using VectorWeb.Services.Security
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
 @inject DocumentosService DocumentoService
+@inject RolePermissionService RolePermissionService
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -289,7 +291,16 @@
                                         <a class="btn btn-sm btn-outline-info" href="documentos/historial/@doc.IdDocumento"><i class="bi bi-clock-history"></i> Historial</a>
                                         <a class="btn btn-sm btn-outline-secondary" href="documentos/recorrido/@doc.IdDocumento"><i class="bi bi-geo-alt"></i> Recorrido</a>
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => IrAEditar(doc.IdDocumento)"><i class="bi bi-pencil-square"></i> Editar</button>
-                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminacion(doc.IdDocumento)"><i class="bi bi-trash"></i> Eliminar total</button>
+                                        @if (esSuperAdmin)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminacion(doc.IdDocumento)"><i class="bi bi-trash"></i> Eliminar total</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary" disabled title="Solo Super Admin puede eliminar documentos.">
+                                                <i class="bi bi-lock"></i> Eliminar bloqueado
+                                            </button>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -349,6 +360,17 @@
                         <div>
                             <strong>¡Atención!</strong> Esta acción es irreversible y eliminará el documento junto con <strong>todos</strong> sus elementos relacionados.
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Clave de seguridad (solo Super Admin)</label>
+                        <input type="password"
+                               class="form-control"
+                               placeholder="Ingrese la clave para eliminar"
+                               @bind="claveEliminacion"
+                               @bind:event="oninput"
+                               disabled="@procesandoEliminacion" />
+                        <div class="form-text">Debe ingresar la clave exacta para confirmar la eliminación definitiva.</div>
                     </div>
 
                     <h6 class="fw-bold text-muted text-uppercase small mb-3">Elementos afectados:</h6>
@@ -558,7 +580,7 @@
 
                 <div class="modal-footer bg-light border-top-0 p-4 pt-2">
                     <button class="btn btn-light fw-bold px-4 rounded-pill border shadow-sm" @onclick="CancelarEliminacion" disabled="@procesandoEliminacion">Cancelar</button>
-                    <button class="btn btn-danger fw-bold px-4 rounded-pill shadow-sm d-flex align-items-center gap-2" @onclick="EjecutarEliminacion" disabled="@procesandoEliminacion">
+                    <button class="btn btn-danger fw-bold px-4 rounded-pill shadow-sm d-flex align-items-center gap-2" @onclick="EjecutarEliminacion" disabled="@(procesandoEliminacion || !ClaveEliminacionValida)">
                         @if (procesandoEliminacion)
                         {
                             <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -594,14 +616,18 @@
     private int totalVerde;
     private bool procesandoEliminacion;
     private bool mostrarModalResumenEliminacion;
+    private bool esSuperAdmin;
+    private string claveEliminacion = string.Empty;
     private string? mensajeError;
     private ResumenEliminacionDocumento? resumenEliminacionActual;
     private readonly HashSet<string> detallesEliminacionExpandidos = [];
     private const int DiasRiesgoSemaforo = 3;
+    private const string ClaveEliminacionDocumentos = "Perron";
     private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
 
     private IEnumerable<MaeDocumento> DocumentosPaginados => listaDocs ?? [];
+    private bool ClaveEliminacionValida => string.Equals(claveEliminacion.Trim(), ClaveEliminacionDocumentos, StringComparison.Ordinal);
     private int TotalRegistros { get; set; }
     private int TotalPaginas => Math.Max(1, (int)Math.Ceiling(TotalRegistros / (double)tamanoPagina));
     private int PaginaActualEfectiva => Math.Max(1, Math.Min(paginaActual, TotalPaginas));
@@ -643,6 +669,9 @@
         var user = authState.User;
         if (user.Identity?.IsAuthenticated == true)
         {
+            var rol = RolePermissionService.NormalizarRol(user.FindFirstValue(ClaimTypes.Role));
+            esSuperAdmin = rol == "SUPERADMIN";
+
             var claimOficina = user.FindFirst("IdOficina")?.Value;
             if (int.TryParse(claimOficina, out var ofId))
             {
@@ -764,6 +793,13 @@
     {
         mensajeError = null;
         procesandoEliminacion = false;
+        claveEliminacion = string.Empty;
+
+        if (!esSuperAdmin)
+        {
+            mensajeError = "Solo un usuario Super Admin puede eliminar documentos.";
+            return;
+        }
         resumenEliminacionActual = await DocumentoService.ObtenerResumenEliminacionAsync(idDocumento);
 
         if (resumenEliminacionActual is null)
@@ -781,12 +817,24 @@
         if (procesandoEliminacion) return;
         mostrarModalResumenEliminacion = false;
         resumenEliminacionActual = null;
+        claveEliminacion = string.Empty;
         detallesEliminacionExpandidos.Clear();
     }
 
     private async Task EjecutarEliminacion()
     {
         if (resumenEliminacionActual is null) return;
+        if (!esSuperAdmin)
+        {
+            mensajeError = "Solo un usuario Super Admin puede eliminar documentos.";
+            return;
+        }
+
+        if (!ClaveEliminacionValida)
+        {
+            mensajeError = "Clave de seguridad inválida para eliminar documentos.";
+            return;
+        }
 
         procesandoEliminacion = true;
         mensajeError = null;
@@ -807,6 +855,7 @@
 
             mostrarModalResumenEliminacion = false;
             resumenEliminacionActual = null;
+            claveEliminacion = string.Empty;
             detallesEliminacionExpandidos.Clear();
             await CargarDocumentos();
         }
