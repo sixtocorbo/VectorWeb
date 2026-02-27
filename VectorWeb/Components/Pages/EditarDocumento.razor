@@ -195,7 +195,8 @@
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                                         <input type="text" class="form-control shadow-none" placeholder="Buscar por nombre o CI..."
-                                               @bind-value="busquedaReclusoAsunto" @bind-value:event="oninput"
+                                               value="@busquedaReclusoAsunto" autocomplete="off"
+                                               @oninput="FiltrarReclusosAsunto"
                                                @onfocus="MostrarSugerenciasPPL" @onblur="OcultarSugerenciasPPLAsync" @onkeydown="ManejarTecladoPPL" />
                                     </div>
 
@@ -247,9 +248,6 @@
 
                     <div class="col-12">
                         <span class="label-info">Descripción Detallada</span>
-                        <InputTextArea class="form-control" style="min-height: 150px;"
-                                       @bind-Value="documento.Descripcion"
-                                       placeholder="Ingrese una descripción" />
 
                         <div class="descripcion-acciones mt-2 no-print">
                             <div class="small text-muted fw-semibold mb-2">Acciones frecuentes: click para insertar en descripción</div>
@@ -265,6 +263,10 @@
                                 }
                             </div>
                         </div>
+
+                        <InputTextArea class="form-control mt-2" style="min-height: 150px;"
+                                       @bind-Value="documento.Descripcion"
+                                       placeholder="Ingrese una descripción" />
                     </div>
                 </div>
 
@@ -316,10 +318,16 @@
     [
         new("Salida transitoria", "Gestión de salida transitoria."),
         new("Libertad anticipada", "Gestión de libertad anticipada."),
+        new("Pase interno", "Pase interno entre oficinas."),
+        new("Pase a juzgado", "Remisión al juzgado competente."),
+        new("Oficio recibido", "Ingreso de oficio recibido."),
+        new("Notificación", "Se registra notificación al interno/terceros."),
         new("Sanción disciplinaria", "Actuación disciplinaria intramuros."),
+        new("Descargo", "Presentación de descargo del interno."),
         new("Traslado de unidad", "Gestión de traslado de unidad."),
         new("Visita extraordinaria", "Trámite de visita extraordinaria."),
         new("Audiencia judicial", "Coordinación por audiencia judicial."),
+        new("Informe criminológico", "Solicitud o incorporación de informe criminológico."),
         new("Requisa e incautación", "Actuación de requisa e incautación."),
         new("Derivación sanitaria", "Gestión de derivación sanitaria.")
     ];
