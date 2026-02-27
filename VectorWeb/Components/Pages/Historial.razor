@@ -203,7 +203,8 @@
             <div class="timeline">
                 @foreach (var mov in historial)
                 {
-                    var incluyePadre = mov.Documentos.Any(d => d.Contains(documento.NumeroOficial ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+                    var incluyePadre = !string.IsNullOrWhiteSpace(documento.NumeroOficial)
+                        && mov.Documentos.Any(d => d.Contains(documento.NumeroOficial, StringComparison.OrdinalIgnoreCase));
                     <div class="timeline-item @(incluyePadre ? "" : "linked-doc")">
                         <div class="card card-movimiento shadow-sm border">
                             <div class="card-body p-4">

@@ -17,24 +17,33 @@ public sealed class EventoExpedienteSimplificado
 
 public static class ExpedienteMovimientoSimplificador
 {
+    private const string SinResponsable = "Sin responsable";
+    private const string SinOrigen = "Sin origen";
+    private const string SinDestino = "Sin destino";
+    private const string DocumentoSinNumero = "Documento S/N";
+    private const string ObservacionActuacionAgregada = "Actuación agregada";
+    private const string PalabraRetorno = "retorno";
+    private const string PalabraDestino = "destino";
+    private const string ObservacionIngresoAutomatico = "ingreso automático";
+
     public static List<EventoExpedienteSimplificado> ConstruirEventos(IEnumerable<TraMovimiento> movimientos, long idDocumentoPrincipal)
     {
         var depurados = movimientos
-            .Where(m => !EsActuacionTecnicaDeDocumentoVinculado(m, idDocumentoPrincipal));
+            .Where(m => m.FechaMovimiento.HasValue && !EsActuacionTecnicaDeDocumentoVinculado(m, idDocumentoPrincipal));
 
         return depurados
             .GroupBy(m => new
             {
-                Fecha = m.FechaMovimiento ?? DateTime.MinValue,
+                Fecha = m.FechaMovimiento!.Value,
                 m.IdOficinaOrigen,
                 m.IdOficinaDestino,
                 Observacion = (m.ObservacionPase ?? string.Empty).Trim(),
-                Responsable = m.IdUsuarioResponsableNavigation?.NombreCompleto ?? "Sin responsable"
+                Responsable = m.IdUsuarioResponsableNavigation?.NombreCompleto ?? SinResponsable
             })
             .Select(g =>
             {
-                var origen = g.First().IdOficinaOrigenNavigation?.Nombre ?? "Sin origen";
-                var destino = g.First().IdOficinaDestinoNavigation?.Nombre ?? "Sin destino";
+                var origen = g.First().IdOficinaOrigenNavigation?.Nombre ?? SinOrigen;
+                var destino = g.First().IdOficinaDestinoNavigation?.Nombre ?? SinDestino;
                 var observacion = g.Key.Observacion;
 
                 var documentos = g
@@ -64,7 +73,7 @@ public static class ExpedienteMovimientoSimplificador
 
     private static bool EsActuacionTecnicaDeDocumentoVinculado(TraMovimiento movimiento, long idDocumentoPrincipal)
     {
-        var esActuacion = string.Equals(movimiento.ObservacionPase?.Trim(), "Actuación agregada", StringComparison.OrdinalIgnoreCase);
+        var esActuacion = string.Equals(movimiento.ObservacionPase?.Trim(), ObservacionActuacionAgregada, StringComparison.OrdinalIgnoreCase);
         return esActuacion
             && movimiento.IdOficinaOrigen == movimiento.IdOficinaDestino
             && movimiento.IdDocumento != idDocumentoPrincipal;
@@ -75,7 +84,7 @@ public static class ExpedienteMovimientoSimplificador
         var tipo = documento?.IdTipoNavigation?.Nombre?.Trim();
         var numero = documento?.NumeroOficial?.Trim();
 
-        if (string.IsNullOrWhiteSpace(tipo) && string.IsNullOrWhiteSpace(numero)) return "Documento S/N";
+        if (string.IsNullOrWhiteSpace(tipo) && string.IsNullOrWhiteSpace(numero)) return DocumentoSinNumero;
         if (string.IsNullOrWhiteSpace(tipo)) return numero!;
         if (string.IsNullOrWhiteSpace(numero)) return tipo;
         return $"{tipo} {numero}";
@@ -88,17 +97,17 @@ public static class ExpedienteMovimientoSimplificador
             return $"Se registró una actuación en {origen}.";
         }
 
-        if (observacion.Contains("retorno", StringComparison.OrdinalIgnoreCase))
+        if (observacion.Contains(PalabraRetorno, StringComparison.OrdinalIgnoreCase))
         {
             return $"Se recibió el expediente desde {origen}.";
         }
 
-        if (observacion.Contains("destino", StringComparison.OrdinalIgnoreCase))
+        if (observacion.Contains(PalabraDestino, StringComparison.OrdinalIgnoreCase))
         {
             return $"Se envió el expediente a {destino}.";
         }
 
-        if (observacion.Contains("ingreso automático", StringComparison.OrdinalIgnoreCase))
+        if (observacion.Contains(ObservacionIngresoAutomatico, StringComparison.OrdinalIgnoreCase))
         {
             return $"El expediente ingresó a {destino}.";
         }
