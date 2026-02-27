@@ -1125,6 +1125,14 @@
             {
                 // El circuito ya está desconectado durante el dispose; no hay interop disponible.
             }
+            catch (TaskCanceledException)
+            {
+                // La tarea de JS Interop fue cancelada por la desconexión.
+            }
+            catch (Exception)
+            {
+                // Atrapa cualquier otra excepción para evitar que el proceso de limpieza rompa el circuito.
+            }
         }
         dotNetRef?.Dispose();
     }
