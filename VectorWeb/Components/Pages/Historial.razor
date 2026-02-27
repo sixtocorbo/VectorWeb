@@ -4,6 +4,7 @@
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using VectorWeb.Services
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @inject IJSRuntime JS
@@ -202,47 +203,40 @@
             <div class="timeline">
                 @foreach (var mov in historial)
                 {
-                    var esPrincipal = mov.IdDocumento == documento.IdDocumento;
-                    <div class="timeline-item @(esPrincipal ? "" : "linked-doc")">
+                    var incluyePadre = mov.Documentos.Any(d => d.Contains(documento.NumeroOficial ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+                    <div class="timeline-item @(incluyePadre ? "" : "linked-doc")">
                         <div class="card card-movimiento shadow-sm border">
                             <div class="card-body p-4">
                                 <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
                                     <div>
-                                        @if (mov.IdDocumentoNavigation is not null)
+                                        @foreach (var doc in mov.Documentos)
                                         {
-                                            <span class="badge px-3 py-2 @(esPrincipal ? "bg-primary-subtle text-primary border border-primary" : "bg-warning-subtle text-dark border border-warning")">
-                                                <i class="bi @(esPrincipal ? "bi-file-earmark-text" : "bi-link-45deg") me-1"></i>
-                                                @mov.IdDocumentoNavigation.IdTipoNavigation?.Nombre @mov.IdDocumentoNavigation.NumeroOficial
+                                            <span class="badge px-3 py-2 me-1 mb-1 @(incluyePadre ? "bg-primary-subtle text-primary border border-primary" : "bg-warning-subtle text-dark border border-warning")">
+                                                <i class="bi bi-file-earmark-text me-1"></i>@doc
                                             </span>
                                         }
                                     </div>
                                     <div class="text-md-end">
-                                        <div class="fw-bold text-dark">@mov.FechaMovimiento?.ToString("dd/MM/yyyy")</div>
-                                        <div class="text-muted small">@mov.FechaMovimiento?.ToString("HH:mm") hs</div>
+                                        <div class="fw-bold text-dark">@mov.FechaMovimiento.ToString("dd/MM/yyyy")</div>
+                                        <div class="text-muted small">@mov.FechaMovimiento.ToString("HH:mm") hs</div>
                                     </div>
                                 </div>
 
                                 <div class="office-path mb-3 shadow-sm border">
-                                    <span class="fw-bold text-secondary">@mov.IdOficinaOrigenNavigation?.Nombre</span>
+                                    <span class="fw-bold text-secondary">@mov.OficinaOrigen</span>
                                     <i class="bi bi-arrow-right text-primary fs-5"></i>
-                                    <span class="fw-bold text-success fs-6">@mov.IdOficinaDestinoNavigation?.Nombre</span>
+                                    <span class="fw-bold text-success fs-6">@mov.OficinaDestino</span>
                                 </div>
 
                                 <div class="p-3 rounded-3 bg-white border">
-                                    @if (!string.IsNullOrWhiteSpace(mov.ObservacionPase))
-                                    {
-                                        <p class="mb-0 text-dark" style="font-size: 0.95rem;">
-                                            <i class="bi bi-chat-square-quote text-info me-2"></i>@mov.ObservacionPase
-                                        </p>
-                                    }
-                                    else
-                                    {
-                                        <em class="text-muted small">Sin observaciones registradas.</em>
-                                    }
+                                    <p class="mb-2 text-dark" style="font-size: 0.95rem;">
+                                        <i class="bi bi-chat-square-quote text-info me-2"></i>@mov.ResumenUsuario
+                                    </p>
+                                    <div class="text-muted small">Detalle técnico: @mov.ObservacionOriginal</div>
 
                                     <div class="mt-3 pt-2 border-top border-light d-flex align-items-center text-muted" style="font-size: 0.8rem;">
                                         <i class="bi bi-person-check-fill me-2 text-primary"></i>
-                                        <span>Responsable: <span class="fw-bold text-dark">@mov.IdUsuarioResponsableNavigation?.NombreCompleto</span></span>
+                                        <span>Responsable: <span class="fw-bold text-dark">@mov.Responsable</span></span>
                                     </div>
                                 </div>
                             </div>
@@ -258,7 +252,7 @@
     [Parameter] public long Id { get; set; }
 
     private MaeDocumento? documento;
-    private List<TraMovimiento> historial = [];
+    private List<EventoExpedienteSimplificado> historial = [];
     private bool cargando = true;
     private bool noEncontrado = false;
 
@@ -291,10 +285,7 @@
                 "IdOficinaOrigenNavigation,IdOficinaDestinoNavigation,IdUsuarioResponsableNavigation,IdDocumentoNavigation.IdTipoNavigation"
             );
 
-            historial = movimientos
-                .OrderByDescending(m => m.FechaMovimiento)
-                .ThenByDescending(m => m.IdMovimiento)
-                .ToList();
+            historial = ExpedienteMovimientoSimplificador.ConstruirEventos(movimientos, documento.IdDocumento);
         }
         catch (Exception ex)
         {
