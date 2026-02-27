@@ -5,6 +5,7 @@
 @using VectorWeb.Models
 @using VectorWeb.Repositories
 @inject IRepository<CatTipoDocumento> RepoTipo
+@inject IRepository<CfgTiemposRespuestum> RepoPlazos
 @rendermode InteractiveServer
 
 <h3>Gestión de Tipos de Documento</h3>
@@ -90,6 +91,15 @@
         }
 
         mensajeError = string.Empty;
+
+        var plazosRelacionados = await RepoPlazos.GetFilteredAsync(p => p.IdTipoDocumento == id);
+        if (plazosRelacionados.Any())
+        {
+            var nombreTipo = tipo?.Nombre ?? "seleccionado";
+            mensajeError = $"No se puede eliminar el tipo de documento '{nombreTipo}' porque está siendo utilizado en la configuración de plazos u otros registros relacionados.";
+            return;
+        }
+
         try
         {
             await RepoTipo.DeleteAsync(id);
