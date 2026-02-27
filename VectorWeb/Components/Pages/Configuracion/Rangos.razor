@@ -113,7 +113,7 @@ else
                                 <th>Tipo</th>
                                 <th>Oficina</th>
                                 <th class="text-center">Año</th>
-                                <th>Serie (Nombre)</th>
+                                <th class="text-end" style="min-width: 220px;">Disponibilidad</th>
                                 <th class="text-end">Rango</th>
                                 <th class="text-end">Último Uso</th>
                                 <th class="text-center">Estado</th>
@@ -144,7 +144,24 @@ else
                                             }
                                         </td>
                                         <td class="text-center">@rango.Anio</td>
-                                        <td><code>@rango.NombreRango</code></td>
+                                        <td>
+                                            @{
+                                                var disponibilidad = ObtenerConsumoTramoActivo(rango);
+                                            }
+                                            @if (!disponibilidad.TieneTramoActivo)
+                                            {
+                                                <span class="text-muted small">Sin tramo activo</span>
+                                            }
+                                            else
+                                            {
+                                                <div class="d-flex flex-column align-items-end">
+                                                    <div class="progress w-100" style="height: 10px;">
+                                                        <div class="progress-bar @disponibilidad.ClaseBarra" role="progressbar" style="width: @disponibilidad.Porcentaje%"></div>
+                                                    </div>
+                                                    <span class="small mt-1 @disponibilidad.ClaseTexto">@disponibilidad.Porcentaje.ToString("F1")% usado</span>
+                                                </div>
+                                            }
+                                        </td>
                                         <td class="text-end">
                                             <span class="badge bg-light text-dark border">@rango.NumeroInicio</span>
                                             <i class="bi bi-arrow-right-short text-muted"></i>
@@ -1325,6 +1342,28 @@ else
         100,
         250
     }.Where(c => c <= Math.Max(CantidadMaximaSugerida, 250)).ToList();
+
+
+    private DisponibilidadTramoInfo ObtenerConsumoTramoActivo(MaeNumeracionRango rango)
+    {
+        if (!rango.Activo || rango.NumeroFin < rango.NumeroInicio)
+            return DisponibilidadTramoInfo.SinTramoActivo;
+
+        var totalTramo = rango.NumeroFin - rango.NumeroInicio + 1;
+        if (totalTramo <= 0)
+            return DisponibilidadTramoInfo.SinTramoActivo;
+
+        var usados = Math.Clamp(rango.UltimoUtilizado - rango.NumeroInicio + 1, 0, totalTramo);
+        var porcentaje = (double)usados / totalTramo * 100;
+        var claseBarra = porcentaje > 95 ? "bg-danger" : (porcentaje > 80 ? "bg-warning" : "bg-success");
+        var claseTexto = porcentaje > 95 ? "text-danger fw-bold" : (porcentaje > 80 ? "text-warning fw-bold" : "text-muted");
+        return new DisponibilidadTramoInfo(true, porcentaje, claseBarra, claseTexto);
+    }
+
+    private readonly record struct DisponibilidadTramoInfo(bool TieneTramoActivo, double Porcentaje, string ClaseBarra, string ClaseTexto)
+    {
+        public static DisponibilidadTramoInfo SinTramoActivo => new(false, 0, "bg-secondary", "text-muted");
+    }
 
     private string ObtenerColorAccion(string accion) => accion switch
     {
