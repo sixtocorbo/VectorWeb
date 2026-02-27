@@ -17,7 +17,7 @@
             <h2 class="h3 fw-bold mb-1"><i class="bi bi-diagram-3 text-primary me-2"></i>Recorrido del Expediente</h2>
             @if (documento is not null)
             {
-                <p class="text-muted mb-0">@FormatoTipoYNumero(documento.IdTipoNavigation?.Nombre, documento.NumeroOficial) - @documento.Asunto</p>
+                <p class="text-muted mb-0">@DocumentoFormatoHelper.FormatearDocumento(documento) - @documento.Asunto</p>
             }
         </div>
         <div class="d-flex gap-2">
@@ -200,15 +200,5 @@
         }
     }
 
-    private static string FormatoTipoYNumero(string? tipo, string? numero)
-    {
-        var tipoLimpio = tipo?.Trim();
-        var numeroLimpio = numero?.Trim();
 
-        if (string.IsNullOrWhiteSpace(tipoLimpio) && string.IsNullOrWhiteSpace(numeroLimpio)) return "S/N";
-        if (string.IsNullOrWhiteSpace(tipoLimpio)) return numeroLimpio!;
-        if (string.IsNullOrWhiteSpace(numeroLimpio)) return tipoLimpio;
-
-        return $"{tipoLimpio} {numeroLimpio}";
-    }
 }
