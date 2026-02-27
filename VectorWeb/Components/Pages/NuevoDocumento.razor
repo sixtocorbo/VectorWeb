@@ -925,6 +925,14 @@
                 nuevoDoc.NumeroOficial = numeroManualInterno.Value.ToString();
             }
 
+            if (string.IsNullOrWhiteSpace(nuevoDoc.NumeroOficial))
+            {
+                errorGuardar = "Número oficial obligatorio (ej. 120/26).";
+                return;
+            }
+
+            nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial.Trim();
+
             if (!nuevoDoc.FechaVencimiento.HasValue)
             {
                 await CalcularVencimientoAsync(nuevoDoc.IdTipo);
