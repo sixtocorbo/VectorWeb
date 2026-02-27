@@ -69,6 +69,18 @@ public class NumeracionRangoService
             .ToListAsync();
     }
 
+    public async Task<List<MaeNumeracionRango>> ObtenerRangosPorOficinaYAnioAsync(int idTipo, int idOficina, int anio)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.MaeNumeracionRangos
+            .AsNoTracking()
+            .Where(r => r.IdTipo == idTipo &&
+                        r.IdOficina == idOficina &&
+                        r.Anio == anio)
+            .OrderBy(r => r.NumeroInicio)
+            .ToListAsync();
+    }
+
     public async Task<List<CupoLibroMayorItem>> ObtenerLibroMayorCuposAsync()
     {
         return await EjecutarLecturaSeguraAsync(async () => {

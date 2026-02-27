@@ -700,6 +700,7 @@
     private int proximoNumeroAutomatico;
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
+    private List<MaeNumeracionRango> rangosPermitidosManualInterna = new();
     private int? numeroManualInterno;
     private bool mostrarModalGestionRangos;
     private int? tipoPreseleccionadoGestionRangos;
@@ -907,17 +908,16 @@
             else if (esNumeracionManualInterna)
             {
                 if (!numeroManualInterno.HasValue) { errorGuardar = "Número oficial obligatorio."; return; }
-                if (rangoManualInternoActivo is null)
+                if (!rangosPermitidosManualInterna.Any())
                 {
-                    errorGuardar = "No se pudo validar el número oficial porque no se encontró un rango activo para la oficina seleccionada.";
+                    errorGuardar = "No se pudo validar el número oficial porque no se encontraron rangos permitidos para la oficina seleccionada.";
                     return;
                 }
 
-                var rangosActivosOficina = await RangoService.ObtenerRangosActivosAsync(nuevoDoc.IdTipo, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
-                var numeroDentroDeRango = rangosActivosOficina.Any(r => r.Activo && numeroManualInterno.Value >= r.NumeroInicio && numeroManualInterno.Value <= r.NumeroFin);
+                var numeroDentroDeRango = rangosPermitidosManualInterna.Any(r => numeroManualInterno.Value >= r.NumeroInicio && numeroManualInterno.Value <= r.NumeroFin);
                 if (!numeroDentroDeRango)
                 {
-                    var textoRangos = string.Join(" | ", rangosActivosOficina.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
+                    var textoRangos = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
                     errorGuardar = $"El número oficial debe estar dentro de un rango permitido para la oficina ({textoRangos}).";
                     return;
                 }
@@ -1004,6 +1004,7 @@
         rangoDisponibleTexto = string.Empty;
         alertaRangoTexto = string.Empty;
         rangoManualInternoActivo = null;
+        rangosPermitidosManualInterna = new();
         var ofi = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
         if (ofi?.EsExterna == true) { esNumeracionExterna = true; return; }
 
@@ -1032,10 +1033,30 @@
         {
             esNumeracionManualInterna = true;
             rangoManualInternoActivo = rango;
-            rangoDisponibleTexto = string.Join(" | ", rangosDisponibles.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
+            rangosPermitidosManualInterna = rangosDisponibles;
+            rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
             mensajeNumeracion = $"Rangos vigentes para esta oficina: {rangoDisponibleTexto}. Ingrese un número dentro de alguno de esos intervalos.";
         }
-        else { bloqueoPorRangoAgotado = true; mensajeNumeracion = MensajeSinRangoConfigurado; }
+        else
+        {
+            var esAnioActual = anioNumeracionSeleccionado == DateTime.Now.Year;
+            if (esAnioActual)
+            {
+                var rangosHistoricos = await RangoService.ObtenerRangosPorOficinaYAnioAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+                if (rangosHistoricos.Any())
+                {
+                    esNumeracionManualInterna = true;
+                    rangosPermitidosManualInterna = rangosHistoricos;
+                    rangoManualInternoActivo = rangosHistoricos.First();
+                    rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
+                    mensajeNumeracion = $"No hay rangos activos, pero para documentos del año en curso se permite usar rangos inactivos/históricos: {rangoDisponibleTexto}.";
+                    return;
+                }
+            }
+
+            bloqueoPorRangoAgotado = true;
+            mensajeNumeracion = MensajeSinRangoConfigurado;
+        }
     }
 
     private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
@@ -1086,6 +1107,7 @@
         esNumeracionExterna = false;
         bloqueoPorRangoAgotado = false;
         rangoManualInternoActivo = null;
+        rangosPermitidosManualInterna = new();
         numeroManualInterno = null;
         oficinasFiltradas = BuscarOficinas(oficinaBusqueda).Take(8).ToList();
     }

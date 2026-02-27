@@ -9,6 +9,58 @@ namespace VectorWeb.Tests;
 public class NumeracionRangoServiceTests
 {
     [Fact]
+    public async Task ObtenerRangosPorOficinaYAnioAsync_IncluyeActivosEInactivos()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeNumeracionRangos.AddRange(
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "ACTIVO",
+                    NumeroInicio = 1,
+                    NumeroFin = 10,
+                    UltimoUtilizado = 5,
+                    Activo = true,
+                    IdOficina = 1
+                },
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "INACTIVO",
+                    NumeroInicio = 11,
+                    NumeroFin = 20,
+                    UltimoUtilizado = 15,
+                    Activo = false,
+                    IdOficina = 1
+                },
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2025,
+                    NombreRango = "OTRO-ANIO",
+                    NumeroInicio = 21,
+                    NumeroFin = 30,
+                    UltimoUtilizado = 21,
+                    Activo = false,
+                    IdOficina = 1
+                });
+
+            await seed.SaveChangesAsync();
+        }
+
+        var rangos = await service.ObtenerRangosPorOficinaYAnioAsync(1, 1, 2026);
+
+        Assert.Equal(2, rangos.Count);
+        Assert.Contains(rangos, r => r.NombreRango == "ACTIVO");
+        Assert.Contains(rangos, r => r.NombreRango == "INACTIVO");
+    }
+
+    [Fact]
     public async Task GuardarRangoAsync_Falla_SiNoExisteCupo()
     {
         var service = CrearServicio(out var options);
