@@ -156,7 +156,7 @@ else
                                             {
                                                 <div class="d-flex flex-column align-items-end">
                                                     <div class="progress w-100" style="height: 10px;">
-                                                        <div class="progress-bar @disponibilidad.ClaseBarra" role="progressbar" style="width: @disponibilidad.Porcentaje%"></div>
+                                                        <div class="progress-bar @disponibilidad.ClaseBarra" role="progressbar" style="width: @(disponibilidad.Porcentaje.ToString(CultureInfo.InvariantCulture))%"></div>
                                                     </div>
                                                     <span class="small mt-1 @disponibilidad.ClaseTexto">@disponibilidad.Porcentaje.ToString("F1")% usado</span>
                                                 </div>
@@ -1344,6 +1344,8 @@ else
         250
     }.Where(c => c <= Math.Max(CantidadMaximaSugerida, 250)).ToList();
 
+    private const double UmbralConsumoAlto = 80;
+    private const double UmbralConsumoCritico = 95;
 
     private DisponibilidadTramoInfo ObtenerConsumoTramoActivo(MaeNumeracionRango rango)
     {
@@ -1351,13 +1353,15 @@ else
             return DisponibilidadTramoInfo.SinTramoActivo;
 
         var totalTramo = rango.NumeroFin - rango.NumeroInicio + 1;
-        if (totalTramo <= 0)
-            return DisponibilidadTramoInfo.SinTramoActivo;
 
         var usados = Math.Clamp(rango.UltimoUtilizado - rango.NumeroInicio + 1, 0, totalTramo);
         var porcentaje = (double)usados / totalTramo * 100;
-        var claseBarra = porcentaje > 95 ? "bg-danger" : (porcentaje > 80 ? "bg-warning" : "bg-success");
-        var claseTexto = porcentaje > 95 ? "text-danger fw-bold" : (porcentaje > 80 ? "text-warning fw-bold" : "text-muted");
+        var claseBarra = porcentaje > UmbralConsumoCritico
+            ? "bg-danger animate__animated animate__pulse animate__infinite"
+            : (porcentaje > UmbralConsumoAlto ? "bg-warning" : "bg-success");
+        var claseTexto = porcentaje > UmbralConsumoCritico
+            ? "text-danger fw-bold"
+            : (porcentaje > UmbralConsumoAlto ? "text-warning fw-bold" : "text-muted");
         return new DisponibilidadTramoInfo(true, porcentaje, claseBarra, claseTexto);
     }
 
