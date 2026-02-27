@@ -9,6 +9,8 @@
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navegador
+@inject IJSRuntime JS
+@inject DocumentosService DocumentoService
 @rendermode InteractiveServer
 @implements IDisposable
 
@@ -197,6 +199,20 @@
         </button>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(mensajeError))
+    {
+        <div class="alert alert-danger shadow-sm" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>@mensajeError
+        </div>
+    }
+
+    @if (procesandoEliminacion)
+    {
+        <div class="alert alert-warning py-2" role="status">
+            <span class="spinner-border spinner-border-sm me-2"></span>Eliminando documento y vinculaciones...
+        </div>
+    }
+
     @if (listaDocs is null)
     {
         <div class="text-center py-5">
@@ -217,7 +233,7 @@
                             <th style="width: 140px;">Vinculación</th>
                             <th>Asunto / Descripción</th>
                             <th style="width: 150px;">Ubicación</th>
-                            <th class="text-end" style="width: 260px;">Acciones</th>
+                            <th class="text-end" style="width: 320px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -273,6 +289,7 @@
                                         <a class="btn btn-sm btn-outline-info" href="documentos/historial/@doc.IdDocumento"><i class="bi bi-clock-history"></i> Historial</a>
                                         <a class="btn btn-sm btn-outline-secondary" href="documentos/recorrido/@doc.IdDocumento"><i class="bi bi-geo-alt"></i> Recorrido</a>
                                         <button class="btn btn-sm btn-outline-primary" @onclick="() => IrAEditar(doc.IdDocumento)"><i class="bi bi-pencil-square"></i> Editar</button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmarEliminacion(doc.IdDocumento)"><i class="bi bi-trash"></i> Eliminar total</button>
                                     </div>
                                 </td>
                             </tr>
@@ -320,6 +337,8 @@
     private int totalRojo;
     private int totalAmarillo;
     private int totalVerde;
+    private bool procesandoEliminacion;
+    private string? mensajeError;
     private const int DiasRiesgoSemaforo = 3;
     private const string CollationBusquedaSinAcentos = "Modern_Spanish_CI_AI";
     private static readonly int[] opcionesTamanoPagina = [10, 20, 50, 100];
@@ -493,6 +512,39 @@
             _ => q
         };
     }
+    private async Task ConfirmarEliminacion(long idDocumento)
+    {
+        var confirmado = await JS.InvokeAsync<bool>("confirm",
+            "¡ATENCIÓN! ¿Está seguro que desea eliminar este documento? Se eliminarán TODOS sus movimientos, archivos adjuntos y documentos hijos. Esta acción no se puede deshacer.");
+
+        if (!confirmado) return;
+
+        procesandoEliminacion = true;
+        mensajeError = null;
+        StateHasChanged();
+
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var idUsuario = int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : 1;
+
+            var resultado = await DocumentoService.EliminarDocumentoTotalAsync(idDocumento, idUsuario);
+            if (!resultado.Exitoso)
+            {
+                mensajeError = resultado.Mensaje;
+                return;
+            }
+
+            await CargarDocumentos();
+        }
+        finally
+        {
+            procesandoEliminacion = false;
+            StateHasChanged();
+        }
+    }
+
     private void IrAEditar(long id) => Navegador.NavigateTo($"documentos/editar/{id}");
 
     private async Task PaginaAnterior() { if (PaginaActualEfectiva > 1) { paginaActual--; await CargarDocumentos(); } }
