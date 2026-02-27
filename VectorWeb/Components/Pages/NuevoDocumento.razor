@@ -99,13 +99,15 @@
         @if (!string.IsNullOrWhiteSpace(mensajeNumeracion))
         {
             <div class="alert @(string.IsNullOrWhiteSpace(alertaRangoTexto) ? "alert-info" : "alert-danger") border-0 shadow-sm small py-2 mb-4" role="alert">
-                <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="d-flex flex-column align-items-start gap-2">
                     <span><i class="bi bi-info-circle-fill me-2"></i> @mensajeNumeracion</span>
                     @if (MostrarAccesoGestionRangos)
                     {
-                        <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AbrirGestionRangosConContexto">
-                            <i class="bi bi-sliders me-1"></i> Gestionar rango de esta oficina
-                        </button>
+                        <div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AbrirGestionRangosConContexto">
+                                <i class="bi bi-sliders me-1"></i> Configurar
+                            </button>
+                        </div>
                     }
                 </div>
                 @if (!string.IsNullOrWhiteSpace(NumeroAsignadoTramiteTexto))
@@ -644,9 +646,18 @@
     private ElementReference contenedorSugerenciasOficinaRef;
     private DotNetObjectReference<NuevoDocumento>? dotNetRef;
     private bool detectorClickRegistrado;
+    private string MensajeSinRangoConfigurado
+    {
+        get
+        {
+            var tipoDocumento = NombreTipo(nuevoDoc.IdTipo);
+            var nombreOficina = NombreOficina(nuevoDoc.IdOficinaActual);
+            return $"Favor configurar rango para {tipoDocumento} para la Oficina {nombreOficina}.";
+        }
+    }
+
     private bool MostrarAccesoGestionRangos =>
         bloqueoPorRangoAgotado
-        && string.Equals(mensajeNumeracion, "No hay rango configurado para el tipo de documento seleccionado.", StringComparison.Ordinal)
         && nuevoDoc.IdTipo > 0
         && nuevoDoc.IdOficinaActual > 0;
 
@@ -943,7 +954,7 @@
             rangoDisponibleTexto = string.Join(" | ", rangosDisponibles.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
             mensajeNumeracion = $"Rangos vigentes para esta oficina: {rangoDisponibleTexto}. Ingrese un número dentro de alguno de esos intervalos.";
         }
-        else { bloqueoPorRangoAgotado = true; mensajeNumeracion = "No hay rango configurado para el tipo de documento seleccionado."; }
+        else { bloqueoPorRangoAgotado = true; mensajeNumeracion = MensajeSinRangoConfigurado; }
     }
 
     private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }
