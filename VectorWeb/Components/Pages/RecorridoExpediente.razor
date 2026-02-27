@@ -4,6 +4,7 @@
 @using Microsoft.EntityFrameworkCore
 @using VectorWeb.Models
 @using VectorWeb.Repositories
+@using VectorWeb.Services
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<TraMovimiento> RepoMovimientos
 @rendermode InteractiveServer
@@ -79,11 +80,11 @@
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
-                        <th>Documento</th>
-                        <th>Recorrido completo</th>
+                        <th>Resumen</th>
+                        <th>Documentos involucrados</th>
+                        <th>Recorrido</th>
                         <th>Fecha</th>
                         <th>Hora</th>
-                        <th>Destino</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -100,16 +101,21 @@
                             <tr>
                                 <td class="fw-bold">@(item.idx + 1)</td>
                                 <td>
-                                    <div class="fw-semibold">@FormatoTipoYNumero(item.mov.IdDocumentoNavigation?.IdTipoNavigation?.Nombre, item.mov.IdDocumentoNavigation?.NumeroOficial)</div>
+                                    <div class="fw-semibold">@item.mov.ResumenUsuario</div>
                                 </td>
                                 <td>
-                                    <span class="fw-semibold text-secondary">@item.mov.IdOficinaOrigenNavigation?.Nombre</span>
-                                    <i class="bi bi-arrow-right mx-2 text-primary"></i>
-                                    <span class="fw-bold text-success">@item.mov.IdOficinaDestinoNavigation?.Nombre</span>
+                                    @foreach (var doc in item.mov.Documentos)
+                                    {
+                                        <span class="badge bg-light text-dark border me-1 mb-1">@doc</span>
+                                    }
                                 </td>
-                                <td>@item.mov.FechaMovimiento?.ToString("dd/MM/yyyy")</td>
-                                <td>@item.mov.FechaMovimiento?.ToString("HH:mm")</td>
-                                <td>@item.mov.IdOficinaDestinoNavigation?.Nombre</td>
+                                <td>
+                                    <span class="fw-semibold text-secondary">@item.mov.OficinaOrigen</span>
+                                    <i class="bi bi-arrow-right mx-2 text-primary"></i>
+                                    <span class="fw-bold text-success">@item.mov.OficinaDestino</span>
+                                </td>
+                                <td>@item.mov.FechaMovimiento.ToString("dd/MM/yyyy")</td>
+                                <td>@item.mov.FechaMovimiento.ToString("HH:mm")</td>
                             </tr>
                         }
                     }
@@ -123,7 +129,7 @@
     [Parameter] public long Id { get; set; }
 
     private MaeDocumento? documento;
-    private List<TraMovimiento> movimientos = [];
+    private List<EventoExpedienteSimplificado> movimientos = [];
     private bool cargando = true;
     private bool noEncontrado;
 
@@ -134,15 +140,14 @@
 
     private List<string> destinosDisponibles = [];
 
-    private IEnumerable<TraMovimiento> MovimientosFiltrados => movimientos
+    private IEnumerable<EventoExpedienteSimplificado> MovimientosFiltrados => movimientos
         .Where(m => string.IsNullOrWhiteSpace(filtroDestino) ||
-                    string.Equals(m.IdOficinaDestinoNavigation?.Nombre, filtroDestino, StringComparison.OrdinalIgnoreCase))
+                    string.Equals(m.OficinaDestino, filtroDestino, StringComparison.OrdinalIgnoreCase))
         .Where(m => string.IsNullOrWhiteSpace(filtroTexto) ||
-                    ($"{m.IdDocumentoNavigation?.NumeroOficial} {m.IdDocumentoNavigation?.Asunto} {m.IdOficinaOrigenNavigation?.Nombre} {m.IdOficinaDestinoNavigation?.Nombre} {m.ObservacionPase}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
-        .Where(m => !filtroDesde.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date >= filtroDesde.Value.Date))
-        .Where(m => !filtroHasta.HasValue || (m.FechaMovimiento.HasValue && m.FechaMovimiento.Value.Date <= filtroHasta.Value.Date))
-        .OrderByDescending(m => m.FechaMovimiento)
-        .ThenBy(m => m.IdMovimiento);
+                    ($"{string.Join(" ", m.Documentos)} {m.ResumenUsuario} {m.OficinaOrigen} {m.OficinaDestino} {m.ObservacionOriginal}".Contains(filtroTexto, StringComparison.OrdinalIgnoreCase)))
+        .Where(m => !filtroDesde.HasValue || m.FechaMovimiento.Date >= filtroDesde.Value.Date)
+        .Where(m => !filtroHasta.HasValue || m.FechaMovimiento.Date <= filtroHasta.Value.Date)
+        .OrderByDescending(m => m.FechaMovimiento);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -173,11 +178,11 @@
                 "IdDocumentoNavigation.IdTipoNavigation,IdOficinaOrigenNavigation,IdOficinaDestinoNavigation"
             );
 
-            movimientos = movs.ToList();
+            movimientos = ExpedienteMovimientoSimplificador.ConstruirEventos(movs, documento.IdDocumento);
 
             // Cargar lista de destinos para el filtro desplegable
             destinosDisponibles = movimientos
-                .Select(m => m.IdOficinaDestinoNavigation?.Nombre)
+                .Select(m => m.OficinaDestino)
                 .Where(n => !string.IsNullOrWhiteSpace(n))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(n => n)

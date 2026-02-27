@@ -212,6 +212,11 @@ public class NumeracionRangoService
 
             if (rango.IdRango == 0)
             {
+                if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
+                {
+                    rango.UltimoUtilizado = rango.NumeroInicio - 1;
+                }
+
                 context.MaeNumeracionRangos.Add(rango);
                 accionBitacora = "APERTURA";
                 detalleBitacora = $"Creación de nuevo rango {rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}. {tipoDetalle}. {oficinaDetalle}";
@@ -220,6 +225,16 @@ public class NumeracionRangoService
             {
                 var dbRango = await context.MaeNumeracionRangos.FindAsync(rango.IdRango);
                 if (dbRango == null) return OperacionResultado.Fail("El rango no existe.");
+
+                if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
+                {
+                    rango.UltimoUtilizado = rango.NumeroInicio - 1;
+                }
+
+                if (rango.UltimoUtilizado > rango.NumeroFin)
+                {
+                    return OperacionResultado.Fail("El último utilizado no puede superar el fin del rango.");
+                }
 
                 context.Entry(dbRango).CurrentValues.SetValues(rango);
                 accionBitacora = "CAMBIO";
