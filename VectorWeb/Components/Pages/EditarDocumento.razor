@@ -252,7 +252,7 @@
                                        placeholder="Ingrese una descripción" />
 
                         <div class="descripcion-acciones mt-2 no-print">
-                            <div class="small text-muted fw-semibold mb-2">Acciones frecuentes (Uruguay): click para insertar en descripción</div>
+                            <div class="small text-muted fw-semibold mb-2">Acciones frecuentes: click para insertar en descripción</div>
                             <div class="d-flex flex-wrap gap-2">
                                 @foreach (var accion in accionesSugeridasDescripcion)
                                 {
@@ -314,14 +314,14 @@
     private bool mostrarSugerenciasPPL;
     private readonly List<AccionDescripcion> accionesSugeridasDescripcion =
     [
-        new("Salida transitoria", "Gestión de salida transitoria: se verifica conducta, clasificación, informe técnico criminológico y requisitos administrativos del centro para su eventual elevación judicial."),
-        new("Libertad anticipada", "Gestión de libertad anticipada: se deja constancia de antecedentes, cómputo de pena, evolución del proceso de rehabilitación y documentación a remitir a sede competente."),
-        new("Sanción disciplinaria", "Actuación disciplinaria intramuros: se registra el hecho, descargos, resolución interna, plazo de sanción y notificación al PPL conforme reglamentación vigente."),
-        new("Traslado de unidad", "Gestión de traslado de unidad: se documentan motivos de seguridad/tratamiento, cupo disponible, informes médicos/sociales y coordinación interinstitucional."),
-        new("Visita extraordinaria", "Trámite de visita extraordinaria: se incorpora solicitud, fundamentos, evaluación del recinto y autorización/denegatoria con notificación correspondiente."),
-        new("Audiencia judicial", "Coordinación por audiencia judicial: se comunica fecha/hora de comparecencia, custodia asignada, logística de traslado y constancia de cumplimiento."),
-        new("Requisa e incautación", "Actuación de requisa e incautación: se registra procedimiento, elementos incautados, cadena de custodia y comunicación a autoridad policial/judicial si corresponde."),
-        new("Derivación sanitaria", "Gestión de derivación sanitaria: se agrega diagnóstico inicial, indicación médica, salida custodiada y resultado de atención para seguimiento clínico.")
+        new("Salida transitoria", "Gestión de salida transitoria."),
+        new("Libertad anticipada", "Gestión de libertad anticipada."),
+        new("Sanción disciplinaria", "Actuación disciplinaria intramuros."),
+        new("Traslado de unidad", "Gestión de traslado de unidad."),
+        new("Visita extraordinaria", "Trámite de visita extraordinaria."),
+        new("Audiencia judicial", "Coordinación por audiencia judicial."),
+        new("Requisa e incautación", "Actuación de requisa e incautación."),
+        new("Derivación sanitaria", "Gestión de derivación sanitaria.")
     ];
 
     protected override async Task OnParametersSetAsync()
