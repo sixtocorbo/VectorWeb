@@ -117,6 +117,31 @@
             </div>
         }
 
+        @if (mostrarModalGestionRangos)
+        {
+            <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.45);">
+                <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                    <div class="modal-content shadow-lg">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-sliders me-2"></i>Gestionar rango de numeración
+                            </h5>
+                            <button type="button" class="btn-close" @onclick="CerrarModalGestionRangos"></button>
+                        </div>
+                        <div class="modal-body p-0">
+                            <iframe src="@urlGestionRangos" title="Gestión de rangos" class="w-100 border-0" style="height: 70vh;"></iframe>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CerrarModalGestionRangos">Cerrar</button>
+                            <button type="button" class="btn btn-primary" @onclick="CerrarModalGestionRangosYRevalidar">
+                                <i class="bi bi-arrow-repeat me-1"></i> Cerrar y revalidar numeración
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
         @if (esActuacion)
         {
             <div class="alert alert-warning shadow-sm border-0 mb-4 p-4">
@@ -594,6 +619,8 @@
     private int anioNumeracionSeleccionado = DateTime.Now.Year;
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
+    private bool mostrarModalGestionRangos;
+    private string urlGestionRangos = string.Empty;
     private const string EstiloPanelSugerencias = "z-index: 20; top: calc(100% + .25rem);";
     private ElementReference contenedorSugerenciasOficinaRef;
     private DotNetObjectReference<NuevoDocumento>? dotNetRef;
@@ -899,8 +926,23 @@
         var abrirNuevoRango = cupoConfigurado ? 1 : 0;
 
         var volver = Uri.EscapeDataString(Navegador.Uri);
-        var destino = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}&bloquearTipo=1&bloquearOficina=1&abrirNuevoRango={abrirNuevoRango}&volver={volver}";
-        await JS.InvokeVoidAsync("open", destino, "_blank");
+        urlGestionRangos = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}&bloquearTipo=1&bloquearOficina=1&abrirNuevoRango={abrirNuevoRango}&volver={volver}";
+        mostrarModalGestionRangos = true;
+    }
+
+    private void CerrarModalGestionRangos()
+    {
+        mostrarModalGestionRangos = false;
+        urlGestionRangos = string.Empty;
+    }
+
+    private async Task CerrarModalGestionRangosYRevalidar()
+    {
+        CerrarModalGestionRangos();
+        if (nuevoDoc.IdTipo > 0)
+        {
+            await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo);
+        }
     }
 
     private void FiltrarOficinas(ChangeEventArgs e)
