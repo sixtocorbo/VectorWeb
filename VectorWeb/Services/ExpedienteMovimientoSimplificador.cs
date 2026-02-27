@@ -4,6 +4,7 @@ namespace VectorWeb.Services;
 
 public sealed class EventoExpedienteSimplificado
 {
+    public long UltimoIdMovimiento { get; init; }
     public DateTime FechaMovimiento { get; init; }
     public int IdOficinaOrigen { get; init; }
     public int IdOficinaDestino { get; init; }
@@ -33,7 +34,7 @@ public static class ExpedienteMovimientoSimplificador
         return depurados
             .GroupBy(m => new
             {
-                Fecha = TruncarAlMinuto(m.FechaMovimiento!.Value),
+                Fecha = TruncarAlSegundo(m.FechaMovimiento!.Value),
                 m.IdOficinaOrigen,
                 OficinaOrigenNombre = m.IdOficinaOrigenNavigation?.Nombre,
                 m.IdOficinaDestino,
@@ -57,6 +58,7 @@ public static class ExpedienteMovimientoSimplificador
 
                 return new EventoExpedienteSimplificado
                 {
+                    UltimoIdMovimiento = g.Max(m => m.IdMovimiento),
                     FechaMovimiento = g.Key.Fecha,
                     IdOficinaOrigen = g.Key.IdOficinaOrigen,
                     IdOficinaDestino = g.Key.IdOficinaDestino,
@@ -69,12 +71,13 @@ public static class ExpedienteMovimientoSimplificador
                 };
             })
             .OrderByDescending(e => e.FechaMovimiento)
+            .ThenByDescending(e => e.UltimoIdMovimiento)
             .ToList();
     }
 
-    private static DateTime TruncarAlMinuto(DateTime fecha)
+    private static DateTime TruncarAlSegundo(DateTime fecha)
     {
-        return fecha.AddTicks(-(fecha.Ticks % TimeSpan.TicksPerMinute));
+        return fecha.AddTicks(-(fecha.Ticks % TimeSpan.TicksPerSecond));
     }
 
     private static bool EsActuacionTecnicaDeDocumentoVinculado(TraMovimiento movimiento, long idDocumentoPrincipal)
