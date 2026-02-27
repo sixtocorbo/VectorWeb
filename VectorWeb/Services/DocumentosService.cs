@@ -63,6 +63,32 @@ public sealed class DocumentosService
         var totalSalidasAfectadas = await context.TraSalidasLaborales.AsNoTracking()
             .CountAsync(s => s.IdDocumentoRespaldo.HasValue && ids.Contains(s.IdDocumentoRespaldo.Value));
 
+        var documentosHijos = await context.MaeDocumentos.AsNoTracking()
+            .Where(d => ids.Contains(d.IdDocumento) && d.IdDocumento != idDocumento)
+            .OrderBy(d => d.IdDocumento)
+            .Select(d => new DetalleDocumentoRelacionado
+            {
+                IdDocumento = d.IdDocumento,
+                NumeroOficial = d.NumeroOficial,
+                Asunto = d.Asunto
+            })
+            .ToListAsync();
+
+        var movimientos = await context.TraMovimientos.AsNoTracking()
+            .Where(m => ids.Contains(m.IdDocumento))
+            .OrderByDescending(m => m.FechaMovimiento)
+            .ThenByDescending(m => m.IdMovimiento)
+            .Select(m => new DetalleMovimientoRelacionado
+            {
+                IdMovimiento = m.IdMovimiento,
+                IdDocumento = m.IdDocumento,
+                FechaMovimiento = m.FechaMovimiento,
+                OficinaOrigen = m.IdOficinaOrigenNavigation.Nombre,
+                OficinaDestino = m.IdOficinaDestinoNavigation.Nombre,
+                Observacion = m.ObservacionPase
+            })
+            .ToListAsync();
+
         return new ResumenEliminacionDocumento
         {
             IdDocumento = documentoPrincipal.IdDocumento,
@@ -73,7 +99,9 @@ public sealed class DocumentosService
             TotalPases = totalPases,
             TotalAdjuntos = totalAdjuntos,
             TotalVinculos = totalVinculos,
-            TotalSalidasAfectadas = totalSalidasAfectadas
+            TotalSalidasAfectadas = totalSalidasAfectadas,
+            DocumentosHijos = documentosHijos,
+            Movimientos = movimientos
         };
     }
 
@@ -159,4 +187,23 @@ public sealed class ResumenEliminacionDocumento
     public int TotalAdjuntos { get; set; }
     public int TotalVinculos { get; set; }
     public int TotalSalidasAfectadas { get; set; }
+    public List<DetalleDocumentoRelacionado> DocumentosHijos { get; set; } = [];
+    public List<DetalleMovimientoRelacionado> Movimientos { get; set; } = [];
+}
+
+public sealed class DetalleDocumentoRelacionado
+{
+    public long IdDocumento { get; set; }
+    public string? NumeroOficial { get; set; }
+    public string? Asunto { get; set; }
+}
+
+public sealed class DetalleMovimientoRelacionado
+{
+    public long IdMovimiento { get; set; }
+    public long IdDocumento { get; set; }
+    public DateTime? FechaMovimiento { get; set; }
+    public string OficinaOrigen { get; set; } = string.Empty;
+    public string OficinaDestino { get; set; } = string.Empty;
+    public string? Observacion { get; set; }
 }
