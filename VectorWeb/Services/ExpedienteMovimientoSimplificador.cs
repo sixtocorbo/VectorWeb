@@ -20,7 +20,6 @@ public static class ExpedienteMovimientoSimplificador
     private const string SinResponsable = "Sin responsable";
     private const string SinOrigen = "Sin origen";
     private const string SinDestino = "Sin destino";
-    private const string DocumentoSinNumero = "Documento S/N";
     private const string ObservacionActuacionAgregada = "Actuación agregada";
     private const string PalabraRetorno = "retorno";
     private const string PalabraDestino = "destino";
@@ -51,7 +50,7 @@ public static class ExpedienteMovimientoSimplificador
                 var documentos = g
                     .OrderBy(m => m.IdDocumento == idDocumentoPrincipal ? 0 : 1)
                     .ThenBy(m => m.IdDocumentoNavigation?.IdTipoNavigation?.Nombre)
-                    .ThenBy(m => ObtenerNumeroMostrable(m.IdDocumentoNavigation))
+                    .ThenBy(m => DocumentoFormatoHelper.ObtenerNumeroMostrable(m.IdDocumentoNavigation).Numero)
                     .Select(m => FormatearDocumento(m.IdDocumentoNavigation))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
@@ -88,26 +87,7 @@ public static class ExpedienteMovimientoSimplificador
 
     private static string FormatearDocumento(MaeDocumento? documento)
     {
-        var tipo = documento?.IdTipoNavigation?.Nombre?.Trim();
-        var (numero, esNumeroInterno) = ObtenerNumeroMostrable(documento);
-
-        if (string.IsNullOrWhiteSpace(tipo) && string.IsNullOrWhiteSpace(numero)) return DocumentoSinNumero;
-        if (string.IsNullOrWhiteSpace(tipo)) return esNumeroInterno ? $"ID {numero}" : numero!;
-        if (string.IsNullOrWhiteSpace(numero)) return $"{tipo} S/N";
-        return esNumeroInterno ? $"{tipo} (ID {numero})" : $"{tipo} {numero}";
-    }
-
-    private static (string? Numero, bool EsNumeroInterno) ObtenerNumeroMostrable(MaeDocumento? documento)
-    {
-        if (documento is null) return (null, false);
-
-        var numeroOficial = documento.NumeroOficial?.Trim();
-        if (!string.IsNullOrWhiteSpace(numeroOficial)) return (numeroOficial, false);
-
-        var numeroInterno = documento.NumeroInterno?.Trim();
-        if (!string.IsNullOrWhiteSpace(numeroInterno)) return (numeroInterno, true);
-
-        return (null, false);
+        return DocumentoFormatoHelper.FormatearDocumento(documento);
     }
 
     private static string ConstruirResumenUsuario(string origen, string destino, string observacion, bool esActuacionInterna)
