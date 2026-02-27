@@ -39,6 +39,7 @@ builder.Services.AddTransient(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<DocumentoPlazosService>();
 builder.Services.AddScoped<NumeracionRangoService>();
 builder.Services.AddScoped<DocumentoVinculacionService>();
+builder.Services.AddScoped<DocumentosService>();
 builder.Services.AddScoped<RenovacionesService>();
 builder.Services.AddScoped<RolePermissionService>();
 builder.Services.AddScoped<PermissionAuditService>();
