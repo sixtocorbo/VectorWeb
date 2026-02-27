@@ -1008,6 +1008,7 @@
         var ofi = oficinas.FirstOrDefault(o => o.IdOficina == nuevoDoc.IdOficinaActual);
         if (ofi?.EsExterna == true) { esNumeracionExterna = true; return; }
 
+        var esAnioActual = anioNumeracionSeleccionado == DateTime.Now.Year;
         var rangosActivos = await RangoService.ObtenerRangosActivosAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
         var rangosDisponibles = rangosActivos.Where(r => r.UltimoUtilizado < r.NumeroFin).OrderBy(r => r.NumeroInicio).ToList();
         var rango = rangosDisponibles.FirstOrDefault();
@@ -1034,12 +1035,26 @@
             esNumeracionManualInterna = true;
             rangoManualInternoActivo = rango;
             rangosPermitidosManualInterna = rangosDisponibles;
+
+            if (esAnioActual)
+            {
+                var rangosHistoricos = await RangoService.ObtenerRangosPorOficinaYAnioAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
+                var rangosHistoricosDisponibles = rangosHistoricos
+                    .Where(r => r.UltimoUtilizado < r.NumeroFin)
+                    .OrderBy(r => r.NumeroInicio)
+                    .ToList();
+
+                if (rangosHistoricosDisponibles.Count > rangosPermitidosManualInterna.Count)
+                {
+                    rangosPermitidosManualInterna = rangosHistoricosDisponibles;
+                }
+            }
+
             rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
             mensajeNumeracion = $"Rangos vigentes para esta oficina: {rangoDisponibleTexto}. Ingrese un número dentro de alguno de esos intervalos.";
         }
         else
         {
-            var esAnioActual = anioNumeracionSeleccionado == DateTime.Now.Year;
             if (esAnioActual)
             {
                 var rangosHistoricos = await RangoService.ObtenerRangosPorOficinaYAnioAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
