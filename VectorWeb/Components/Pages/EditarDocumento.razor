@@ -67,6 +67,18 @@
         border-radius: 999px;
     }
 
+    .acciones-descripcion-lista {
+        max-height: 86px;
+        overflow: hidden;
+        transition: max-height 0.2s ease-in-out;
+    }
+
+    .acciones-descripcion-lista.expandida {
+        max-height: 240px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
     /* --- ESTILOS PARA IMPRESIÓN (BLINDAJE Y LIMPIEZA) --- */
     @@media print {
         /* 1. Ocultar todo lo que no sea la ficha técnica */
@@ -251,17 +263,26 @@
 
                         <div class="descripcion-acciones mt-2 no-print">
                             <div class="small text-muted fw-semibold mb-2">Acciones frecuentes: click para insertar en descripción</div>
-                            <div class="d-flex flex-wrap gap-2">
-                                @foreach (var accion in accionesSugeridasDescripcion)
-                                {
-                                    <button type="button"
-                                            class="btn btn-outline-primary btn-sm chip-accion"
-                                            title="@(accion.Texto)"
-                                            @onclick="() => InsertarAccionEnDescripcion(accion)">
-                                        @accion.Titulo
-                                    </button>
-                                }
+                            <div class="acciones-descripcion-lista @(mostrarTodasAccionesDescripcion ? "expandida" : string.Empty)">
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach (var accion in AccionesDescripcionVisibles)
+                                    {
+                                        var accionSeleccionada = accionesDescripcionSeleccionadas.Contains(accion.Texto);
+                                        <button type="button"
+                                                class="btn btn-sm chip-accion @(accionSeleccionada ? "btn-success" : "btn-outline-primary")"
+                                                title="@(accion.Texto)"
+                                                @onclick="() => AlternarAccionEnDescripcion(accion)">
+                                            @accion.Titulo
+                                        </button>
+                                    }
+                                </div>
                             </div>
+                            @if (accionesSugeridasDescripcion.Count > AccionesSugeridasColapsadas)
+                            {
+                                <button type="button" class="btn btn-link btn-sm px-0 mt-2" @onclick="AlternarVistaAccionesDescripcion">
+                                    @(mostrarTodasAccionesDescripcion ? "Ver menos acciones" : "Ver todas las acciones")
+                                </button>
+                            }
                         </div>
 
                         <InputTextArea class="form-control mt-2" style="min-height: 150px;"
@@ -329,8 +350,24 @@
         new("Audiencia judicial", "Coordinación por audiencia judicial."),
         new("Informe criminológico", "Solicitud o incorporación de informe criminológico."),
         new("Requisa e incautación", "Actuación de requisa e incautación."),
-        new("Derivación sanitaria", "Gestión de derivación sanitaria.")
+        new("Derivación sanitaria", "Gestión de derivación sanitaria."),
+        new("Informe social", "Incorporación de informe social actualizado."),
+        new("Solicitud de audiencia", "Se solicita audiencia con autoridad competente."),
+        new("Pedido de informes", "Se requiere informe a otras áreas intervinientes."),
+        new("Cumplimiento de oficio", "Se deja constancia de cumplimiento de oficio."),
+        new("Seguimiento de trámite", "Se registra seguimiento de trámite en curso."),
+        new("Archivo", "Se dispone archivo de las actuaciones."),
+        new("Reapertura", "Se dispone reapertura de actuaciones."),
+        new("Entrega de documentación", "Se deja constancia de entrega de documentación."),
+        new("Recepción de documentación", "Se deja constancia de recepción de documentación."),
+        new("Informe médico", "Se incorpora informe médico al expediente.")
     ];
+    private readonly HashSet<string> accionesDescripcionSeleccionadas = new(StringComparer.OrdinalIgnoreCase);
+    private const int AccionesSugeridasColapsadas = 10;
+    private bool mostrarTodasAccionesDescripcion;
+    private IEnumerable<AccionDescripcion> AccionesDescripcionVisibles => mostrarTodasAccionesDescripcion
+        ? accionesSugeridasDescripcion
+        : accionesSugeridasDescripcion.Take(AccionesSugeridasColapsadas);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -345,6 +382,7 @@
                 "IdTipoNavigation,IdOficinaActualNavigation,IdEstadoActualNavigation"
             );
             documento = docs.FirstOrDefault();
+            SincronizarAccionesDescripcionSeleccionadasDesdeTexto();
         }
         finally
         {
@@ -431,17 +469,75 @@
         LimpiarReclusosAsunto();
     }
 
-    private void InsertarAccionEnDescripcion(AccionDescripcion accion)
+    private void AlternarAccionEnDescripcion(AccionDescripcion accion)
     {
         if (documento is null) return;
 
-        if (string.IsNullOrWhiteSpace(documento.Descripcion))
+        if (accionesDescripcionSeleccionadas.Contains(accion.Texto))
         {
-            documento.Descripcion = accion.Texto;
+            accionesDescripcionSeleccionadas.Remove(accion.Texto);
+            documento.Descripcion = QuitarTextoAccionDeDescripcion(documento.Descripcion, accion.Texto);
             return;
         }
 
-        documento.Descripcion = $"{documento.Descripcion}{Environment.NewLine}- {accion.Texto}";
+        accionesDescripcionSeleccionadas.Add(accion.Texto);
+        documento.Descripcion = AgregarTextoAccionADescripcion(documento.Descripcion, accion.Texto);
+    }
+
+    private void AlternarVistaAccionesDescripcion() => mostrarTodasAccionesDescripcion = !mostrarTodasAccionesDescripcion;
+
+    private void SincronizarAccionesDescripcionSeleccionadasDesdeTexto()
+    {
+        accionesDescripcionSeleccionadas.Clear();
+        var descripcion = documento?.Descripcion;
+
+        if (string.IsNullOrWhiteSpace(descripcion)) return;
+
+        foreach (var accion in accionesSugeridasDescripcion)
+        {
+            if (ContieneTextoAccion(descripcion, accion.Texto))
+            {
+                accionesDescripcionSeleccionadas.Add(accion.Texto);
+            }
+        }
+    }
+
+    private static string AgregarTextoAccionADescripcion(string? descripcionActual, string textoAccion)
+    {
+        if (string.IsNullOrWhiteSpace(descripcionActual)) return textoAccion;
+        return $"{descripcionActual.TrimEnd()}{Environment.NewLine}- {textoAccion}";
+    }
+
+    private static string QuitarTextoAccionDeDescripcion(string? descripcionActual, string textoAccion)
+    {
+        if (string.IsNullOrWhiteSpace(descripcionActual)) return string.Empty;
+
+        var lineas = descripcionActual
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n')
+            .Select(linea => linea.TrimEnd())
+            .Where(linea => !CoincideConTextoAccion(linea, textoAccion))
+            .ToList();
+
+        return string.Join(Environment.NewLine, lineas).Trim();
+    }
+
+    private static bool CoincideConTextoAccion(string linea, string textoAccion)
+    {
+        var limpia = linea.Trim();
+        if (string.IsNullOrWhiteSpace(limpia)) return false;
+        if (limpia.StartsWith("- ", StringComparison.Ordinal))
+        {
+            limpia = limpia[2..].Trim();
+        }
+
+        return string.Equals(limpia, textoAccion, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContieneTextoAccion(string descripcion, string textoAccion)
+    {
+        var lineas = descripcion.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        return lineas.Any(linea => CoincideConTextoAccion(linea, textoAccion));
     }
 
     private sealed record AccionDescripcion(string Titulo, string Texto);
