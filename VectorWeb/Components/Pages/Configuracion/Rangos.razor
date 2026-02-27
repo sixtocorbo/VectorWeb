@@ -211,12 +211,13 @@ else
                                 <th class="text-end">Cupo Total</th>
                                 <th class="text-end">Consumido</th>
                                 <th class="text-end" style="width: 30%;">Disponibilidad</th>
+                                <th class="text-end" style="min-width: 180px;">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             @if (libroMayorCupos.Count == 0)
                             {
-                                <tr><td colspan="5" class="text-center py-4 text-muted">No hay cupos asignados aún.</td></tr>
+                                <tr><td colspan="6" class="text-center py-4 text-muted">No hay cupos asignados aún.</td></tr>
                             }
                             else
                             {
@@ -245,6 +246,14 @@ else
                                                     <span class="@claseTexto">@item.Disponible disp.</span>
                                                 </div>
                                             </div>
+                                        </td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary me-2" @onclick="() => EditarCupo(item)">
+                                                <i class="bi bi-pencil-square me-1"></i>Editar
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => EliminarCupo(item)">
+                                                <i class="bi bi-trash me-1"></i>Eliminar
+                                            </button>
                                         </td>
                                     </tr>
                                 }
@@ -538,7 +547,7 @@ else
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Configurar Cupo Anual</h5>
+                    <h5 class="modal-title">@(modoEdicionCupo ? "Editar Cupo Anual" : "Configurar Cupo Anual")</h5>
                     <button type="button" class="btn-close btn-close-white" @onclick="CerrarModalCupo"></button>
                 </div>
                 <div class="modal-body">
@@ -587,7 +596,7 @@ else
                             {
                                 <span class="spinner-border spinner-border-sm me-1"></span>
                             }
-                            Guardar Cupo
+                            @(modoEdicionCupo ? "Guardar Cambios" : "Guardar Cupo")
                         </button>
                     </div>
                 </div>
@@ -662,6 +671,7 @@ else
     private int cupoAnio = DateTime.Now.Year;
     private int? cupoCantidad;
     private int cupoConsumido;
+    private bool modoEdicionCupo;
 
     // Sugerencias
     private int? cantidadSugeridaSolicitada;
@@ -773,6 +783,7 @@ else
             : DateTime.Now.Year;
         cupoCantidad = 0;
         cupoConsumido = 0;
+        modoEdicionCupo = false;
         mostrarModalCupo = true;
         mensajeOk = "No existe cupo configurado para este tipo y año. Primero cree el cupo para luego configurar el rango.";
         contextoPreseleccionAplicado = true;
@@ -1095,7 +1106,43 @@ else
         cupoTipoSeleccionado = 0;
         cupoCantidad = 0;
         cupoConsumido = 0;
+        modoEdicionCupo = false;
         mostrarModalCupo = true;
+    }
+
+    private void EditarCupo(CupoLibroMayorItem item)
+    {
+        LimpiarMensajes();
+        cupoTipoSeleccionado = item.IdTipo;
+        cupoAnio = item.Anio;
+        cupoCantidad = item.Cantidad;
+        cupoConsumido = item.Consumido;
+        modoEdicionCupo = true;
+        mostrarModalCupo = true;
+    }
+
+    private async Task EliminarCupo(CupoLibroMayorItem item)
+    {
+        LimpiarMensajes();
+        procesando = true;
+
+        try
+        {
+            var resultado = await RangoService.EliminarCupoAsync(item.IdTipo, item.Anio);
+            if (!resultado.Exitoso)
+            {
+                mensajeError = resultado.Mensaje;
+                return;
+            }
+
+            mensajeOk = string.IsNullOrWhiteSpace(resultado.Mensaje) ? "Cupo eliminado correctamente." : resultado.Mensaje;
+            await CargarTodo();
+            await RefrescarSugerenciaRangoAsync();
+        }
+        finally
+        {
+            procesando = false;
+        }
     }
 
     // Reemplaza tu método actual (línea 644 aprox.) por este:
@@ -1118,7 +1165,7 @@ else
                 return;
             }
 
-            mensajeOk = "Cupo guardado correctamente.";
+            mensajeOk = string.IsNullOrWhiteSpace(resultado.Mensaje) ? "Cupo guardado correctamente." : resultado.Mensaje;
             mostrarModalCupo = false;
             await CargarTodo();
 
