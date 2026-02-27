@@ -716,12 +716,23 @@
     {
         if (!firstRender || detectorClickRegistrado) return;
 
-        var funcionRegistroDisponible = await JS.InvokeAsync<string>("eval", "typeof window.registrarOcultarSugerenciasOficina") == "function";
-        if (!funcionRegistroDisponible) return;
+        try
+        {
+            var funcionRegistroDisponible = await JS.InvokeAsync<string>("eval", "typeof window.registrarOcultarSugerenciasOficina") == "function";
+            if (!funcionRegistroDisponible) return;
 
-        dotNetRef = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("registrarOcultarSugerenciasOficina", contenedorSugerenciasOficinaRef, dotNetRef);
-        detectorClickRegistrado = true;
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("registrarOcultarSugerenciasOficina", contenedorSugerenciasOficinaRef, dotNetRef);
+            detectorClickRegistrado = true;
+        }
+        catch (JSDisconnectedException)
+        {
+            // El circuito se cerró antes de completar el registro del listener JS.
+        }
+        catch (TaskCanceledException)
+        {
+            // La llamada a JS fue cancelada durante la desconexión del circuito.
+        }
     }
 
     private async Task CalcularVencimientoAsync(int idTipo)
@@ -1128,6 +1139,10 @@
             catch (TaskCanceledException)
             {
                 // La tarea de JS Interop fue cancelada por la desconexión.
+            }
+            catch (ObjectDisposedException)
+            {
+                // El runtime de JS fue descartado al cerrar el circuito.
             }
             catch (Exception)
             {
