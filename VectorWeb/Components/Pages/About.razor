@@ -76,6 +76,26 @@
         margin-right: 15px;
         font-size: 1.25rem;
     }
+
+    .about-chip {
+        border: 1px dashed #ced4da;
+        border-radius: 999px;
+        padding: 0.3rem 0.7rem;
+        font-size: 0.8rem;
+        background: #fff;
+    }
+
+    .quick-card {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 1rem;
+        background-color: #fff;
+        height: 100%;
+    }
+
+    .quick-card h6 {
+        font-size: 0.95rem;
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -92,7 +112,12 @@
                         <a class="nav-link" href="/about#rangos-cupos"><i class="bi bi-hash me-2"></i>Numeración</a>
                         <a class="nav-link" href="/about#modulo-reclusos"><i class="bi bi-people me-2"></i>Reclusos</a>
                         <a class="nav-link" href="/about#renovaciones-120"><i class="bi bi-calendar-check me-2"></i>Art. 120</a>
+                        <a class="nav-link" href="/about#dashboard-alertas"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+                        <a class="nav-link" href="/about#seguridad-accesos"><i class="bi bi-person-lock me-2"></i>Accesos y Auditoría</a>
+                        <a class="nav-link" href="/about#respaldo-continuidad"><i class="bi bi-database-check me-2"></i>Respaldo BD</a>
+                        <a class="nav-link" href="/about#catalogos-parametros"><i class="bi bi-sliders me-2"></i>Catálogos</a>
                         <a class="nav-link" href="/about#ejemplo-practico"><i class="bi bi-diagram-3 me-2"></i>Flujo Real</a>
+                        <a class="nav-link" href="/about#buenas-practicas"><i class="bi bi-clipboard-check me-2"></i>Buenas prácticas</a>
                     </nav>
                 </div>
 
@@ -137,6 +162,20 @@
                             </div>
                             <p class="small text-muted mb-0">Sistema de alertas tempranas para evitar vencimientos legales.</p>
                         </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 border rounded-3 bg-light">
+                    <h6 class="fw-bold mb-3"><i class="bi bi-grid-3x3-gap me-2"></i>Mapa rápido del sistema</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="about-chip"><i class="bi bi-file-earmark-text me-1"></i>Documentos</span>
+                        <span class="about-chip"><i class="bi bi-link-45deg me-1"></i>Vinculación</span>
+                        <span class="about-chip"><i class="bi bi-people me-1"></i>Reclusos</span>
+                        <span class="about-chip"><i class="bi bi-calendar-check me-1"></i>Permisos Art. 120</span>
+                        <span class="about-chip"><i class="bi bi-speedometer2 me-1"></i>Dashboard</span>
+                        <span class="about-chip"><i class="bi bi-shield-lock me-1"></i>Usuarios y Roles</span>
+                        <span class="about-chip"><i class="bi bi-journal-check me-1"></i>Auditoría</span>
+                        <span class="about-chip"><i class="bi bi-database me-1"></i>Respaldo de BD</span>
                     </div>
                 </div>
             </section>
@@ -299,8 +338,124 @@
                 </div>
             </section>
 
+            <section id="dashboard-alertas" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">7. Dashboard y Alertas Operativas</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <p>La pantalla <strong>Dashboard</strong> centraliza indicadores para priorizar tareas del día y anticipar desvíos de plazos.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="quick-card">
+                                    <h6 class="fw-bold text-dark"><i class="bi bi-traffic-cone me-2 text-danger"></i>Alertas críticas</h6>
+                                    <ul class="small text-muted mb-0">
+                                        <li>Documentos vencidos o cercanos al vencimiento.</li>
+                                        <li>Permisos Art. 120 próximos a caducar.</li>
+                                        <li>Expedientes que requieren respuesta inmediata.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="quick-card">
+                                    <h6 class="fw-bold text-dark"><i class="bi bi-bar-chart-line me-2 text-primary"></i>Seguimiento diario</h6>
+                                    <ul class="small text-muted mb-0">
+                                        <li>Volumen de ingresos y egresos de expedientes.</li>
+                                        <li>Estado general de bandejas por oficina.</li>
+                                        <li>Priorización de trabajo según semáforos.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="seguridad-accesos" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">8. Accesos, Roles y Auditoría</h3>
+                <div class="card shadow-sm border-0 border-start border-primary border-4">
+                    <div class="card-body p-4">
+                        <p>
+                            El acceso a funcionalidades se controla por permisos específicos (por ejemplo: ver documentos, gestionar reclusos,
+                            configurar rangos, administrar usuarios).
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-lg-4">
+                                <div class="quick-card bg-light">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-person-badge me-2"></i>Usuarios y Roles</h6>
+                                    <p class="small text-muted mb-0">Define qué puede hacer cada perfil para sostener separación de funciones.</p>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="quick-card bg-light">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-journal-check me-2"></i>Auditoría de Permisos</h6>
+                                    <p class="small text-muted mb-0">Registra cambios de seguridad y permite rastrear quién modificó cada autorización.</p>
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <div class="quick-card bg-light">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-door-open me-2"></i>Sesiones</h6>
+                                    <p class="small text-muted mb-0">Cada operación queda asociada al usuario autenticado para garantizar responsabilidad operativa.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="respaldo-continuidad" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">9. Respaldo de Base de Datos y Continuidad</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <p>
+                            El módulo de <strong>Respaldo BD</strong> permite generar copias de seguridad para preservar evidencia digital,
+                            facilitar recuperación ante incidentes y cumplir lineamientos de continuidad operativa.
+                        </p>
+                        <div class="alert alert-info small mb-3">
+                            <i class="bi bi-info-circle-fill me-1"></i>
+                            Recomendación: ejecutar respaldos planificados y verificar periódicamente la restauración en ambiente de prueba.
+                        </div>
+                        <ul class="small text-muted mb-0">
+                            <li>Resguarda documentos, movimientos, numeración y configuraciones del sistema.</li>
+                            <li>Reduce el riesgo de pérdida de datos frente a fallas técnicas.</li>
+                            <li>Complementa la trazabilidad jurídica y administrativa del expediente digital.</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <section id="catalogos-parametros" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">10. Catálogos y Parámetros de Configuración</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <p>Los catálogos sostienen la consistencia de datos y evitan errores de carga manual.</p>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="quick-card">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-building me-2"></i>Oficinas</h6>
+                                    <p class="small text-muted mb-0">Define áreas emisoras/receptoras válidas para pases y asignaciones.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="quick-card">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-filetype-doc me-2"></i>Tipos de Documento</h6>
+                                    <p class="small text-muted mb-0">Normaliza clasificación documental para búsquedas y reportes.</p>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="quick-card">
+                                    <h6 class="fw-bold mb-2"><i class="bi bi-signpost me-2"></i>Estados</h6>
+                                    <p class="small text-muted mb-0">Modela el ciclo de vida del trámite (ingresado, en proceso, finalizado, etc.).</p>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="small text-muted mt-3 mb-0">
+                            Los módulos de <strong>Rangos</strong>, <strong>Semáforos</strong> y <strong>Plazos de documentos</strong> trabajan sobre estos catálogos para mantener reglas homogéneas en todo el circuito.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
             <section id="ejemplo-practico" class="about-section mb-5">
-                <h3 class="fw-bold mb-4 text-primary">7. Flujo Real: "Respuesta a Oficio"</h3>
+                <h3 class="fw-bold mb-4 text-primary">11. Flujo Real: "Respuesta a Oficio"</h3>
                 <div class="ms-3">
                     <div class="timeline-item">
                         <span class="badge bg-primary mb-2">INICIO</span>
@@ -321,6 +476,30 @@
                         <span class="badge bg-success mb-2">FIN</span>
                         <h6 class="fw-bold">Salida y Archivo</h6>
                         <p class="small text-muted mb-0">Se firma la respuesta. Se cambia el estado a <em>Finalizado/Archivado</em>. El semáforo se detiene.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="buenas-practicas" class="about-section mb-5">
+                <h3 class="fw-bold mb-3 text-primary">12. Buenas Prácticas Recomendadas</h3>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <ul class="small text-muted mb-0">
+                                    <li>Registrar asuntos descriptivos y consistentes para facilitar búsquedas.</li>
+                                    <li>Evitar demoras en bandeja: revisar semáforos al iniciar y cerrar jornada.</li>
+                                    <li>Usar vinculación padre/hijo en lugar de duplicar información en múltiples oficios.</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="small text-muted mb-0">
+                                    <li>No compartir credenciales entre usuarios para preservar trazabilidad.</li>
+                                    <li>Validar estado ACTIVO de internos antes de generar trámites asociados.</li>
+                                    <li>Coordinar con Sistemas altas/bajas de permisos y respaldos programados.</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
