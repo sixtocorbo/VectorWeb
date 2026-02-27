@@ -931,7 +931,14 @@
                 return;
             }
 
-            nuevoDoc.NumeroOficial = nuevoDoc.NumeroOficial.Trim();
+            var numeroOficialNormalizado = DocumentoFormatoHelper.NormalizarNumeroOficial(nuevoDoc.NumeroOficial, anioNumeracionSeleccionado);
+            if (string.IsNullOrWhiteSpace(numeroOficialNormalizado))
+            {
+                errorGuardar = "Número oficial obligatorio (ej. 120/26).";
+                return;
+            }
+
+            nuevoDoc.NumeroOficial = numeroOficialNormalizado;
 
             if (!nuevoDoc.FechaVencimiento.HasValue)
             {

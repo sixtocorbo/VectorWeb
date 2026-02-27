@@ -6,6 +6,7 @@
 @using System.Globalization
 @using System.Text
 @using VectorWeb.Models
+@using VectorWeb.Services
 @using VectorWeb.Repositories
 @inject IRepository<MaeDocumento> RepoDocs
 @inject IRepository<MaeRecluso> RepoReclusos
@@ -401,6 +402,9 @@
         guardando = true;
         try
         {
+            var anioReferencia = documento.FechaCreacion?.Year ?? DateTime.Now.Year;
+            documento.NumeroOficial = DocumentoFormatoHelper.NormalizarNumeroOficial(documento.NumeroOficial, anioReferencia);
+
             await RepoDocs.UpdateAsync(documento);
             mensajeExito = "Información actualizada correctamente.";
         }

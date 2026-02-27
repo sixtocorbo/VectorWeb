@@ -35,4 +35,44 @@ public static class DocumentoFormatoHelper
 
         return (null, false);
     }
+
+    public static string? NormalizarNumeroOficial(string? numeroOficial, int anioReferencia)
+    {
+        if (string.IsNullOrWhiteSpace(numeroOficial)) return null;
+
+        var numeroLimpio = numeroOficial.Trim();
+        var indiceSeparador = numeroLimpio.IndexOf('/');
+        var anioCorto = ObtenerAnioCorto(anioReferencia);
+
+        if (indiceSeparador < 0)
+        {
+            return $"{numeroLimpio}/{anioCorto}";
+        }
+
+        var prefijo = numeroLimpio[..indiceSeparador].Trim();
+        if (string.IsNullOrWhiteSpace(prefijo)) return numeroLimpio;
+
+        var sufijo = numeroLimpio[(indiceSeparador + 1)..].Trim();
+        if (string.IsNullOrWhiteSpace(sufijo))
+        {
+            return $"{prefijo}/{anioCorto}";
+        }
+
+        if (int.TryParse(sufijo, out var anioNumerico))
+        {
+            if (sufijo.Length == 4)
+            {
+                return $"{prefijo}/{ObtenerAnioCorto(anioNumerico)}";
+            }
+
+            if (sufijo.Length <= 2)
+            {
+                return $"{prefijo}/{anioNumerico:00}";
+            }
+        }
+
+        return $"{prefijo}/{sufijo}";
+    }
+
+    private static string ObtenerAnioCorto(int anio) => (Math.Abs(anio) % 100).ToString("00");
 }
