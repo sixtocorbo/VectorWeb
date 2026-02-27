@@ -137,6 +137,43 @@ public class NumeracionRangoService
     {
         return await EjecutarOperacionControladaAsync(async () => {
             using var context = await _contextFactory.CreateDbContextAsync();
+
+            var cupo = await context.MaeCuposSecretaria
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.IdTipo == rango.IdTipo && c.Anio == rango.Anio);
+
+            if (cupo == null)
+            {
+                return OperacionResultado.Fail("No existe cupo configurado para este tipo y año.");
+            }
+
+            var cantidadNuevoRango = rango.NumeroFin - rango.NumeroInicio + 1;
+            if (cantidadNuevoRango <= 0)
+            {
+                return OperacionResultado.Fail("Rango inválido (Inicio > Fin).");
+            }
+
+            var consumoSinRangoActual = await context.MaeNumeracionRangos
+                .Where(r => r.IdTipo == rango.IdTipo && r.Anio == rango.Anio && r.IdRango != rango.IdRango)
+                .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
+
+            if (consumoSinRangoActual + cantidadNuevoRango > cupo.Cantidad)
+            {
+                return OperacionResultado.Fail("El rango supera el cupo disponible para este tipo y año.");
+            }
+
+            var hayTraslape = await context.MaeNumeracionRangos.AnyAsync(r =>
+                r.IdTipo == rango.IdTipo &&
+                r.Anio == rango.Anio &&
+                r.IdRango != rango.IdRango &&
+                rango.NumeroInicio <= r.NumeroFin &&
+                rango.NumeroFin >= r.NumeroInicio);
+
+            if (hayTraslape)
+            {
+                return OperacionResultado.Fail("El rango se superpone con otro ya existente para este tipo y año.");
+            }
+
             string accionBitacora;
             string detalleBitacora;
 
