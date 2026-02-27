@@ -149,6 +149,111 @@ public class NumeracionRangoServiceTests
         Assert.Equal(120, rangos[1].NumeroFin);
     }
 
+
+    [Fact]
+    public async Task ObtenerSugerenciaRangoAsync_SugiereHuecoMinimoQueCumpleCantidad()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                Cantidad = 3000,
+                Fecha = DateTime.Now,
+                NombreCupo = "CUPO-1-2026"
+            });
+
+            seed.MaeNumeracionRangos.AddRange(
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "BANDEJA",
+                    NumeroInicio = 1,
+                    NumeroFin = 200,
+                    UltimoUtilizado = 187,
+                    Activo = true,
+                    IdOficina = 10
+                },
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "PERSONAL",
+                    NumeroInicio = 201,
+                    NumeroFin = 501,
+                    UltimoUtilizado = 220,
+                    Activo = true,
+                    IdOficina = 20
+                });
+
+            await seed.SaveChangesAsync();
+        }
+
+        var sugerencia = await service.ObtenerSugerenciaRangoAsync(1, 2026, 10, null, 50);
+
+        Assert.Equal(502, sugerencia.NumeroInicioSugerido);
+        Assert.Equal(551, sugerencia.NumeroFinSugerido);
+        Assert.Equal(50, sugerencia.CantidadSugerida);
+        Assert.Equal(2499, sugerencia.MaximoConsecutivoDisponible);
+        Assert.False(sugerencia.SugerenciaRecortadaPorSaldo);
+    }
+
+    [Fact]
+    public async Task ObtenerSugerenciaRangoAsync_RecortaSiCantidadNoCabeEnNingunBloque()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                Cantidad = 3000,
+                Fecha = DateTime.Now,
+                NombreCupo = "CUPO-1-2026"
+            });
+
+            seed.MaeNumeracionRangos.AddRange(
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "R1",
+                    NumeroInicio = 201,
+                    NumeroFin = 501,
+                    UltimoUtilizado = 250,
+                    Activo = true,
+                    IdOficina = 20
+                },
+                new MaeNumeracionRango
+                {
+                    IdTipo = 1,
+                    Anio = 2026,
+                    NombreRango = "R2",
+                    NumeroInicio = 700,
+                    NumeroFin = 3000,
+                    UltimoUtilizado = 1000,
+                    Activo = true,
+                    IdOficina = 30
+                });
+
+            await seed.SaveChangesAsync();
+        }
+
+        var sugerencia = await service.ObtenerSugerenciaRangoAsync(1, 2026, 10, null, 250);
+
+        Assert.Equal(1, sugerencia.NumeroInicioSugerido);
+        Assert.Equal(200, sugerencia.NumeroFinSugerido);
+        Assert.Equal(200, sugerencia.CantidadSugerida);
+        Assert.Equal(200, sugerencia.MaximoConsecutivoDisponible);
+        Assert.True(sugerencia.SugerenciaRecortadaPorSaldo);
+    }
+
     [Fact]
     public async Task EliminarCupoAsync_Falla_SiHayRangosAsociados()
     {

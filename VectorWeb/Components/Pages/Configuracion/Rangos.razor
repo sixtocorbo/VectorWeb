@@ -368,6 +368,7 @@ else
                                             <div class="col-md-4"><span class="text-muted">Inicio sugerido:</span> <strong>@sugerenciaRango.NumeroInicioSugerido.ToString("N0", CulturaUi)</strong></div>
                                             <div class="col-md-4"><span class="text-muted">Fin sugerido:</span> <strong>@sugerenciaRango.NumeroFinSugerido.ToString("N0", CulturaUi)</strong></div>
                                             <div class="col-md-4"><span class="text-muted">Cantidad:</span> <strong>@sugerenciaRango.CantidadSugerida.ToString("N0", CulturaUi)</strong></div>
+                                            <div class="col-md-12"><span class="text-muted">Máximo consecutivo libre:</span> <strong>@sugerenciaRango.MaximoConsecutivoDisponible.ToString("N0", CulturaUi)</strong></div>
                                         </div>
                                         @* Avisos varios de lógica de negocio *@
                                         @if (MostrarAvisoExisteRangoActivo)
@@ -1292,7 +1293,7 @@ else
     private bool DebeSugerirCrearCupo => rangoActual.IdTipo > 0 && rangoActual.Anio > 0 && sugerenciaRango.CupoTotal == 0;
     private bool DebeSugerirCrearRango => rangoActual.IdTipo > 0 && rangoActual.Anio > 0 && sugerenciaRango.CupoTotal > 0 && !PuedeAplicarSugerencia;
     private bool MostrarAccionesSugeridas => DebeSugerirCrearCupo || DebeSugerirCrearRango;
-    private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.SaldoDisponible > 0 ? sugerenciaRango.SaldoDisponible : sugerenciaRango.CantidadSugerida);
+    private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.MaximoConsecutivoDisponible > 0 ? sugerenciaRango.MaximoConsecutivoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
     private int CupoCantidadSegura => Math.Max(0, cupoCantidad.GetValueOrDefault());
     private string MensajeSolapamientoEnTiempoReal
