@@ -84,6 +84,7 @@ public class NumeracionRangoService
                 lookup.TryGetValue((c.IdTipo, c.Anio), out var consumido);
                 return new CupoLibroMayorItem
                 {
+                    IdTipo = c.IdTipo,
                     Tipo = c.IdTipoNavigation?.Nombre ?? "S/T",
                     Anio = c.Anio,
                     Cantidad = c.Cantidad,
@@ -269,6 +270,37 @@ public class NumeracionRangoService
         return await EjecutarOperacionControladaAsync(async () => {
             using var context = await _contextFactory.CreateDbContextAsync();
             var cupo = await context.MaeCuposSecretaria.FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
+            var rangos = await context.MaeNumeracionRangos
+                .Where(r => r.IdTipo == idTipo && r.Anio == anio)
+                .OrderBy(r => r.NumeroInicio)
+                .ToListAsync();
+
+            var detalleAjustes = new List<string>();
+
+            if (rangos.Any())
+            {
+                var maximoUtilizado = rangos.Max(r => r.UltimoUtilizado);
+                if (maximoUtilizado > cantidad)
+                {
+                    return OperacionResultado.Fail($"No se puede reducir el cupo a {cantidad} porque ya existen documentos numerados hasta {maximoUtilizado}. Ajuste el cupo a un valor mayor o igual al último número utilizado.");
+                }
+
+                foreach (var rango in rangos)
+                {
+                    if (rango.NumeroInicio > cantidad)
+                    {
+                        detalleAjustes.Add($"{rango.NombreRango} eliminado ({rango.NumeroInicio}-{rango.NumeroFin})");
+                        context.MaeNumeracionRangos.Remove(rango);
+                        continue;
+                    }
+
+                    if (rango.NumeroFin > cantidad)
+                    {
+                        detalleAjustes.Add($"{rango.NombreRango} ajustado: {rango.NumeroInicio}-{rango.NumeroFin} → {rango.NumeroInicio}-{cantidad}");
+                        rango.NumeroFin = cantidad;
+                    }
+                }
+            }
 
             if (cupo == null)
             {
@@ -293,13 +325,54 @@ public class NumeracionRangoService
                 Fecha = DateTime.Now,
                 Entidad = "CUPOS",
                 Accion = "CONFIGURACION",
-                Detalle = $"Se configuró cupo anual de {cantidad} para Tipo {idTipo} / Año {anio}",
+                Detalle = $"Se configuró cupo anual de {cantidad} para Tipo {idTipo} / Año {anio}" + (detalleAjustes.Count > 0 ? $". Ajustes automáticos: {string.Join("; ", detalleAjustes)}" : string.Empty),
                 IdTipo = idTipo
             });
 
             await context.SaveChangesAsync();
-            return OperacionResultado.Ok();
+
+            if (detalleAjustes.Count > 0)
+            {
+                return OperacionResultado.Ok($"Cupo guardado. Se ajustaron {detalleAjustes.Count} rango(s) para mantener consistencia: {string.Join("; ", detalleAjustes)}.");
+            }
+
+            return OperacionResultado.Ok("Cupo guardado correctamente.");
         }, "Error al guardar cupo", "guardar cupo");
+    }
+
+    public async Task<OperacionResultado> EliminarCupoAsync(int idTipo, int anio)
+    {
+        return await EjecutarOperacionControladaAsync(async () => {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var cupo = await context.MaeCuposSecretaria.FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
+
+            if (cupo == null)
+            {
+                return OperacionResultado.Fail("No existe el cupo seleccionado.");
+            }
+
+            var rangosAsociados = await context.MaeNumeracionRangos
+                .Where(r => r.IdTipo == idTipo && r.Anio == anio)
+                .CountAsync();
+
+            if (rangosAsociados > 0)
+            {
+                return OperacionResultado.Fail($"No se puede eliminar el cupo porque hay {rangosAsociados} rango(s) asociados en oficinas. Elimine primero todos los rangos de ese tipo y año.");
+            }
+
+            context.MaeCuposSecretaria.Remove(cupo);
+            context.MaeNumeracionBitacoras.Add(new MaeNumeracionBitacora
+            {
+                Fecha = DateTime.Now,
+                Entidad = "CUPOS",
+                Accion = "ELIMINACION",
+                Detalle = $"Se eliminó el cupo anual Tipo {idTipo} / Año {anio}",
+                IdTipo = idTipo
+            });
+
+            await context.SaveChangesAsync();
+            return OperacionResultado.Ok("Cupo eliminado correctamente.");
+        }, "Error al eliminar cupo", "eliminar cupo");
     }
 
     public async Task<SugerenciaRangoNumeracion> ObtenerSugerenciaRangoAsync(int idTipo, int anio, int? idOficina, int? idRangoActual, int? cantidadSolicitada)
@@ -375,7 +448,7 @@ public class OperacionResultado
 {
     public bool Exitoso { get; set; }
     public string Mensaje { get; set; } = string.Empty;
-    public static OperacionResultado Ok() => new() { Exitoso = true };
+    public static OperacionResultado Ok(string mensaje = "") => new() { Exitoso = true, Mensaje = mensaje };
     public static OperacionResultado Fail(string m) => new() { Exitoso = false, Mensaje = m };
 }
 
@@ -388,6 +461,7 @@ public class OperacionResultado<T> : OperacionResultado
 
 public sealed class CupoLibroMayorItem
 {
+    public int IdTipo { get; set; }
     public string Tipo { get; set; } = "";
     public int Anio { get; set; }
     public int Cantidad { get; set; }
