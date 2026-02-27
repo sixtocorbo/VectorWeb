@@ -377,7 +377,7 @@ else
                                             <div class="col-md-3"><span class="text-muted">Cupo total:</span> <strong>@sugerenciaRango.CupoTotal.ToString("N0", CulturaUi)</strong></div>
                                             <div class="col-md-3">
                                                 <span class="text-muted">Asignado:</span> <strong>@sugerenciaRango.ConsumoTotalAsignado.ToString("N0", CulturaUi)</strong>
-                                                <div class="text-muted" style="font-size:.75rem;">(rango reservado, no último uso)</div>
+                                                <div class="text-muted fs-6">(rango reservado, no último uso)</div>
                                             </div>
                                             <div class="col-md-3 text-success"><span class="text-muted">Disponible:</span> <strong>@sugerenciaRango.SaldoDisponible.ToString("N0", CulturaUi)</strong></div>
                                         </div>
@@ -395,9 +395,10 @@ else
                                         {
                                             <div class="small text-primary mt-2"><i class="bi bi-info-circle me-1"></i>Oficina ya tiene @sugerenciaRango.CantidadRangosActivosOficina rango(s) activo(s).</div>
                                         }
-                                        @if (sugerenciaRango.CantidadRangosActivosOficina >= 1)
+                                        @{ var maximoRangosActivos = 1; }
+                                        @if (sugerenciaRango.CantidadRangosActivosOficina >= maximoRangosActivos)
                                         {
-                                            <div class="small text-danger mt-2"><i class="bi bi-exclamation-octagon me-1"></i>La oficina alcanzó el máximo de 1 rango activo para este tipo/año.</div>
+                                            <div class="small text-danger mt-2"><i class="bi bi-exclamation-octagon me-1"></i>La oficina alcanzó el máximo de @maximoRangosActivos rango activo para este tipo/año.</div>
                                         }
                                         @if (sugerenciaRango.SugerenciaRecortadaPorSaldo)
                                         {
