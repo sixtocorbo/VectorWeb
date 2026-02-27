@@ -1117,7 +1117,14 @@
     {
         if (detectorClickRegistrado)
         {
-            await JS.InvokeVoidAsync("desregistrarOcultarSugerenciasOficina", contenedorSugerenciasOficinaRef);
+            try
+            {
+                await JS.InvokeVoidAsync("desregistrarOcultarSugerenciasOficina", contenedorSugerenciasOficinaRef);
+            }
+            catch (JSDisconnectedException)
+            {
+                // El circuito ya está desconectado durante el dispose; no hay interop disponible.
+            }
         }
         dotNetRef?.Dispose();
     }
