@@ -58,6 +58,18 @@
         font-size: 0.9rem;
     }
 
+    .acciones-descripcion-lista {
+        max-height: 86px;
+        overflow: hidden;
+        transition: max-height 0.2s ease-in-out;
+    }
+
+    .acciones-descripcion-lista.expandida {
+        max-height: 240px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
     .label-important {
         color: #b02a37;
         font-weight: 700;
@@ -375,17 +387,26 @@
                             <label class="label-custom mb-1">Descripción detallada</label>
                             <div class="search-panel p-3 mb-2">
                                 <div class="small text-muted fw-semibold mb-2">Acciones frecuentes: click para insertar en descripción</div>
-                                <div class="d-flex flex-wrap gap-2">
-                                    @foreach (var accion in accionesSugeridasDescripcion)
-                                    {
-                                        <button type="button"
-                                                class="btn btn-outline-primary btn-sm rounded-pill"
-                                                title="@(accion.Texto)"
-                                                @onclick="() => InsertarAccionEnDescripcion(accion)">
-                                            @accion.Titulo
-                                        </button>
-                                    }
+                                <div class="acciones-descripcion-lista @(mostrarTodasAccionesDescripcion ? "expandida" : string.Empty)">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        @foreach (var accion in AccionesDescripcionVisibles)
+                                        {
+                                            var accionSeleccionada = accionesDescripcionSeleccionadas.Contains(accion.Texto);
+                                            <button type="button"
+                                                    class="btn btn-sm rounded-pill @(accionSeleccionada ? "btn-success" : "btn-outline-primary")"
+                                                    title="@(accion.Texto)"
+                                                    @onclick="() => AlternarAccionEnDescripcion(accion)">
+                                                @accion.Titulo
+                                            </button>
+                                        }
+                                    </div>
                                 </div>
+                                @if (accionesSugeridasDescripcion.Count > AccionesSugeridasColapsadas)
+                                {
+                                    <button type="button" class="btn btn-link btn-sm px-0 mt-2" @onclick="AlternarVistaAccionesDescripcion">
+                                        @(mostrarTodasAccionesDescripcion ? "Ver menos acciones" : "Ver todas las acciones")
+                                    </button>
+                                }
                             </div>
                             <InputTextArea @bind-Value="nuevoDoc.Descripcion" class="form-control shadow-none" rows="4" placeholder="Ingrese una descripción detallada (opcional)..." />
                         </div>
@@ -586,8 +607,24 @@
         new("Audiencia judicial", "Coordinación por audiencia judicial."),
         new("Informe criminológico", "Solicitud o incorporación de informe criminológico."),
         new("Requisa e incautación", "Actuación de requisa e incautación."),
-        new("Derivación sanitaria", "Gestión de derivación sanitaria.")
+        new("Derivación sanitaria", "Gestión de derivación sanitaria."),
+        new("Informe social", "Incorporación de informe social actualizado."),
+        new("Solicitud de audiencia", "Se solicita audiencia con autoridad competente."),
+        new("Pedido de informes", "Se requiere informe a otras áreas intervinientes."),
+        new("Cumplimiento de oficio", "Se deja constancia de cumplimiento de oficio."),
+        new("Seguimiento de trámite", "Se registra seguimiento de trámite en curso."),
+        new("Archivo", "Se dispone archivo de las actuaciones."),
+        new("Reapertura", "Se dispone reapertura de actuaciones."),
+        new("Entrega de documentación", "Se deja constancia de entrega de documentación."),
+        new("Recepción de documentación", "Se deja constancia de recepción de documentación."),
+        new("Informe médico", "Se incorpora informe médico al expediente.")
     ];
+    private readonly HashSet<string> accionesDescripcionSeleccionadas = new(StringComparer.OrdinalIgnoreCase);
+    private const int AccionesSugeridasColapsadas = 10;
+    private bool mostrarTodasAccionesDescripcion;
+    private IEnumerable<AccionDescripcion> AccionesDescripcionVisibles => mostrarTodasAccionesDescripcion
+        ? accionesSugeridasDescripcion
+        : accionesSugeridasDescripcion.Take(AccionesSugeridasColapsadas);
 
     // --- MODAL PAGINADO EN BASE DE DATOS ---
     private string filtroModalPadre = string.Empty;
@@ -747,6 +784,7 @@
                     soloTraerSinActuacion = false;
                     nuevoDoc.Asunto = padre.Asunto?.Trim() ?? string.Empty;
                     nuevoDoc.Descripcion = padre.Descripcion;
+                    SincronizarAccionesDescripcionSeleccionadasDesdeTexto();
                     mostrarAvisoTextoSugeridoPadre = !string.IsNullOrWhiteSpace(nuevoDoc.Asunto) || !string.IsNullOrWhiteSpace(nuevoDoc.Descripcion);
                 }
             }
@@ -1198,15 +1236,73 @@
         nuevoDoc.Descripcion = ReemplazarBloqueReclusos(nuevoDoc.Descripcion, bloqueReclusos);
     }
 
-    private void InsertarAccionEnDescripcion(AccionDescripcion accion)
+    private void AlternarAccionEnDescripcion(AccionDescripcion accion)
     {
-        if (string.IsNullOrWhiteSpace(nuevoDoc.Descripcion))
+        if (accionesDescripcionSeleccionadas.Contains(accion.Texto))
         {
-            nuevoDoc.Descripcion = accion.Texto;
+            accionesDescripcionSeleccionadas.Remove(accion.Texto);
+            nuevoDoc.Descripcion = QuitarTextoAccionDeDescripcion(nuevoDoc.Descripcion, accion.Texto);
             return;
         }
 
-        nuevoDoc.Descripcion = $"{nuevoDoc.Descripcion}{Environment.NewLine}- {accion.Texto}";
+        accionesDescripcionSeleccionadas.Add(accion.Texto);
+        nuevoDoc.Descripcion = AgregarTextoAccionADescripcion(nuevoDoc.Descripcion, accion.Texto);
+    }
+
+    private void AlternarVistaAccionesDescripcion() => mostrarTodasAccionesDescripcion = !mostrarTodasAccionesDescripcion;
+
+    private void SincronizarAccionesDescripcionSeleccionadasDesdeTexto()
+    {
+        accionesDescripcionSeleccionadas.Clear();
+        var descripcion = nuevoDoc.Descripcion;
+
+        if (string.IsNullOrWhiteSpace(descripcion)) return;
+
+        foreach (var accion in accionesSugeridasDescripcion)
+        {
+            if (ContieneTextoAccion(descripcion, accion.Texto))
+            {
+                accionesDescripcionSeleccionadas.Add(accion.Texto);
+            }
+        }
+    }
+
+    private static string AgregarTextoAccionADescripcion(string? descripcionActual, string textoAccion)
+    {
+        if (string.IsNullOrWhiteSpace(descripcionActual)) return textoAccion;
+        return $"{descripcionActual.TrimEnd()}{Environment.NewLine}- {textoAccion}";
+    }
+
+    private static string QuitarTextoAccionDeDescripcion(string? descripcionActual, string textoAccion)
+    {
+        if (string.IsNullOrWhiteSpace(descripcionActual)) return string.Empty;
+
+        var lineas = descripcionActual
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Split('\n')
+            .Select(linea => linea.TrimEnd())
+            .Where(linea => !CoincideConTextoAccion(linea, textoAccion))
+            .ToList();
+
+        return string.Join(Environment.NewLine, lineas).Trim();
+    }
+
+    private static bool CoincideConTextoAccion(string linea, string textoAccion)
+    {
+        var limpia = linea.Trim();
+        if (string.IsNullOrWhiteSpace(limpia)) return false;
+        if (limpia.StartsWith("- ", StringComparison.Ordinal))
+        {
+            limpia = limpia[2..].Trim();
+        }
+
+        return string.Equals(limpia, textoAccion, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContieneTextoAccion(string descripcion, string textoAccion)
+    {
+        var lineas = descripcion.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+        return lineas.Any(linea => CoincideConTextoAccion(linea, textoAccion));
     }
 
     private string ConstruirBloqueReclusosSeleccionados()
