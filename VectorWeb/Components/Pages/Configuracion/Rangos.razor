@@ -21,20 +21,20 @@
 
 @* --- MENSAJES DE ALERTA (Sin Toast, integrados) --- *@
 <AlertaScroll Id="alertaPrincipalError"
-             Mensaje="@mensajeError"
-             Tipo="danger"
-             CssClass="alert-dismissible fade show"
-             IconoCss="bi bi-exclamation-triangle-fill"
-             PermitirCerrar="true"
-             OnCerrar="LimpiarMensajeError" />
+              Mensaje="@mensajeError"
+              Tipo="danger"
+              CssClass="alert-dismissible fade show"
+              IconoCss="bi bi-exclamation-triangle-fill"
+              PermitirCerrar="true"
+              OnCerrar="LimpiarMensajeError" />
 
 <AlertaScroll Id="alertaPrincipalOk"
-             Mensaje="@mensajeOk"
-             Tipo="success"
-             CssClass="alert-dismissible fade show"
-             IconoCss="bi bi-check-circle-fill"
-             PermitirCerrar="true"
-             OnCerrar="LimpiarMensajeOk" />
+              Mensaje="@mensajeOk"
+              Tipo="success"
+              CssClass="alert-dismissible fade show"
+              IconoCss="bi bi-check-circle-fill"
+              PermitirCerrar="true"
+              OnCerrar="LimpiarMensajeOk" />
 
 @* --- SISTEMA DE PESTAÑAS --- *@
 <ul class="nav nav-tabs mb-4">
@@ -224,7 +224,6 @@ else
                                     var claseTexto = porcentaje > 95 ? "text-danger fw-bold"
                                     : (porcentaje > 80 ? "text-warning fw-bold"
                                     : "text-muted");
-
                                     <tr>
                                         <td class="fw-bold text-dark">@item.Tipo</td>
                                         <td class="text-center">@item.Anio</td>
@@ -557,7 +556,7 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Cantidad Total (Cupo)</label>
-                        <InputNumber @bind-Value="cupoCantidad" @bind-Value:event="oninput" class="form-control form-control-lg" />
+                        <input type="number" @bind="cupoCantidad" @bind:event="oninput" class="form-control form-control-lg" />
                     </div>
 
                     @if (cupoTipoSeleccionado > 0)
@@ -1094,6 +1093,7 @@ else
             var tipoSeleccionado = cupoTipoSeleccionado;
             var anioSeleccionado = cupoAnio;
             procesando = true;
+            StateHasChanged(); // <-- Forzamos a mostrar el spinner
 
             try
             {
@@ -1108,11 +1108,16 @@ else
                 cupoCantidad = cantidad;
                 cupoConsumido = consumido;
             }
+            catch (Exception ex)
+            {
+                MostrarErrorModalCupo($"Error al cargar datos: {ex.Message}");
+            }
             finally
             {
                 if (tipoSeleccionado == cupoTipoSeleccionado && anioSeleccionado == cupoAnio)
                 {
                     procesando = false;
+                    StateHasChanged(); // <-- AVISAMOS A LA PANTALLA QUE YA TERMINÓ
                 }
             }
         }
@@ -1121,6 +1126,7 @@ else
             cupoConsumido = 0;
             cupoCantidad = 0;
             procesando = false;
+            StateHasChanged(); // <-- AVISAMOS A LA PANTALLA
         }
     }
 
