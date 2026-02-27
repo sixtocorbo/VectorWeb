@@ -138,6 +138,8 @@ public class NumeracionRangoService
     {
         return await EjecutarOperacionControladaAsync(async () => {
             using var context = await _contextFactory.CreateDbContextAsync();
+            var tipoDetalle = await ConstruirDetalleTipoAsync(context, rango.IdTipo);
+            var oficinaDetalle = await ConstruirDetalleOficinaAsync(context, rango.IdOficina);
 
             var cupo = await context.MaeCuposSecretaria
                 .AsNoTracking()
@@ -212,7 +214,7 @@ public class NumeracionRangoService
             {
                 context.MaeNumeracionRangos.Add(rango);
                 accionBitacora = "APERTURA";
-                detalleBitacora = $"Creación de nuevo rango: {rango.NumeroInicio}-{rango.NumeroFin}";
+                detalleBitacora = $"Creación de nuevo rango {rango.NombreRango}: {rango.NumeroInicio}-{rango.NumeroFin}. {tipoDetalle}. {oficinaDetalle}";
             }
             else
             {
@@ -221,7 +223,7 @@ public class NumeracionRangoService
 
                 context.Entry(dbRango).CurrentValues.SetValues(rango);
                 accionBitacora = "CAMBIO";
-                detalleBitacora = $"Modificación de rango ID {rango.IdRango}. Nuevo fin: {rango.NumeroFin}";
+                detalleBitacora = $"Modificación de rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}). Nuevo fin: {rango.NumeroFin}. {tipoDetalle}. {oficinaDetalle}";
             }
 
             // REGISTRO EN BITÁCORA (Campo Entidad agregado para evitar SqlException)
@@ -248,12 +250,14 @@ public class NumeracionRangoService
 
             if (rango != null)
             {
+                var tipoDetalle = await ConstruirDetalleTipoAsync(context, rango.IdTipo);
+                var oficinaDetalle = await ConstruirDetalleOficinaAsync(context, rango.IdOficina);
                 context.MaeNumeracionBitacoras.Add(new MaeNumeracionBitacora
                 {
                     Fecha = DateTime.Now,
                     Entidad = "RANGOS",
                     Accion = "ELIMINACION",
-                    Detalle = $"Se eliminó el rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin})",
+                    Detalle = $"Se eliminó el rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}). {tipoDetalle}. {oficinaDetalle}",
                     IdTipo = rango.IdTipo,
                     IdOficina = rango.IdOficina
                 });
@@ -269,6 +273,7 @@ public class NumeracionRangoService
     {
         return await EjecutarOperacionControladaAsync(async () => {
             using var context = await _contextFactory.CreateDbContextAsync();
+            var tipoDetalle = await ConstruirDetalleTipoAsync(context, idTipo);
             var cupo = await context.MaeCuposSecretaria.FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
             var rangos = await context.MaeNumeracionRangos
                 .Where(r => r.IdTipo == idTipo && r.Anio == anio)
@@ -287,16 +292,17 @@ public class NumeracionRangoService
 
                 foreach (var rango in rangos)
                 {
+                    var oficinaDetalle = await ConstruirDetalleOficinaAsync(context, rango.IdOficina);
                     if (rango.NumeroInicio > cantidad)
                     {
-                        detalleAjustes.Add($"{rango.NombreRango} eliminado ({rango.NumeroInicio}-{rango.NumeroFin})");
+                        detalleAjustes.Add($"{rango.NombreRango} eliminado ({rango.NumeroInicio}-{rango.NumeroFin}) [{oficinaDetalle}]");
                         context.MaeNumeracionRangos.Remove(rango);
                         continue;
                     }
 
                     if (rango.NumeroFin > cantidad)
                     {
-                        detalleAjustes.Add($"{rango.NombreRango} ajustado: {rango.NumeroInicio}-{rango.NumeroFin} → {rango.NumeroInicio}-{cantidad}");
+                        detalleAjustes.Add($"{rango.NombreRango} ajustado: {rango.NumeroInicio}-{rango.NumeroFin} → {rango.NumeroInicio}-{cantidad} [{oficinaDetalle}]");
                         rango.NumeroFin = cantidad;
                     }
                 }
@@ -325,7 +331,7 @@ public class NumeracionRangoService
                 Fecha = DateTime.Now,
                 Entidad = "CUPOS",
                 Accion = "CONFIGURACION",
-                Detalle = $"Se configuró cupo anual de {cantidad} para Tipo {idTipo} / Año {anio}" + (detalleAjustes.Count > 0 ? $". Ajustes automáticos: {string.Join("; ", detalleAjustes)}" : string.Empty),
+                Detalle = $"Se configuró cupo anual de {cantidad} para {tipoDetalle} / Año {anio}" + (detalleAjustes.Count > 0 ? $". Ajustes automáticos: {string.Join("; ", detalleAjustes)}" : string.Empty),
                 IdTipo = idTipo
             });
 
@@ -344,6 +350,7 @@ public class NumeracionRangoService
     {
         return await EjecutarOperacionControladaAsync(async () => {
             using var context = await _contextFactory.CreateDbContextAsync();
+            var tipoDetalle = await ConstruirDetalleTipoAsync(context, idTipo);
             var cupo = await context.MaeCuposSecretaria.FirstOrDefaultAsync(c => c.IdTipo == idTipo && c.Anio == anio);
 
             if (cupo == null)
@@ -366,7 +373,7 @@ public class NumeracionRangoService
                 Fecha = DateTime.Now,
                 Entidad = "CUPOS",
                 Accion = "ELIMINACION",
-                Detalle = $"Se eliminó el cupo anual Tipo {idTipo} / Año {anio}",
+                Detalle = $"Se eliminó el cupo anual {tipoDetalle} / Año {anio}",
                 IdTipo = idTipo
             });
 
@@ -434,6 +441,33 @@ public class NumeracionRangoService
     private async Task<T> EjecutarLecturaSeguraAsync<T>(Func<Task<T>> accion, T fallback, string op)
     {
         try { return await accion(); } catch (Exception ex) { _logger.LogError(ex, "Error en {Op}", op); return fallback; }
+    }
+
+    private async Task<string> ConstruirDetalleTipoAsync(SecretariaDbContext context, int idTipo)
+    {
+        var nombreTipo = await context.CatTipoDocumentos
+            .Where(t => t.IdTipo == idTipo)
+            .Select(t => t.Nombre)
+            .FirstOrDefaultAsync();
+
+        return string.IsNullOrWhiteSpace(nombreTipo)
+            ? $"Tipo ID {idTipo}"
+            : $"Tipo {nombreTipo} (ID {idTipo})";
+    }
+
+    private async Task<string> ConstruirDetalleOficinaAsync(SecretariaDbContext context, int? idOficina)
+    {
+        if (!idOficina.HasValue)
+            return "Oficina no especificada";
+
+        var nombreOficina = await context.CatOficinas
+            .Where(o => o.IdOficina == idOficina.Value)
+            .Select(o => o.Nombre)
+            .FirstOrDefaultAsync();
+
+        return string.IsNullOrWhiteSpace(nombreOficina)
+            ? $"Oficina ID {idOficina.Value}"
+            : $"Oficina {nombreOficina} (ID {idOficina.Value})";
     }
 
     private async Task<OperacionResultado> EjecutarOperacionControladaAsync(Func<Task<OperacionResultado>> accion, string msg, string op)
