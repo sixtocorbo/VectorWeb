@@ -378,7 +378,7 @@
                                         <hr class="my-2 text-light" />
                                         @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
                                         {
-                                            <div>• Hijo: @(string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $"Documento #{hijo.IdDocumento}" : hijo.NumeroOficial) - Asunto: @(string.IsNullOrWhiteSpace(hijo.Asunto) ? "Sin asunto" : hijo.Asunto)</div>
+                                            <div>• Tipo: @(string.IsNullOrWhiteSpace(hijo.TipoDocumento) ? "Sin tipo" : hijo.TipoDocumento) · N°: @(string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $"Documento #{hijo.IdDocumento}" : hijo.NumeroOficial) · Asunto: @(string.IsNullOrWhiteSpace(hijo.Asunto) ? "Sin asunto" : hijo.Asunto)</div>
                                         }
                                     }
                                 </div>
@@ -406,11 +406,9 @@
                                         @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
                                         {
                                             <div class="mb-2 pb-2 border-bottom border-light">
-                                                <div class="fw-semibold text-dark">@(string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $"Documento #{hijo.IdDocumento}" : hijo.NumeroOficial)</div>
-                                                @if (!string.IsNullOrWhiteSpace(hijo.Asunto))
-                                                {
-                                                    <div>Asunto: @hijo.Asunto</div>
-                                                }
+                                                <div class="fw-semibold text-dark">Tipo: @(string.IsNullOrWhiteSpace(hijo.TipoDocumento) ? "Sin tipo" : hijo.TipoDocumento)</div>
+                                                <div>N°: @(string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $"Documento #{hijo.IdDocumento}" : hijo.NumeroOficial)</div>
+                                                <div>Asunto: @(string.IsNullOrWhiteSpace(hijo.Asunto) ? "Sin asunto" : hijo.Asunto)</div>
                                             </div>
                                         }
                                     }
@@ -440,7 +438,7 @@
                                             <table class="table table-sm table-striped table-hover align-middle mb-0">
                                                 <thead class="table-light text-secondary">
                                                     <tr>
-                                                        <th>ID</th><th>Doc</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Observación</th>
+                                                        <th>ID</th><th>Tipo</th><th>Número</th><th>Asunto</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Observación</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -448,7 +446,9 @@
                                                     {
                                                         <tr>
                                                             <td>#@movimiento.IdMovimiento</td>
-                                                            <td>#@movimiento.IdDocumento</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.DocumentoTipo) ? "Sin tipo" : movimiento.DocumentoTipo)</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.DocumentoNumero) ? $"#{movimiento.IdDocumento}" : movimiento.DocumentoNumero)</td>
+                                                            <td><span class="text-truncate d-inline-block" style="max-width: 220px;" title="@movimiento.DocumentoAsunto">@(string.IsNullOrWhiteSpace(movimiento.DocumentoAsunto) ? "Sin asunto" : movimiento.DocumentoAsunto)</span></td>
                                                             <td class="text-nowrap">@(movimiento.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
                                                             <td>@movimiento.OficinaOrigen</td>
                                                             <td>@movimiento.OficinaDestino</td>
@@ -1210,7 +1210,7 @@
                                         <hr class="my-2" />
                                         @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
                                         {
-                                            <div>• Hijo #@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
+                                            <div>• Tipo: @(string.IsNullOrWhiteSpace(hijo.TipoDocumento) ? "Sin tipo" : hijo.TipoDocumento) · N°: #@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty) · Asunto: @(string.IsNullOrWhiteSpace(hijo.Asunto) ? "Sin asunto" : hijo.Asunto)</div>
                                         }
                                     }
                                 </div>
@@ -1238,11 +1238,9 @@
                                         @foreach (var hijo in resumenEliminacionActual.DocumentosHijos)
                                         {
                                             <div class="mb-1">
-                                                <div class="fw-semibold">#@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
-                                                @if (!string.IsNullOrWhiteSpace(hijo.Asunto))
-                                                {
-                                                    <div class="text-muted">Asunto: @hijo.Asunto</div>
-                                                }
+                                                <div class="fw-semibold">Tipo: @(string.IsNullOrWhiteSpace(hijo.TipoDocumento) ? "Sin tipo" : hijo.TipoDocumento)</div>
+                                                <div>N°: #@hijo.IdDocumento@(!string.IsNullOrWhiteSpace(hijo.NumeroOficial) ? $" ({hijo.NumeroOficial})" : string.Empty)</div>
+                                                <div class="text-muted">Asunto: @(string.IsNullOrWhiteSpace(hijo.Asunto) ? "Sin asunto" : hijo.Asunto)</div>
                                             </div>
                                         }
                                     }
@@ -1272,7 +1270,7 @@
                                             <table class="table table-sm table-striped align-middle mb-0">
                                                 <thead class="table-light">
                                                     <tr>
-                                                        <th>ID</th><th>Documento</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Observación</th>
+                                                        <th>ID</th><th>Tipo</th><th>Número</th><th>Asunto</th><th>Fecha</th><th>Origen</th><th>Destino</th><th>Observación</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1280,7 +1278,9 @@
                                                     {
                                                         <tr>
                                                             <td>#@movimiento.IdMovimiento</td>
-                                                            <td>#@movimiento.IdDocumento</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.DocumentoTipo) ? "Sin tipo" : movimiento.DocumentoTipo)</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.DocumentoNumero) ? $"#{movimiento.IdDocumento}" : movimiento.DocumentoNumero)</td>
+                                                            <td>@(string.IsNullOrWhiteSpace(movimiento.DocumentoAsunto) ? "Sin asunto" : movimiento.DocumentoAsunto)</td>
                                                             <td>@(movimiento.FechaMovimiento?.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
                                                             <td>@movimiento.OficinaOrigen</td>
                                                             <td>@movimiento.OficinaDestino</td>
