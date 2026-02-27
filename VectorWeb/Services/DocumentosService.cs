@@ -21,7 +21,7 @@ public sealed class DocumentosService
 
         var documentoPrincipal = await context.MaeDocumentos.AsNoTracking()
             .Where(d => d.IdDocumento == idDocumento)
-            .Select(d => new { d.IdDocumento, d.NumeroOficial, d.Asunto })
+            .Select(d => new { d.IdDocumento, d.NumeroOficial, d.Asunto, TipoDocumento = d.IdTipoNavigation.Nombre })
             .FirstOrDefaultAsync();
 
         if (documentoPrincipal is null)
@@ -70,6 +70,7 @@ public sealed class DocumentosService
             {
                 IdDocumento = d.IdDocumento,
                 NumeroOficial = d.NumeroOficial,
+                TipoDocumento = d.IdTipoNavigation.Nombre,
                 Asunto = d.Asunto
             })
             .ToListAsync();
@@ -82,6 +83,9 @@ public sealed class DocumentosService
             {
                 IdMovimiento = m.IdMovimiento,
                 IdDocumento = m.IdDocumento,
+                DocumentoTipo = m.IdDocumentoNavigation.IdTipoNavigation.Nombre,
+                DocumentoNumero = m.IdDocumentoNavigation.NumeroOficial,
+                DocumentoAsunto = m.IdDocumentoNavigation.Asunto,
                 FechaMovimiento = m.FechaMovimiento,
                 OficinaOrigen = m.IdOficinaOrigenNavigation.Nombre,
                 OficinaDestino = m.IdOficinaDestinoNavigation.Nombre,
@@ -134,6 +138,7 @@ public sealed class DocumentosService
         {
             IdDocumento = documentoPrincipal.IdDocumento,
             NumeroOficial = documentoPrincipal.NumeroOficial,
+            TipoDocumento = documentoPrincipal.TipoDocumento,
             Asunto = documentoPrincipal.Asunto,
             TotalDocumentos = ids.Count,
             TotalDocumentosHijos = Math.Max(0, ids.Count - 1),
@@ -224,6 +229,7 @@ public sealed class ResumenEliminacionDocumento
 {
     public long IdDocumento { get; set; }
     public string? NumeroOficial { get; set; }
+    public string? TipoDocumento { get; set; }
     public string? Asunto { get; set; }
     public int TotalDocumentos { get; set; }
     public int TotalDocumentosHijos { get; set; }
@@ -242,6 +248,7 @@ public sealed class DetalleDocumentoRelacionado
 {
     public long IdDocumento { get; set; }
     public string? NumeroOficial { get; set; }
+    public string? TipoDocumento { get; set; }
     public string? Asunto { get; set; }
 }
 
@@ -249,6 +256,9 @@ public sealed class DetalleMovimientoRelacionado
 {
     public long IdMovimiento { get; set; }
     public long IdDocumento { get; set; }
+    public string? DocumentoTipo { get; set; }
+    public string? DocumentoNumero { get; set; }
+    public string? DocumentoAsunto { get; set; }
     public DateTime? FechaMovimiento { get; set; }
     public string OficinaOrigen { get; set; } = string.Empty;
     public string OficinaDestino { get; set; } = string.Empty;
