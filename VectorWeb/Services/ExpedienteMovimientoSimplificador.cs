@@ -34,16 +34,18 @@ public static class ExpedienteMovimientoSimplificador
         return depurados
             .GroupBy(m => new
             {
-                Fecha = m.FechaMovimiento!.Value,
+                Fecha = TruncarAlMinuto(m.FechaMovimiento!.Value),
                 m.IdOficinaOrigen,
+                OficinaOrigenNombre = m.IdOficinaOrigenNavigation?.Nombre,
                 m.IdOficinaDestino,
+                OficinaDestinoNombre = m.IdOficinaDestinoNavigation?.Nombre,
                 Observacion = (m.ObservacionPase ?? string.Empty).Trim(),
                 Responsable = m.IdUsuarioResponsableNavigation?.NombreCompleto ?? SinResponsable
             })
             .Select(g =>
             {
-                var origen = g.First().IdOficinaOrigenNavigation?.Nombre ?? SinOrigen;
-                var destino = g.First().IdOficinaDestinoNavigation?.Nombre ?? SinDestino;
+                var origen = g.Key.OficinaOrigenNombre ?? SinOrigen;
+                var destino = g.Key.OficinaDestinoNombre ?? SinDestino;
                 var observacion = g.Key.Observacion;
 
                 var documentos = g
@@ -69,6 +71,11 @@ public static class ExpedienteMovimientoSimplificador
             })
             .OrderByDescending(e => e.FechaMovimiento)
             .ToList();
+    }
+
+    private static DateTime TruncarAlMinuto(DateTime fecha)
+    {
+        return fecha.AddTicks(-(fecha.Ticks % TimeSpan.TicksPerMinute));
     }
 
     private static bool EsActuacionTecnicaDeDocumentoVinculado(TraMovimiento movimiento, long idDocumentoPrincipal)
