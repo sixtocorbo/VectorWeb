@@ -13,6 +13,7 @@
 @using System.Globalization
 @using System.Security.Claims
 @using System.Text
+@using VectorWeb.Components.Pages.Configuracion
 
 @* INYECCIÓN CORREGIDA: Uso de Factory en lugar de DbContext y Repositorios Scoped *@
 @inject IDbContextFactory<SecretariaDbContext> DbContextFactory
@@ -128,8 +129,14 @@
                             </h5>
                             <button type="button" class="btn-close" @onclick="CerrarModalGestionRangos"></button>
                         </div>
-                        <div class="modal-body p-0">
-                            <iframe src="@urlGestionRangos" title="Gestión de rangos" class="w-100 border-0" style="height: 70vh;"></iframe>
+                        <div class="modal-body p-0" style="min-height: 70vh;">
+                            <Rangos TipoPreseleccionado="@tipoPreseleccionadoGestionRangos"
+                                    OficinaPreseleccionada="@oficinaPreseleccionadaGestionRangos"
+                                    AnioPreseleccionado="@anioPreseleccionadoGestionRangos"
+                                    BloquearTipoQuery="1"
+                                    BloquearOficinaQuery="1"
+                                    AbrirNuevoRangoQuery="@abrirNuevoRangoGestionRangos"
+                                    VolverUrl="@volverGestionRangos" />
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" @onclick="CerrarModalGestionRangos">Cerrar</button>
@@ -620,7 +627,11 @@
     private MaeNumeracionRango? rangoManualInternoActivo;
     private int? numeroManualInterno;
     private bool mostrarModalGestionRangos;
-    private string urlGestionRangos = string.Empty;
+    private int? tipoPreseleccionadoGestionRangos;
+    private int? oficinaPreseleccionadaGestionRangos;
+    private int? anioPreseleccionadoGestionRangos;
+    private int abrirNuevoRangoGestionRangos;
+    private string? volverGestionRangos;
     private const string EstiloPanelSugerencias = "z-index: 20; top: calc(100% + .25rem);";
     private ElementReference contenedorSugerenciasOficinaRef;
     private DotNetObjectReference<NuevoDocumento>? dotNetRef;
@@ -925,15 +936,22 @@
         var cupoConfigurado = (await RangoService.ObtenerCantidadCupoAsync(nuevoDoc.IdTipo, anioNumeracionSeleccionado) ?? 0) > 0;
         var abrirNuevoRango = cupoConfigurado ? 1 : 0;
 
-        var volver = Uri.EscapeDataString(Navegador.Uri);
-        urlGestionRangos = $"/configuracion/rangos?tipo={nuevoDoc.IdTipo}&oficina={nuevoDoc.IdOficinaActual}&anio={anioNumeracionSeleccionado}&bloquearTipo=1&bloquearOficina=1&abrirNuevoRango={abrirNuevoRango}&volver={volver}";
+        tipoPreseleccionadoGestionRangos = nuevoDoc.IdTipo;
+        oficinaPreseleccionadaGestionRangos = nuevoDoc.IdOficinaActual;
+        anioPreseleccionadoGestionRangos = anioNumeracionSeleccionado;
+        abrirNuevoRangoGestionRangos = abrirNuevoRango;
+        volverGestionRangos = Uri.EscapeDataString(Navegador.Uri);
         mostrarModalGestionRangos = true;
     }
 
     private void CerrarModalGestionRangos()
     {
         mostrarModalGestionRangos = false;
-        urlGestionRangos = string.Empty;
+        tipoPreseleccionadoGestionRangos = null;
+        oficinaPreseleccionadaGestionRangos = null;
+        anioPreseleccionadoGestionRangos = null;
+        abrirNuevoRangoGestionRangos = 0;
+        volverGestionRangos = null;
     }
 
     private async Task CerrarModalGestionRangosYRevalidar()
