@@ -597,24 +597,31 @@ else
 }
 
 @code {
+    [Parameter]
     [SupplyParameterFromQuery(Name = "tipo")]
     public int? TipoPreseleccionado { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "oficina")]
     public int? OficinaPreseleccionada { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "anio")]
     public int? AnioPreseleccionado { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "bloquearTipo")]
     public int? BloquearTipoQuery { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "bloquearOficina")]
     public int? BloquearOficinaQuery { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "abrirNuevoRango")]
     public int? AbrirNuevoRangoQuery { get; set; }
 
+    [Parameter]
     [SupplyParameterFromQuery(Name = "volver")]
     public string? VolverUrl { get; set; }
 
