@@ -73,7 +73,7 @@ public class NumeracionRangoServiceTests
                 IdTipo = 1,
                 Anio = 2026,
                 Cantidad = 200,
-                Fecha = DateTime.Now,
+                Fecha = new DateTime(2026, 1, 1),
                 NombreCupo = "CUPO-1-2026"
             });
 

@@ -395,8 +395,7 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina, e.Activo }, "IX_Mae_NumeracionRangos_Completo");
 
-            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina }, "UX_Mae_NumeracionRangos_Activo_OficinaTipoAnio")
-                .IsUnique()
+            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina }, "IX_Mae_NumeracionRangos_Activo_OficinaTipoAnio")
                 .HasFilter("([Activo]=(1))");
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
