@@ -201,6 +201,46 @@ public class NumeracionRangoServiceTests
         Assert.Equal("El rango supera el cupo disponible para este tipo y año.", resultado.Mensaje);
     }
 
+
+    [Fact]
+    public async Task CambiarEstadoRangoAsync_DesactivaRangoYRegistraBitacora()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeNumeracionRangos.Add(new MaeNumeracionRango
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                NombreRango = "RANGO-ACTIVO",
+                NumeroInicio = 1,
+                NumeroFin = 50,
+                UltimoUtilizado = 10,
+                Activo = true,
+                IdOficina = 1
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        await using var read = new SecretariaDbContext(options);
+        var idRango = await read.MaeNumeracionRangos.Select(r => r.IdRango).FirstAsync();
+
+        var resultado = await service.CambiarEstadoRangoAsync(idRango, false);
+
+        Assert.True(resultado.Exitoso);
+
+        await using var verify = new SecretariaDbContext(options);
+        var rango = await verify.MaeNumeracionRangos.FirstAsync(r => r.IdRango == idRango);
+        Assert.False(rango.Activo);
+
+        var bitacora = await verify.MaeNumeracionBitacoras
+            .OrderByDescending(b => b.Fecha)
+            .FirstAsync();
+        Assert.Equal("DESACTIVACION", bitacora.Accion);
+    }
+
     [Fact]
     public async Task GuardarCupoAsync_AjustaRangos_SiSeReduceElCupo()
     {

@@ -254,6 +254,47 @@ public class NumeracionRangoService
         }, "Error al guardar rango", "guardar rango");
     }
 
+    public async Task<OperacionResultado> CambiarEstadoRangoAsync(int idRango, bool activo)
+    {
+        return await EjecutarOperacionControladaAsync(async () => {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var rango = await context.MaeNumeracionRangos.FindAsync(idRango);
+
+            if (rango == null)
+            {
+                return OperacionResultado.Fail("El rango no existe.");
+            }
+
+            if (rango.Activo == activo)
+            {
+                var estadoActual = activo ? "activo" : "inactivo";
+                return OperacionResultado.Fail($"El rango ya está {estadoActual}.");
+            }
+
+            rango.Activo = activo;
+
+            var tipoDetalle = await ConstruirDetalleTipoAsync(context, rango.IdTipo);
+            var oficinaDetalle = await ConstruirDetalleOficinaAsync(context, rango.IdOficina);
+            var accion = activo ? "ACTIVACION" : "DESACTIVACION";
+            var detalle = activo
+                ? $"Se activó el rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}). {tipoDetalle}. {oficinaDetalle}"
+                : $"Se desactivó el rango {rango.NombreRango} ({rango.NumeroInicio}-{rango.NumeroFin}). {tipoDetalle}. {oficinaDetalle}";
+
+            context.MaeNumeracionBitacoras.Add(new MaeNumeracionBitacora
+            {
+                Fecha = DateTime.Now,
+                Entidad = "RANGOS",
+                Accion = accion,
+                Detalle = detalle,
+                IdTipo = rango.IdTipo,
+                IdOficina = rango.IdOficina
+            });
+
+            await context.SaveChangesAsync();
+            return OperacionResultado.Ok();
+        }, "Error al cambiar estado del rango", "cambiar estado rango");
+    }
+
     public async Task<OperacionResultado> EliminarRangoAsync(int idRango)
     {
         return await EjecutarOperacionControladaAsync(async () => {
