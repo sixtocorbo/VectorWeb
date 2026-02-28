@@ -57,6 +57,10 @@ public partial class SecretariaDbContext : DbContext
 
     public virtual DbSet<Usuario> Usuarios { get; set; }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseSqlServer("Server=LOCALHOST;Database=SecretariaDB;Trusted_Connection=True;TrustServerCertificate=True;");
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CatEstado>(entity =>
@@ -300,6 +304,10 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.IdHiloConversacion, e.IdOficinaActual, e.IdEstadoActual, e.FechaCreacion }, "IX_Mae_Documento_Hilo_Covering").IsDescending(false, false, false, true);
 
+            entity.HasIndex(e => new { e.IdOficinaActual, e.IdHiloConversacion, e.FechaCreacion }, "IX_Mae_Documento_Oficina_Hilo_Semaforo_Fecha")
+                .IsDescending(false, false, true)
+                .HasFilter("([IdEstadoActual]<>(5))");
+
             entity.HasIndex(e => e.IdUsuarioCreador, "IX_Mae_Documento_UsuarioCreador");
 
             entity.HasIndex(e => e.NumeroOficial, "IX_NumeroOficial");
@@ -393,10 +401,9 @@ public partial class SecretariaDbContext : DbContext
 
             entity.ToTable("Mae_NumeracionRangos");
 
-            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina, e.Activo }, "IX_Mae_NumeracionRangos_Completo");
+            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina }, "IX_Mae_NumeracionRangos_Activo_OficinaTipoAnio").HasFilter("([Activo]=(1))");
 
-            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina }, "IX_Mae_NumeracionRangos_Activo_OficinaTipoAnio")
-                .HasFilter("([Activo]=(1))");
+            entity.HasIndex(e => new { e.IdTipo, e.Anio, e.IdOficina, e.Activo }, "IX_Mae_NumeracionRangos_Completo");
 
             entity.Property(e => e.Activo).HasDefaultValue(true);
             entity.Property(e => e.Anio).HasDefaultValueSql("(datepart(year,getdate()))");
@@ -447,8 +454,6 @@ public partial class SecretariaDbContext : DbContext
 
             entity.HasIndex(e => new { e.UsuarioId, e.FechaEvento }, "IX_Seg_AuditoriaPermisos_Usuario_Fecha").IsDescending(false, true);
 
-            entity.Property(e => e.IdAuditoria)
-                .ValueGeneratedOnAdd();
             entity.Property(e => e.FechaEvento)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysdatetime())");
