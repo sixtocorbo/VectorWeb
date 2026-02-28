@@ -1034,20 +1034,17 @@
         {
             esNumeracionManualInterna = true;
             rangoManualInternoActivo = rango;
-            rangosPermitidosManualInterna = rangosDisponibles;
+            rangosPermitidosManualInterna = NormalizarRangosDisponibles(rangosDisponibles);
 
             if (esAnioActual)
             {
                 var rangosHistoricos = await RangoService.ObtenerRangosPorOficinaYAnioAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
                 var rangosHistoricosDisponibles = rangosHistoricos
                     .Where(r => r.UltimoUtilizado < r.NumeroFin)
-                    .OrderBy(r => r.NumeroInicio)
                     .ToList();
 
-                if (rangosHistoricosDisponibles.Count > rangosPermitidosManualInterna.Count)
-                {
-                    rangosPermitidosManualInterna = rangosHistoricosDisponibles;
-                }
+                rangosPermitidosManualInterna = NormalizarRangosDisponibles(
+                    rangosPermitidosManualInterna.Concat(rangosHistoricosDisponibles));
             }
 
             rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
@@ -1061,8 +1058,8 @@
                 if (rangosHistoricos.Any())
                 {
                     esNumeracionManualInterna = true;
-                    rangosPermitidosManualInterna = rangosHistoricos;
-                    rangoManualInternoActivo = rangosHistoricos.First();
+                    rangosPermitidosManualInterna = NormalizarRangosDisponibles(rangosHistoricos.Where(r => r.UltimoUtilizado < r.NumeroFin));
+                    rangoManualInternoActivo = rangosPermitidosManualInterna.FirstOrDefault();
                     rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
                     mensajeNumeracion = $"No hay rangos activos, pero para documentos del año en curso se permite usar rangos inactivos/históricos: {rangoDisponibleTexto}.";
                     return;
@@ -1072,6 +1069,20 @@
             bloqueoPorRangoAgotado = true;
             mensajeNumeracion = MensajeSinRangoConfigurado;
         }
+    }
+
+
+    private static List<MaeNumeracionRango> NormalizarRangosDisponibles(IEnumerable<MaeNumeracionRango> rangos)
+    {
+        return rangos
+            .Where(r => r.UltimoUtilizado < r.NumeroFin)
+            .GroupBy(r => new { r.NumeroInicio, r.NumeroFin })
+            .Select(g => g
+                .OrderByDescending(x => x.Activo)
+                .ThenByDescending(x => x.UltimoUtilizado)
+                .First())
+            .OrderBy(r => r.NumeroInicio)
+            .ToList();
     }
 
     private async Task OnAnioNumeracionChanged() { if (nuevoDoc.IdTipo > 0) await EvaluarNumeracionAutomaticaAsync(nuevoDoc.IdTipo); }

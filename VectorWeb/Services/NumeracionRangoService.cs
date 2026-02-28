@@ -202,25 +202,10 @@ public class NumeracionRangoService
                     numeroFin >= r.NumeroInicio);
             }
 
-            const int maximoActivosPorOficina = 1;
-
             var existeSolapamiento = await ExisteSolapamientoAsync(rango.NumeroInicio, rango.NumeroFin, rango.IdRango == 0 ? null : rango.IdRango);
 
             if (existeSolapamiento)
                 return OperacionResultado.Fail("El rango se superpone con otro rango ya asignado para este tipo y año.");
-
-            if (rango.Activo && rango.IdOficina.HasValue)
-            {
-                var cantidadActivosOficina = await context.MaeNumeracionRangos.CountAsync(r =>
-                    r.IdTipo == rango.IdTipo &&
-                    r.Anio == rango.Anio &&
-                    r.IdOficina == rango.IdOficina &&
-                    r.Activo &&
-                    r.IdRango != rango.IdRango);
-
-                if (cantidadActivosOficina >= maximoActivosPorOficina)
-                    return OperacionResultado.Fail($"La oficina ya tiene {maximoActivosPorOficina} rango(s) activo(s) para este tipo y año.");
-            }
 
             if (rango.IdRango == 0)
             {

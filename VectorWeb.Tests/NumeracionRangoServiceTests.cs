@@ -60,6 +60,60 @@ public class NumeracionRangoServiceTests
         Assert.Contains(rangos, r => r.NombreRango == "INACTIVO");
     }
 
+
+    [Fact]
+    public async Task GuardarRangoAsync_PermiteMultiplesRangosActivosPorOficina()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                Cantidad = 200,
+                Fecha = DateTime.Now,
+                NombreCupo = "CUPO-1-2026"
+            });
+
+            seed.MaeNumeracionRangos.Add(new MaeNumeracionRango
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                NombreRango = "RANGO-ACTIVO-1",
+                NumeroInicio = 1,
+                NumeroFin = 50,
+                UltimoUtilizado = 10,
+                Activo = true,
+                IdOficina = 1
+            });
+
+            await seed.SaveChangesAsync();
+        }
+
+        var resultado = await service.GuardarRangoAsync(new MaeNumeracionRango
+        {
+            IdTipo = 1,
+            Anio = 2026,
+            NombreRango = "RANGO-ACTIVO-2",
+            NumeroInicio = 60,
+            NumeroFin = 100,
+            UltimoUtilizado = 59,
+            Activo = true,
+            IdOficina = 1
+        });
+
+        Assert.True(resultado.Exitoso);
+
+        await using var verify = new SecretariaDbContext(options);
+        var activos = await verify.MaeNumeracionRangos
+            .Where(r => r.IdTipo == 1 && r.Anio == 2026 && r.IdOficina == 1 && r.Activo)
+            .ToListAsync();
+
+        Assert.Equal(2, activos.Count);
+    }
+
     [Fact]
     public async Task GuardarRangoAsync_Falla_SiNoExisteCupo()
     {
