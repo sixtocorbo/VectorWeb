@@ -186,6 +186,12 @@ else
                                             <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Editar(rango)" title="Editar">
                                                 <i class="bi bi-pencil me-1"></i>Editar
                                             </button>
+                                            <button class="btn btn-sm btn-outline-secondary me-1"
+                                                    @onclick="() => CambiarEstadoRango(rango)"
+                                                    disabled="@procesando"
+                                                    title="@(rango.Activo ? "Desactivar" : "Activar")">
+                                                <i class="bi @(rango.Activo ? "bi-toggle-off" : "bi-toggle-on") me-1"></i>@(rango.Activo ? "Desactivar" : "Activar")
+                                            </button>
                                             <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarRango(rango)" title="Eliminar">
                                                 <i class="bi bi-trash me-1"></i>Eliminar
                                             </button>
@@ -904,6 +910,31 @@ else
 
             mostrarModal = false;
             mensajeOk = "Rango guardado correctamente.";
+            await CargarTodo();
+        }
+        finally { procesando = false; }
+    }
+
+    private async Task CambiarEstadoRango(MaeNumeracionRango rango)
+    {
+        var accion = rango.Activo ? "desactivar" : "activar";
+        bool confirmado = await JS.InvokeAsync<bool>("confirm", $"¿Está seguro de {accion} el rango '{rango.NombreRango}'?");
+        if (!confirmado) return;
+
+        procesando = true;
+        LimpiarMensajes();
+        try
+        {
+            var resultado = await RangoService.CambiarEstadoRangoAsync(rango.IdRango, !rango.Activo);
+            if (!resultado.Exitoso)
+            {
+                mensajeError = resultado.Mensaje;
+                return;
+            }
+
+            mensajeOk = rango.Activo
+                ? "Rango desactivado correctamente."
+                : "Rango activado correctamente.";
             await CargarTodo();
         }
         finally { procesando = false; }
