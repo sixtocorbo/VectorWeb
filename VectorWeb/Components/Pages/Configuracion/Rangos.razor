@@ -127,76 +127,96 @@ else
                             }
                             else
                             {
-                                @foreach (var rango in RangosFiltrados)
+                                @foreach (var grupoOficina in RangosAgrupadosPorOficina)
                                 {
-                                    <tr>
-                                        <td>
-                                            <span class="fw-bold text-primary">@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</span>
-                                        </td>
-                                        <td>
-                                            @if (rango.IdOficinaNavigation != null)
-                                            {
-                                                <span class="badge bg-info text-dark"><i class="bi bi-building me-1"></i>@rango.IdOficinaNavigation.Nombre</span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Sin oficina</span>
-                                            }
-                                        </td>
-                                        <td class="text-center">@rango.Anio</td>
-                                        <td>
-                                            @{
-                                                var disponibilidad = ObtenerConsumoTramoActivo(rango);
-                                            }
-                                            @if (!disponibilidad.TieneTramoActivo)
-                                            {
-                                                <span class="text-muted small">Sin tramo activo</span>
-                                            }
-                                            else
-                                            {
-                                                <div class="d-flex flex-column align-items-end">
-                                                    <div class="progress w-100" style="height: 10px;">
-                                                        <div class="progress-bar @disponibilidad.ClaseBarra" role="progressbar" style="width: @(disponibilidad.Porcentaje.ToString(CultureInfo.InvariantCulture))%"></div>
-                                                    </div>
-                                                    <span class="small mt-1 @disponibilidad.ClaseTexto">@disponibilidad.Porcentaje.ToString("F1")% usado</span>
-                                                </div>
-                                            }
-                                        </td>
-                                        <td class="text-end">
-                                            <span class="badge bg-light text-dark border">@rango.NumeroInicio</span>
-                                            <i class="bi bi-arrow-right-short text-muted"></i>
-                                            <span class="badge bg-light text-dark border">@rango.NumeroFin</span>
-                                        </td>
-                                        <td class="text-end fw-bold">@rango.UltimoUtilizado</td>
-                                        <td class="text-center">
-                                            @if (rango.Activo)
-                                            {
-                                                <span class="badge bg-success text-white">
-                                                    <i class="bi bi-check-circle-fill me-1"></i>Activo
-                                                </span>
-                                            }
-                                            else
-                                            {
-                                                <span class="badge bg-secondary text-white">
-                                                    <i class="bi bi-dash-circle me-1"></i>Inactivo
-                                                </span>
-                                            }
-                                        </td>
-                                        <td class="text-end">
-                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Editar(rango)" title="Editar">
-                                                <i class="bi bi-pencil me-1"></i>Editar
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-secondary me-1"
-                                                    @onclick="() => CambiarEstadoRango(rango)"
-                                                    disabled="@procesando"
-                                                    title="@(rango.Activo ? "Desactivar" : "Activar")">
-                                                <i class="bi @(rango.Activo ? "bi-toggle-off" : "bi-toggle-on") me-1"></i>@(rango.Activo ? "Desactivar" : "Activar")
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarRango(rango)" title="Eliminar">
-                                                <i class="bi bi-trash me-1"></i>Eliminar
-                                            </button>
+                                    <tr class="table-primary">
+                                        <td colspan="8" class="fw-semibold">
+                                            <i class="bi bi-building me-2"></i>@grupoOficina.Oficina
+                                            <span class="badge bg-light text-primary border ms-2">@grupoOficina.TotalRangos rangos</span>
                                         </td>
                                     </tr>
+
+                                    @foreach (var grupoTipo in grupoOficina.Tipos)
+                                    {
+                                        <tr class="table-light">
+                                            <td colspan="8" class="ps-4 fw-semibold text-primary-emphasis">
+                                                <i class="bi bi-file-earmark-text me-2"></i>@grupoTipo.Tipo
+                                                <span class="badge bg-white text-dark border ms-2">@grupoTipo.Rangos.Count</span>
+                                            </td>
+                                        </tr>
+
+                                        @foreach (var rango in grupoTipo.Rangos)
+                                        {
+                                            <tr>
+                                                <td class="ps-5">
+                                                    <span class="fw-bold text-primary">@(rango.IdTipoNavigation?.Nombre ?? $"Tipo {rango.IdTipo}")</span>
+                                                </td>
+                                                <td>
+                                                    @if (rango.IdOficinaNavigation != null)
+                                                    {
+                                                        <span class="badge bg-info text-dark"><i class="bi bi-building me-1"></i>@rango.IdOficinaNavigation.Nombre</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary"><i class="bi bi-exclamation-circle me-1"></i>Sin oficina</span>
+                                                    }
+                                                </td>
+                                                <td class="text-center">@rango.Anio</td>
+                                                <td>
+                                                    @{
+                                                        var disponibilidad = ObtenerConsumoTramoActivo(rango);
+                                                    }
+                                                    @if (!disponibilidad.TieneTramoActivo)
+                                                    {
+                                                        <span class="text-muted small">Sin tramo activo</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="d-flex flex-column align-items-end">
+                                                            <div class="progress w-100" style="height: 10px;">
+                                                                <div class="progress-bar @disponibilidad.ClaseBarra" role="progressbar" style="width: @(disponibilidad.Porcentaje.ToString(CultureInfo.InvariantCulture))%"></div>
+                                                            </div>
+                                                            <span class="small mt-1 @disponibilidad.ClaseTexto">@disponibilidad.Porcentaje.ToString("F1")% usado</span>
+                                                        </div>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <span class="badge bg-light text-dark border">@rango.NumeroInicio</span>
+                                                    <i class="bi bi-arrow-right-short text-muted"></i>
+                                                    <span class="badge bg-light text-dark border">@rango.NumeroFin</span>
+                                                </td>
+                                                <td class="text-end fw-bold">@rango.UltimoUtilizado</td>
+                                                <td class="text-center">
+                                                    @if (rango.Activo)
+                                                    {
+                                                        <span class="badge bg-success text-white">
+                                                            <i class="bi bi-check-circle-fill me-1"></i>Activo
+                                                        </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary text-white">
+                                                            <i class="bi bi-dash-circle me-1"></i>Inactivo
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => Editar(rango)" title="Editar">
+                                                        <i class="bi bi-pencil me-1"></i>Editar
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary me-1"
+                                                            @onclick="() => CambiarEstadoRango(rango)"
+                                                            disabled="@procesando"
+                                                            title="@(rango.Activo ? "Desactivar" : "Activar")">
+                                                        <i class="bi @(rango.Activo ? "bi-toggle-off" : "bi-toggle-on") me-1"></i>@(rango.Activo ? "Desactivar" : "Activar")
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarRango(rango)" title="Eliminar">
+                                                        <i class="bi bi-trash me-1"></i>Eliminar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
                                 }
                             }
                         </tbody>
@@ -714,6 +734,23 @@ else
             (r.IdTipoNavigation?.Nombre?.Contains(filtroTexto, StringComparison.OrdinalIgnoreCase) ?? false) ||
             CoincideOficinaSinImportarOrden(r.IdOficinaNavigation?.Nombre, filtroTexto)
           );
+
+    private IReadOnlyList<GrupoRangoOficina> RangosAgrupadosPorOficina => RangosFiltrados
+        .OrderBy(r => r.IdOficinaNavigation?.Nombre ?? "Sin oficina")
+        .ThenBy(r => r.IdTipoNavigation?.Nombre ?? $"Tipo {r.IdTipo}")
+        .ThenBy(r => r.Anio)
+        .ThenBy(r => r.NumeroInicio)
+        .GroupBy(r => r.IdOficinaNavigation?.Nombre ?? "Sin oficina")
+        .Select(oficinaGrupo => new GrupoRangoOficina(
+            oficinaGrupo.Key,
+            oficinaGrupo.Count(),
+            oficinaGrupo.GroupBy(r => r.IdTipoNavigation?.Nombre ?? $"Tipo {r.IdTipo}")
+                .Select(tipoGrupo => new GrupoRangoTipo(
+                    tipoGrupo.Key,
+                    tipoGrupo.OrderBy(r => r.Anio).ThenBy(r => r.NumeroInicio).ToList()))
+                .OrderBy(g => g.Tipo)
+                .ToList()))
+        .ToList();
 
     // --- INICIALIZACIÓN Y DISPOSE ---
     protected override async Task OnInitializedAsync()
@@ -1372,6 +1409,9 @@ else
 
     private const double UmbralConsumoAlto = 80;
     private const double UmbralConsumoCritico = 95;
+
+    private sealed record GrupoRangoOficina(string Oficina, int TotalRangos, IReadOnlyList<GrupoRangoTipo> Tipos);
+    private sealed record GrupoRangoTipo(string Tipo, IReadOnlyList<MaeNumeracionRango> Rangos);
 
     private DisponibilidadTramoInfo ObtenerConsumoTramoActivo(MaeNumeracionRango rango)
     {
