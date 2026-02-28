@@ -27,15 +27,24 @@ builder.Services.AddRazorComponents()
 // evitando el error 'Invalid attempt to call ReadAsync when reader is closed'.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
-if (string.IsNullOrWhiteSpace(connectionString))
+if (!string.IsNullOrWhiteSpace(connectionString))
+{
+    builder.Services.AddDbContextFactory<SecretariaDbContext>(options =>
+        options.UseSqlServer(connectionString));
+}
+else if (builder.Environment.IsDevelopment())
+{
+    Console.WriteLine("[AVISO] No se encontró la cadena 'DefaultConnection'. Se usará base en memoria para desarrollo.");
+
+    builder.Services.AddDbContextFactory<SecretariaDbContext>(options =>
+        options.UseInMemoryDatabase("VectorWeb.Dev"));
+}
+else
 {
     throw new InvalidOperationException(
         "No se encontró la cadena de conexión 'DefaultConnection'. " +
-        "Defínela en appsettings.Development.json, Secret Manager o la variable de entorno ConnectionStrings__DefaultConnection.");
+        "Defínela en appsettings.json, Secret Manager o la variable de entorno ConnectionStrings__DefaultConnection.");
 }
-
-builder.Services.AddDbContextFactory<SecretariaDbContext>(options =>
-    options.UseSqlServer(connectionString));
 
 // -----------------------------------------------------------------------------
 
