@@ -556,6 +556,8 @@ else
                                     <input type="number"
                                            class="form-control"
                                            @bind="rangoActual.UltimoUtilizado"
+                                           @bind:event="oninput"
+                                           @bind:after="OnUltimoUtilizadoChanged"
                                            min="@UltimoUtilizadoMinimoPermitido"
                                            max="@rangoActual.NumeroFin" />
                                 </div>
@@ -564,13 +566,13 @@ else
                                 </div>
                             </div>
                             <div class="col-12">
-                                <div class="card border-0 bg-light mb-0">
+                                <div class="card border-primary bg-primary-subtle mb-0">
                                     <div class="card-body py-2 small">
                                         <div class="d-flex flex-wrap gap-3 align-items-center">
-                                            <span><i class="bi bi-gear-wide-connected me-1"></i>Se asignarán <strong>@CantidadSolicitadaSegura.ToString("N0", CulturaUi)</strong> números.</span>
+                                            <span class="text-dark"><i class="bi bi-gear-wide-connected me-1"></i>Se asignarán <strong>@CantidadSolicitadaSegura.ToString("N0", CulturaUi)</strong> números.</span>
                                             <span class="badge text-bg-primary">Desde @rangoActual.NumeroInicio.ToString("N0", CulturaUi)</span>
                                             <span class="badge text-bg-primary">Hasta @rangoActual.NumeroFin.ToString("N0", CulturaUi)</span>
-                                            <span class="badge text-bg-secondary">Próximo: @ProximoNumeroDisponible.ToString("N0", CulturaUi)</span>
+                                            <span class="badge text-bg-dark">Próximo: @ProximoNumeroDisponible.ToString("N0", CulturaUi)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1204,6 +1206,20 @@ else
         rangoActual.NumeroFin = cantidad > 0
             ? inicio + cantidad - 1
             : inicio;
+
+        NormalizarUltimoUtilizado();
+    }
+
+    private void OnUltimoUtilizadoChanged()
+    {
+        NormalizarUltimoUtilizado();
+    }
+
+    private void NormalizarUltimoUtilizado()
+    {
+        var minimoPermitido = ObtenerUltimoUtilizadoMinimo(rangoActual.NumeroInicio);
+        var maximoPermitido = Math.Max(minimoPermitido, rangoActual.NumeroFin);
+        rangoActual.UltimoUtilizado = Math.Clamp(rangoActual.UltimoUtilizado, minimoPermitido, maximoPermitido);
     }
 
     private int AjustarCantidadDentroDeLimite(int valor)
