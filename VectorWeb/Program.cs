@@ -25,8 +25,7 @@ builder.Services.AddRazorComponents()
 // Registro de la factoría de contextos (Recomendado para Blazor Server)
 // Esto permite que el repositorio cree y destruya contextos por cada operación,
 // evitando el error 'Invalid attempt to call ReadAsync when reader is closed'.
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? builder.Configuration["ConnectionStrings:DefaultConnection"];
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
 if (string.IsNullOrWhiteSpace(connectionString))
 {
