@@ -463,6 +463,75 @@ public class NumeracionRangoServiceTests
         Assert.Empty(await verify.MaeCuposSecretaria.ToListAsync());
     }
 
+
+    [Fact]
+    public async Task GuardarRangoAsync_Falla_SiUltimoUtilizadoEsMenorQueInicioMenosUno()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                Cantidad = 100,
+                Fecha = DateTime.Now,
+                NombreCupo = "CUPO-1-2026"
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        var resultado = await service.GuardarRangoAsync(new MaeNumeracionRango
+        {
+            IdTipo = 1,
+            Anio = 2026,
+            NombreRango = "NUEVO",
+            NumeroInicio = 100,
+            NumeroFin = 120,
+            UltimoUtilizado = 10,
+            Activo = true,
+            IdOficina = 1
+        });
+
+        Assert.False(resultado.Exitoso);
+        Assert.Contains("El último utilizado no puede ser menor", resultado.Mensaje);
+    }
+
+    [Fact]
+    public async Task GuardarRangoAsync_Falla_SiUltimoUtilizadoSuperaNumeroFin()
+    {
+        var service = CrearServicio(out var options);
+
+        await using (var seed = new SecretariaDbContext(options))
+        {
+            seed.MaeCuposSecretaria.Add(new MaeCuposSecretarium
+            {
+                IdTipo = 1,
+                Anio = 2026,
+                Cantidad = 100,
+                Fecha = DateTime.Now,
+                NombreCupo = "CUPO-1-2026"
+            });
+            await seed.SaveChangesAsync();
+        }
+
+        var resultado = await service.GuardarRangoAsync(new MaeNumeracionRango
+        {
+            IdTipo = 1,
+            Anio = 2026,
+            NombreRango = "NUEVO",
+            NumeroInicio = 100,
+            NumeroFin = 120,
+            UltimoUtilizado = 121,
+            Activo = true,
+            IdOficina = 1
+        });
+
+        Assert.False(resultado.Exitoso);
+        Assert.Equal("El último utilizado no puede superar el fin del rango.", resultado.Mensaje);
+    }
+
     private static NumeracionRangoService CrearServicio(out DbContextOptions<SecretariaDbContext> options)
     {
         options = new DbContextOptionsBuilder<SecretariaDbContext>()
