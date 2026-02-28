@@ -1057,12 +1057,16 @@
                 var rangosHistoricos = await RangoService.ObtenerRangosPorOficinaYAnioAsync(idT, nuevoDoc.IdOficinaActual, anioNumeracionSeleccionado);
                 if (rangosHistoricos.Any())
                 {
-                    esNumeracionManualInterna = true;
-                    rangosPermitidosManualInterna = NormalizarRangosDisponibles(rangosHistoricos.Where(r => r.UltimoUtilizado < r.NumeroFin));
-                    rangoManualInternoActivo = rangosPermitidosManualInterna.FirstOrDefault();
-                    rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
-                    mensajeNumeracion = $"No hay rangos activos, pero para documentos del año en curso se permite usar rangos inactivos/históricos: {rangoDisponibleTexto}.";
-                    return;
+                    var rangosHistoricosDisponibles = NormalizarRangosDisponibles(rangosHistoricos.Where(r => r.UltimoUtilizado < r.NumeroFin));
+                    if (rangosHistoricosDisponibles.Any())
+                    {
+                        esNumeracionManualInterna = true;
+                        rangosPermitidosManualInterna = rangosHistoricosDisponibles;
+                        rangoManualInternoActivo = rangosPermitidosManualInterna.FirstOrDefault();
+                        rangoDisponibleTexto = string.Join(" | ", rangosPermitidosManualInterna.Select(r => $"{r.NumeroInicio}-{r.NumeroFin}"));
+                        mensajeNumeracion = $"No hay rangos activos, pero para documentos del año en curso se permite usar rangos inactivos/históricos: {rangoDisponibleTexto}.";
+                        return;
+                    }
                 }
             }
 
