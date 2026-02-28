@@ -168,6 +168,17 @@ public class NumeracionRangoService
                 return OperacionResultado.Fail("Rango inválido (Inicio > Fin).");
             }
 
+            var ultimoMinimoPermitido = Math.Max(0, rango.NumeroInicio - 1);
+            if (rango.UltimoUtilizado < ultimoMinimoPermitido)
+            {
+                return OperacionResultado.Fail($"El último utilizado no puede ser menor que {ultimoMinimoPermitido} para este rango.");
+            }
+
+            if (rango.UltimoUtilizado > rango.NumeroFin)
+            {
+                return OperacionResultado.Fail("El último utilizado no puede superar el fin del rango.");
+            }
+
             var consumoSinRangoActual = await context.MaeNumeracionRangos
                 .Where(r => r.IdTipo == rango.IdTipo && r.Anio == rango.Anio && r.IdRango != rango.IdRango)
                 .SumAsync(r => r.NumeroFin - r.NumeroInicio + 1);
@@ -226,11 +237,6 @@ public class NumeracionRangoService
                 if (rango.UltimoUtilizado < rango.NumeroInicio - 1)
                 {
                     rango.UltimoUtilizado = rango.NumeroInicio - 1;
-                }
-
-                if (rango.UltimoUtilizado > rango.NumeroFin)
-                {
-                    return OperacionResultado.Fail("El último utilizado no puede superar el fin del rango.");
                 }
 
                 context.Entry(dbRango).CurrentValues.SetValues(rango);

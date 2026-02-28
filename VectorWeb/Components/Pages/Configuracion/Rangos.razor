@@ -185,7 +185,7 @@ else
                                                     <i class="bi bi-arrow-right-short text-muted"></i>
                                                     <span class="badge bg-light text-dark border">@rango.NumeroFin</span>
                                                 </td>
-                                                <td class="text-end fw-bold">@rango.UltimoUtilizado</td>
+                                                <td class="text-end fw-bold">@FormatearUltimoUsoTabla(rango)</td>
                                                 <td class="text-center">
                                                     @if (rango.Activo)
                                                     {
@@ -499,7 +499,10 @@ else
 
                             <div class="col-md-4">
                                 <label class="form-label fw-bold">Desde</label>
-                                <InputNumber @bind-Value="rangoActual.NumeroInicio" @bind-Value:after="OnNumeroInicioChanged" class="form-control" />
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="bi bi-sort-numeric-down"></i></span>
+                                    <InputNumber @bind-Value="rangoActual.NumeroInicio" @bind-Value:after="OnNumeroInicioChanged" class="form-control" />
+                                </div>
                                 @if (!string.IsNullOrWhiteSpace(MensajeSolapamientoEnTiempoReal))
                                 {
                                     <div class="text-danger small mt-1">@MensajeSolapamientoEnTiempoReal</div>
@@ -547,15 +550,29 @@ else
                                 }
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label fw-bold">Último Utilizado</label>
-                                <InputNumber @bind-Value="rangoActual.UltimoUtilizado" class="form-control" />
+                                <label class="form-label fw-bold">Último Utilizado (control)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-light"><i class="bi bi-123"></i></span>
+                                    <input type="number"
+                                           class="form-control"
+                                           @bind="rangoActual.UltimoUtilizado"
+                                           min="@UltimoUtilizadoMinimoPermitido"
+                                           max="@rangoActual.NumeroFin" />
+                                </div>
+                                <div class="form-text text-muted">
+                                    Use <strong>@UltimoUtilizadoMinimoPermitido.ToString("N0", CulturaUi)</strong> para indicar que todavía no se ha usado ningún número del rango.
+                                </div>
                             </div>
                             <div class="col-12">
-                                <div class="alert alert-light border mb-0 small">
-                                    <i class="bi bi-gear-wide-connected me-1"></i>
-                                    Se asignarán <strong>@CantidadSolicitadaSegura.ToString("N0", CulturaUi)</strong> números desde
-                                    <strong>@rangoActual.NumeroInicio.ToString("N0", CulturaUi)</strong> hasta
-                                    <strong>@rangoActual.NumeroFin.ToString("N0", CulturaUi)</strong>.
+                                <div class="card border-0 bg-light mb-0">
+                                    <div class="card-body py-2 small">
+                                        <div class="d-flex flex-wrap gap-3 align-items-center">
+                                            <span><i class="bi bi-gear-wide-connected me-1"></i>Se asignarán <strong>@CantidadSolicitadaSegura.ToString("N0", CulturaUi)</strong> números.</span>
+                                            <span class="badge text-bg-primary">Desde @rangoActual.NumeroInicio.ToString("N0", CulturaUi)</span>
+                                            <span class="badge text-bg-primary">Hasta @rangoActual.NumeroFin.ToString("N0", CulturaUi)</span>
+                                            <span class="badge text-bg-secondary">Próximo: @ProximoNumeroDisponible.ToString("N0", CulturaUi)</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -938,6 +955,19 @@ else
             if (rangoActual.IdTipo <= 0) { MostrarErrorModalRango("Seleccione un tipo."); return; }
             if (!rangoActual.IdOficina.HasValue) { MostrarErrorModalRango("Seleccione una oficina."); return; }
             if (rangoActual.NumeroInicio > rangoActual.NumeroFin) { MostrarErrorModalRango("Rango inválido (Inicio > Fin)."); return; }
+
+            var ultimoMinimoPermitido = ObtenerUltimoUtilizadoMinimo(rangoActual.NumeroInicio);
+            if (rangoActual.UltimoUtilizado < ultimoMinimoPermitido)
+            {
+                MostrarErrorModalRango($"El último utilizado no puede ser menor que {ultimoMinimoPermitido} para este rango.");
+                return;
+            }
+
+            if (rangoActual.UltimoUtilizado > rangoActual.NumeroFin)
+            {
+                MostrarErrorModalRango("El último utilizado no puede superar el fin del rango.");
+                return;
+            }
 
             // IMPORTANTE: Aquí se espera que el servicio valide si hay otro rango activo y devuelva Fail si es necesario.
             var resultado = await RangoService.GuardarRangoAsync(rangoActual);
@@ -1383,6 +1413,21 @@ else
     private int CantidadMaximaSugerida => Math.Max(0, sugerenciaRango.MaximoConsecutivoDisponible > 0 ? sugerenciaRango.MaximoConsecutivoDisponible : sugerenciaRango.CantidadSugerida);
     private int CantidadSolicitadaSegura => Math.Max(0, cantidadSugeridaSolicitada.GetValueOrDefault());
     private int CupoCantidadSegura => Math.Max(0, cupoCantidad.GetValueOrDefault());
+    private int UltimoUtilizadoMinimoPermitido => ObtenerUltimoUtilizadoMinimo(rangoActual.NumeroInicio);
+    private int ProximoNumeroDisponible => Math.Clamp(rangoActual.UltimoUtilizado + 1, Math.Max(1, rangoActual.NumeroInicio), Math.Max(1, rangoActual.NumeroFin));
+    private static int ObtenerUltimoUtilizadoMinimo(int numeroInicio)
+    {
+        return Math.Max(0, numeroInicio - 1);
+    }
+
+    private static string FormatearUltimoUsoTabla(MaeNumeracionRango rango)
+    {
+        var sinUso = ObtenerUltimoUtilizadoMinimo(rango.NumeroInicio);
+        return rango.UltimoUtilizado <= sinUso
+            ? $"Sin uso ({sinUso})"
+            : rango.UltimoUtilizado.ToString(CultureInfo.InvariantCulture);
+    }
+
     private string MensajeSolapamientoEnTiempoReal
     {
         get
